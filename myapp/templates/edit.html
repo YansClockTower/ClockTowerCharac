@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>编辑角色</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            margin: 40px auto;
+            max-width: 800px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        h2 {
+            border-left: 4px solid #007bff;
+            padding-left: 10px;
+            color: #007bff;
+        }
+
+        form {
+            background: #fff;
+            padding: 20px;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.05);
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 16px;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .image-preview {
+            margin-top: 10px;
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid #ccc;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        hr {
+            margin: 40px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
+
+        b {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>编辑角色 #{{character.id}} ({{ character.name }}) 信息</h2>
+    <form method="post" action="{{ url_for('edit_info', char_id=character.id) }}">
+        <label>名称:</label>
+        <input type="text" name="name" value="{{ character.name }}">
+
+        <label>团队:</label>
+        <input type="text" name="team" value="{{ character.team }}">
+
+        <label>能力:</label>
+        <textarea name="ability" rows="4">{{ character.ability }}</textarea>
+
+        <label>是否改变配版:</label>
+        <select name="setup">
+            <option value="1" {% if character.setup %}selected{% endif %}>True</option>
+            <option value="0" {% if not character.setup %}selected{% endif %}>False</option>
+        </select>
+
+        <label>首夜顺序:</label>
+        <input type="number" name="firstNight" value="{{ character.firstNight }}">
+
+        <label>其他夜晚顺序:</label>
+        <input type="number" name="otherNight" value="{{ character.otherNight }}">
+
+        <label>首夜提示:</label>
+        <textarea name="firstNightReminder" rows="3">{{ character.firstNightReminder }}</textarea>
+
+        <label>其他夜晚提示:</label>
+        <textarea name="otherNightReminder" rows="3">{{ character.otherNightReminder }}</textarea>
+
+        <label>Token:</label>
+        <textarea name="reminders" rows="3">{{ character.reminders }}</textarea>
+
+        <label>全局token:</label>
+        <textarea name="remindersGlobal" rows="3">{{ character.remindersGlobal }}</textarea>
+
+        <label>图片链接 (image):</label>
+        <textarea name="image" rows="2">{{ character.image }}</textarea>
+
+        {% if character.image %}
+            <img src="{{ character.image }}" alt="图片预览" class="image-preview">
+        {% endif %}
+
+        <label>角色标签 (tags):</label>
+        <textarea name="tags" rows="3">{{ character.tags }}</textarea>
+
+        <label>出自剧本 (fromEdition):</label>
+        <input type="number" name="fromEdition" value="{{ character.fromEdition }}">
+
+        <b>最后更新：</b> {{ character.lastUpdated | datetime }}
+
+        <br><button type="submit">保存角色信息</button>
+    </form>
+
+    <h2>编辑角色 #{{character.id}} ({{ character.name }}) 历书</h2>
+    <form method="post" action="{{ url_for('edit_almanac', char_id=character.id) }}">
+        <label>设计者 (designer):</label>
+        <input type="text" name="designer" value="{{ almanac.designer if almanac else '' }}">
+
+        <label>画师 (drawer):</label>
+        <input type="text" name="drawer" value="{{ almanac.drawer if almanac else '' }}">
+
+        <label>概要 (overview):</label>
+        <textarea name="overview" rows="3">{{ almanac.overview if almanac else '' }}</textarea>
+
+        <label>示例 (examples):</label>
+        <textarea name="examples" rows="3">{{ almanac.examples if almanac else '' }}</textarea>
+
+        <label>运行建议 (howtorun):</label>
+        <textarea name="howtorun" rows="3">{{ almanac.howtorun if almanac else '' }}</textarea>
+
+        <label>提示 (tips):</label>
+        <textarea name="tips" rows="3">{{ almanac.tips if almanac else '' }}</textarea>
+
+        <b>最后更新：</b> {{ almanac.lastUpdated | datetime }}
+
+        <br><button type="submit">保存角色历书</button>
+    </form>
+
+    <a href="{{ url_for('index') }}">← 返回列表</a>
+</body>
+</html>
