@@ -1,12 +1,8 @@
 import os
 import sqlite3
-
-# 当前脚本所在目录
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from flask import current_app
 
 # 使用相对路径构造绝对路径
-CHARACTER_DB = os.path.join(BASE_DIR, 'database', 'character_latest.sqlite')
-EDITION_DB   = os.path.join(BASE_DIR, 'database', 'edition_latest.sqlite')
 
 def get_db(path):
     conn = sqlite3.connect(path)
@@ -14,9 +10,13 @@ def get_db(path):
     return conn
 
 def get_character_db():
+    CHARACTER_DB = os.path.join(current_app.root_path, '..', 'database', 'character_latest.sqlite')
+    print(CHARACTER_DB)
     return get_db(CHARACTER_DB)
 
 def get_edition_db():
+    EDITION_DB   = os.path.join(current_app.root_path, '..', 'database', 'edition_latest.sqlite')
+
     return get_db(EDITION_DB)
 
 def get_editions_info():
