@@ -66,10 +66,7 @@ def insert_character(character_data, editionId, author, database):
         return cursor.lastrowid
 
 
-def import_from_json(json_file_path, edition_base, character_base):
-    json_file = None;
-    with open(json_file_path, 'r') as fil:
-        json_file = json.load(fil)
+def import_from_json(json_file, edition_base, character_base):
 
 ######################################
 ### save the edition info
@@ -98,20 +95,40 @@ def import_from_json(json_file_path, edition_base, character_base):
     conn = edition_base
     cursor = conn.cursor()
 
-    # 插入操作
-    cursor.execute('''
-        INSERT INTO editions_info (
-            logo, name, description, version, author, lastUpdated
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    ''', (
-        logo,
-        editionName,
-        description,
-        version,
-        author,
-        int(time.time())  # 当前 Unix 时间戳
-    ))
-    editionId = cursor.lastrowid
+    # 查询是否已存在同名剧本
+    cursor.execute('SELECT id FROM editions_info WHERE name = ?', (editionName,))
+    existing = cursor.fetchone()
+
+    if existing:
+        # 已存在则执行 UPDATE
+        editionId = existing[0]
+        cursor.execute('''
+            UPDATE editions_info
+            SET logo = ?, description = ?, version = ?, author = ?, lastUpdated = ?
+            WHERE id = ?
+        ''', (
+            logo,
+            description,
+            version,
+            author,
+            int(time.time()),
+            editionId
+        ))
+    else:
+        # 不存在则 INSERT
+        cursor.execute('''
+            INSERT INTO editions_info (
+                logo, name, description, version, author, lastUpdated
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            logo,
+            editionName,
+            description,
+            version,
+            author,
+            int(time.time())
+        ))
+        editionId = cursor.lastrowid
 
 ######################################
 ### save the character info

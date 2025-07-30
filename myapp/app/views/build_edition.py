@@ -1,8 +1,11 @@
-from flask import Blueprint, render_template, request, make_response, send_file
+import json
+import string
+from flask import Blueprint, render_template, request, make_response, send_file, jsonify
 from io import BytesIO
 
 from app.models.database import (
     get_character_db,
+    get_edition_db,
     get_filtered_characters,
     get_all_teams,
     get_editions_info
@@ -89,3 +92,31 @@ def submit_selection():
         download_name=filename,
         mimetype='application/json'
     )
+
+@buildedition_bp.route('/import', methods=['GET', 'POST'])
+def import_json():
+    if request.method == 'POST':
+        json_data_str = request.form.get('json_data', '')
+        from app.models.fetch_json import import_from_json
+        try:
+            data = json.loads(json_data_str)
+            edb = get_edition_db()
+            cdb = get_character_db()
+            import_from_json(data, edb, cdb)
+            edb.commit()
+            edb.close()
+            cdb.commit()
+            cdb.close()
+            
+            return """
+            <h2>✅ 导入成功</h2>
+            <p>剧本数据已成功导入库。</p>
+            <a href="/" style="display:inline-block; margin-top:15px; padding:8px 16px; background-color:#4CAF50; color:white; text-decoration:none; border-radius:4px;">
+                返回首页
+            </a>
+            """
+        except Exception as e:
+            return f"❌ 导入失败: {e}"
+    else:
+        return render_template('import.html')
+
