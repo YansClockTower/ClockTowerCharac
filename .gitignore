@@ -1,0 +1,3 @@
+myapp/database/*.sqlite
+jsons/
+*__pycache__*

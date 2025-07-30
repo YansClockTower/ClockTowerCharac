@@ -1,9 +1,16 @@
+from datetime import datetime
 import os
+import shutil
 import sqlite3
 from flask import current_app
 
 # 使用相对路径构造绝对路径
 
+def db_backup():
+    DB_PATH = os.path.join(current_app.root_path, '..', 'database')
+    shutil.copy2(DB_PATH+"/edition_latest.sqlite", f'{DB_PATH}/history/{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}_edition.sqlite')
+    shutil.copy2(DB_PATH+"/character_latest.sqlite", f'{DB_PATH}/history/{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}_character.sqlite')
+    
 def get_db(path):
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row

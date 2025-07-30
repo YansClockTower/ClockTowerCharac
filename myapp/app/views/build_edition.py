@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, make_response, send_file,
 from io import BytesIO
 
 from app.models.database import (
+    db_backup,
     get_character_db,
     get_edition_db,
     get_filtered_characters,
@@ -100,6 +101,7 @@ def import_json():
         from app.models.fetch_json import import_from_json
         try:
             data = json.loads(json_data_str)
+            db_backup()
             edb = get_edition_db()
             cdb = get_character_db()
             import_from_json(data, edb, cdb)
