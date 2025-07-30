@@ -1,7 +1,7 @@
 from flask import Flask
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, static_url_path='/static', static_folder='static')
 
     # 注册过滤器
     from .filter import format_timestamp, team_label_filter

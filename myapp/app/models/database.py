@@ -1,7 +1,12 @@
+import os
 import sqlite3
 
-CHARACTER_DB = "/home/yanice/Desktop/ClockTowerCharac/database/character_latest.sqlite"
-EDITION_DB = "/home/yanice/Desktop/ClockTowerCharac/database/edition_latest.sqlite"
+# 当前脚本所在目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 使用相对路径构造绝对路径
+CHARACTER_DB = os.path.join(BASE_DIR, 'database', 'character_latest.sqlite')
+EDITION_DB   = os.path.join(BASE_DIR, 'database', 'edition_latest.sqlite')
 
 def get_db(path):
     conn = sqlite3.connect(path)
