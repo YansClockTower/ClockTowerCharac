@@ -2,27 +2,28 @@
 <html>
 <head>
     <title>角色列表</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <style>
         .character-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 16px;
-            padding: 0;
+            gap: 10px;
+            padding: 10px;
             list-style-type: none;
         }
         .character-icon {
-            width: 64px;            /* 固定宽度 */
-            height: 64px;           /* 固定高度，保持正方形 */
+            width: 50px;            /* 固定宽度 */
+            height: 50px;           /* 固定高度，保持正方形 */
             object-fit: cover;      /* 保证图片填满容器并裁剪多余 */
-            border-radius: 6px;     /* 可选：微圆角，不想要可以设为 0 */
-            margin-right: 12px;
+            border-radius: 5px;     /* 可选：微圆角，不想要可以设为 0 */
+            margin-right: 10px;
             background-color: #eee; /* 防止加载失败时出现透明 */
         }
 
         .character-card {
             border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 5px;
+            padding: 10px;
             background-color: #f9f9f9;
             text-align: center;
             transition: box-shadow 0.2s;
@@ -31,7 +32,7 @@
             display: flex;
             align-items: center;     /* 垂直居中 */
             flex-direction: row;     /* 横向排列（默认其实就是 row，可写明） */
-            gap: 12px;               /* 元素之间留白，或使用 margin-right 也可以 */
+            gap: 10px;               /* 元素之间留白，或使用 margin-right 也可以 */
         }
         .character-card:hover {
             box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
@@ -42,6 +43,15 @@
             color: #333;
             font-weight: bold;
         }
+        /* 表单元素 */
+input[type="text"],
+input[type="password"],
+input[type="search"],
+select,
+textarea {
+  max-width: 200px;
+  box-sizing: border-box;
+}
     </style>
 </head>
 <body>
@@ -79,11 +89,11 @@
 <ul class="character-grid">
     {% for character in characters %}
         <li class="character-card">
-            <a href="{{ url_for('view', char_id=character.id) }}">
+            <a href="{{ url_for('character.view', char_id=character.id) }}">
                 <div class="card-content">
                     <img class="character-icon" src="{{ character.image }}" alt="头像" onerror="this.src='/static/default-icon.png'">
                     <div class="character-info">
-                        <div class="team">[{{ character.team }}]</div>
+                        <div class="team">[{{ character.team | team_name}}]</div>
                         <div class="name">{{ character.name }}</div>
                     </div>
                 </div>

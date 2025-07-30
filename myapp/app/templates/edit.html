@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>编辑角色</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <style>
         body {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -95,12 +96,12 @@
 <body>
 
     <h2>编辑角色 #{{character.id}} ({{ character.name }}) 信息</h2>
-    <form method="post" action="{{ url_for('edit_info', char_id=character.id) }}">
+    <form method="post" action="{{ url_for('character.edit_info', char_id=character.id) }}">
         <label>名称:</label>
         <input type="text" name="name" value="{{ character.name }}">
 
         <label>团队:</label>
-        <input type="text" name="team" value="{{ character.team }}">
+        <input type="text" name="team" value="{{ character.team}}">
 
         <label>能力:</label>
         <textarea name="ability" rows="4">{{ character.ability }}</textarea>
@@ -148,7 +149,7 @@
     </form>
 
     <h2>编辑角色 #{{character.id}} ({{ character.name }}) 历书</h2>
-    <form method="post" action="{{ url_for('edit_almanac', char_id=character.id) }}">
+    <form method="post" action="{{ url_for('character.edit_almanac', char_id=character.id) }}">
         <label>设计者 (designer):</label>
         <input type="text" name="designer" value="{{ almanac.designer if almanac else '' }}">
 

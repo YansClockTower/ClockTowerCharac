@@ -1,0 +1,98 @@
+.sidebar {
+            width: 25vw;       /* 25% 视口宽度 */
+            min-width: 250px;  /* 最小200像素 */
+            padding: 10px;
+            border-right: 1px solid #ccc;
+            height: 95vh;  /* 固定高度 */
+            display: flex;
+            flex-direction: column;
+}
+.selected-panel {
+            width: auto;
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+            height: 95vh;
+}
+
+.submit-panel {
+    width: 200px;
+    min-width: 200px;
+    padding: 10px;
+    display: flex;
+    border-left: 1px solid #ccc; /* 加左边框作为分界线 */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+        .sidebar > h2,
+        .sidebar > form {
+            /* 固定高度，或者自动撑开内容 */
+            flex-shrink: 0;
+        }
+
+        .character-grid {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1;           /* 占满剩余空间 */
+            overflow-y: auto;      /* 垂直滚动 */
+            border-top: 1px solid #ddd;
+        }
+
+        .character-row {
+            display: flex;
+            align-items: center;
+            height: 50px;  /* 固定高度 */
+            padding: 0 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+
+        .character-row:hover {
+            background-color: #f8f8f8;
+        }
+
+        .character-row input[type="checkbox"] {
+            margin-right: 10px;
+            pointer-events: none;  /* 避免点击被抢占，让整行控制切换 */
+        }
+
+        .character-icon {
+            width: 50px;
+            height: 50px;
+        }
+
+        .character-team {
+            margin-right: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .character-name {
+            font-weight: bold;
+            font-size: 14px;
+            flex-grow: 1;
+        }
+
+        .character-info {
+            font-size: 14px;
+        }
+
+        .selected-item:hover {
+            background-color: #f0f0f0;
+        }
+
+button,
+input[type="submit"],
+input[type="button"] {
+    padding: 4px 10px;    /* 减小内边距 */
+
+    line-height: 1.2;
+    height: auto;         /* 让高度自适应 */
+    min-height: 35px;     /* 也可以限制最小高度 */
+    border-radius: 3px;
+}

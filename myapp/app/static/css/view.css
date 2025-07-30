@@ -1,0 +1,55 @@
+
+        h2 {
+            border-left: 4px solid #17a2b8;
+            padding-left: 10px;
+            color: #17a2b8;
+        }
+
+        .section {
+            background: #fff;
+            padding: 20px;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            box-shadow: 0 0 8px rgba(0,0,0,0.05);
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field label {
+            font-weight: bold;
+            display: block;
+            color: #555;
+            margin-bottom: 4px;
+        }
+
+        .field .value {
+            padding: 8px 12px;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .image-preview {
+            margin-top: 10px;
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid #ccc;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        hr {
+            margin: 40px 0;
+            border: none;
+            border-top: 1px solid #ddd;
+        }
