@@ -32,7 +32,7 @@ def view(char_id):
 #     # ...
 #     return redirect(url_for("character.edit", char_id=char_id))
 
-@character_bp.route('/edit/info/<int:char_id>', methods=['POST'])
+@character_bp.route('/edit_info/<int:char_id>', methods=['POST'])
 def edit_info(char_id):
     form = request.form
     conn = get_character_db()
@@ -53,7 +53,7 @@ def edit_info(char_id):
     conn.close()
     return redirect(url_for('character.edit', char_id=char_id))
 
-@character_bp.route('/edit/almanac/<int:char_id>', methods=['POST'])
+@character_bp.route('/edit_almanac/<int:char_id>', methods=['POST'])
 def edit_almanac(char_id):
     form = request.form
     conn = get_character_db()

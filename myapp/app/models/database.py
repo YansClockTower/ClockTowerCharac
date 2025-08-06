@@ -19,8 +19,12 @@ def db_init():
             config = json.load(config_file)
 
         # 3. Get the database path from the config
-        DB_PATH = config['database_path']
-        print("DB_PATH:" + DB_PATH)
+        if config['development']:
+            DB_PATH = config['database_path_dev']
+            print("DB_PATH_DEV: " + DB_PATH)
+        else:
+            DB_PATH = config['database_path']
+            print("DB_PATH: " + DB_PATH)
 
 def db_backup():
     db_init()
