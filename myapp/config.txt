@@ -1,4 +1,5 @@
 {
-    "database_path": "/home/ubuntu/ClockTower_database"
+    "database_path": "/home/ubuntu/ClockTower_database",
+    "database_path_dev": "./database"
 }
 
