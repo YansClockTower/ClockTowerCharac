@@ -23,3 +23,8 @@ sudo systemctl daemon-reload
 sudo systemctl start edition_app
 sudo systemctl enable edition_app
 ```
+
+
+To Server:
+git push and pull.
+run makefile in your server.

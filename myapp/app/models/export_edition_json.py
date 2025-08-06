@@ -46,6 +46,19 @@ def generate_edition_json(edition_name, edition_author, edition_version, selecte
             item["firstNight"] = row["firstNight"]
         if row.get("firstNightReminder"):
             item["firstNightReminder"] = row["firstNightReminder"]
+
+        if row.get("otherNight"):
+            item["otherNight"] = row["otherNight"]
+        if row.get("otherNightReminder"):
+            item["otherNightReminder"] = row["otherNightReminder"]
+        
+        if row.get("reminders"):
+            # 假设数据库中是 JSON 字符串
+            try:
+                item["reminders"] = json.loads(row["reminders"])
+            except:
+                item["reminders"] = [row["reminders"]]
+
         if row.get("remindersGlobal"):
             # 假设数据库中是 JSON 字符串
             try:

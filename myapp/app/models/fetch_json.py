@@ -7,6 +7,8 @@ import time
 def insert_character(character_data, editionId, author, database):
     # 提取字段并处理 reminders
     image = character_data.get("image", "")
+    if len(image[0]) > 0:
+        image = image[0]
     name = character_data.get("name", "").strip(string.whitespace + string.punctuation)
     team = character_data.get("team", "").strip(string.whitespace + string.punctuation)
     ability = character_data.get("ability", "")
@@ -130,11 +132,13 @@ def import_from_json(json_file, edition_base, character_base):
         ))
         editionId = cursor.lastrowid
 
+    print("01121")
 ######################################
 ### save the character info
 ###
     characters = []
     for ch in json_file:
+        print(ch['id'])
         if ch['id'] != '_meta' and 'jinx' not in ch['team']:
             if 'travel' in ch['team']:
                 ch['team'] = 'traveler'
@@ -144,7 +148,7 @@ def import_from_json(json_file, edition_base, character_base):
             if 'image' in ch:
                 image_url = ch['image']
         
-
+    print("0111")
     cursor.execute('''
         UPDATE editions_info
         SET characterList = ?
