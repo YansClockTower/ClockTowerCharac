@@ -1,3 +1,4 @@
 myapp/database/*.sqlite
+myapp/database/history
 jsons/
 *__pycache__*
