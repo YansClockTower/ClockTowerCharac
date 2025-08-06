@@ -40,14 +40,14 @@ def edit_info(char_id):
         UPDATE character_info SET
             name = ?, team = ?, ability = ?, setup = ?, firstNight = ?, otherNight = ?,
             firstNightReminder = ?, otherNightReminder = ?, reminders = ?, remindersGlobal = ?,
-            image = ?, lastUpdated = ?
+            image = ?, tags = ?, fromEdition = ?, lastUpdated = ?
         WHERE id = ?
     ''', (
         form['name'], form['team'], form['ability'], int(form['setup']),
         int(form['firstNight']), int(form['otherNight']),
         form['firstNightReminder'], form['otherNightReminder'],
         form['reminders'], form['remindersGlobal'],
-        form['image'], int(time.time()), char_id
+        form['image'], form['tags'], int(form['fromEdition']), int(time.time()), char_id
     ))
     conn.commit()
     conn.close()
@@ -64,12 +64,12 @@ def edit_almanac(char_id):
         conn.execute('''
             UPDATE character_almanac SET
                 designer = ?, drawer = ?, overview = ?, examples = ?, howtorun = ?, tips = ?,
-                tags = ?, fromEdition = ?, lastUpdated = ?
+                lastUpdated = ?
             WHERE id = ?
         ''', (
             form['designer'], form['drawer'], form['overview'],
             form['examples'], form['howtorun'], form['tips'],
-            form['tags'], int(form['fromEdition']), int(time.time()), char_id
+            int(time.time()), char_id
         ))
     else:
         conn.execute('''
