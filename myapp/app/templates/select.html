@@ -89,7 +89,7 @@
 
     <label for="editionVersion">剧本版本:</label>
     <input type="text" id="editionVersion" name="editionVersion" value="{{ editionVersion or '' }}">
-
+    
     <button type="submit">确认选择</button>
   </form>
 </div>
@@ -220,6 +220,19 @@ window.onload = function () {
         }
     }
 }
+
+
+
+async function fetchDbEdition(name) {
+    const response = await fetch('/api/edition_info', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({"name": name})
+    });
+    return response.json();
+}
+
+////////////////////// TODO ///////////////////
 
 </script>
 

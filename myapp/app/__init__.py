@@ -12,11 +12,13 @@ def create_app():
     # 注册 blueprint
     from .views.character_info import character_bp
     from .views.build_edition import buildedition_bp
+    from .views.view_edition import viewedition_bp
     from .views.api import api_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(character_bp)
     app.register_blueprint(buildedition_bp)
+    app.register_blueprint(viewedition_bp)
     
     # 注册首页路由
     from .route import register_routes

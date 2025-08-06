@@ -1,0 +1,108 @@
+    body {
+        font-family: sans-serif;
+        background-color: #bbaf98;
+        background-size: 100%;                  /* 拉伸以覆盖整个区域 */
+        background-repeat: repeat;            /* 不重复平铺 */
+    }
+    .statement {
+        margin-right: 20px;
+        margin-left: 20px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 10px;
+        text-align: center;
+        background-color: #d9d0be;
+        height: 150px;
+        width: 1500px;
+        font-size: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        z-index: 1001;
+    }
+    .content_body {
+        background-color: #f4ece1;
+        margin-right: 5vw;
+        margin-left: 5vw;
+        padding: 20px;
+    }
+    
+    .team-section {
+        margin-bottom: 5px;
+    }
+
+    .team-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin: 16px 0;
+    }
+
+    .team-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 0px;
+    }
+
+    .item {
+        border-radius: 0px;
+        padding: 0px;
+        display: flex; /* 横向排列 */
+        text-align: center;
+    }
+    .item img {
+        width: 70px;
+        height: 70px;
+        object-fit: cover;
+    }
+    .item p {
+        text-align: left;
+        margin-right: 10px;
+        margin-top: 10px;
+        font-size: 13px;
+        color: #333;
+    }
+
+    /* Collapsible Filter Styling */
+    details > summary {
+        list-style: none; /* Remove default marker */
+        cursor: pointer;
+        padding: 10px;
+        background-color: #f9fafb; /* Light gray background for summary */
+        border-radius: 8px;
+        font-weight: 600;
+        color: #1f2937; /* Dark gray text */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    details > summary::-webkit-details-marker {
+        display: none; /* Hide marker in Chrome/Safari */
+    }
+    details > summary::after { /* Custom arrow indicator */
+        content: '▼'; /* Down arrow */
+        font-size: 0.8em;
+        transition: transform 0.2s ease-in-out;
+    }
+    details[open] > summary::after {
+        transform: rotate(180deg); /* Rotate arrow when open */
+    }
+    
+    .splitl-bar {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .splitl-title {
+      font-size: 24px;
+      font-family: 'FZHY', 'Arial Black', sans-serif;
+      text-shadow: 1px 1px 1px #aaa;
+      white-space: nowrap;
+    }
+
+    .splitl-line {
+      flex: 1;
+      height: 2px;
+      margin-left: 20px;
+    }
+    

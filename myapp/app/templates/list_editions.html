@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>剧本列表</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2em;
+            background-color: #f8f8f8;
+        }
+
+        .edition-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .edition-link {
+            display: block;
+            background: white;
+            padding: 1em;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: #333;
+            font-size: 18px;
+            transition: all 0.2s ease;
+        }
+
+        .edition-link:hover {
+            background-color: #f0f0ff;
+        }
+    </style>
+</head>
+<body>
+    <h2>剧本列表</h2>
+    <div class="edition-list">
+        {% for id, name in editions.items() %}
+            <a class="edition-link" href="{{ url_for('editionpdf.render_edition', id=id) }}">
+                {{ name }}
+            </a>
+        {% endfor %}
+    </div>
+</body>
+</html>

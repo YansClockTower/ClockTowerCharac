@@ -1,11 +1,14 @@
 from datetime import datetime
 
 team_mapping = {
-        'traveler': '旅行者',
         'townsfolk': '镇民',
         'outsider': '外来者',
         'minion': '爪牙',
-        'demon': '恶魔'
+        'demon': '恶魔',
+        'fabled': '传奇角色',
+        'traveler': '旅行者',
+        'jinx': '相克规则'
+
     }
 
 def format_timestamp(ts):

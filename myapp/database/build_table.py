@@ -65,6 +65,8 @@ conn.execute('''CREATE TABLE editions_info (
     characterList TEXT,
     version TEXT,
     author TEXT,
+    minPlayer INTEGER,
+    maxPlayer INTEGER,
     synopsis TEXT,
     overview TEXT,
     changeLog TEXT,

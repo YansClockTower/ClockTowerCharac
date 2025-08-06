@@ -4,7 +4,8 @@ from flask import Blueprint, render_template, request, make_response, send_file,
 from io import BytesIO
 
 from app.models.database import (
-    get_character_db
+    get_character_db,
+    get_edition_db
 )
 from app.models.export_edition_json import generate_edition_json
 
@@ -37,3 +38,29 @@ def character_info():
         else:
             not_found.append(cid)
     return jsonify({"found": found, "not_found": not_found})
+
+@api_bp.route('/api/edition_info', methods=['POST'])
+def edition_info():
+    name = request.json.get('name', '')
+    found = {}
+    not_found = []
+
+    conn = get_edition_db()
+    cursor = conn.cursor()
+
+    name = name.strip(string.whitespace + string.punctuation)
+    cursor.execute("SELECT * FROM editions_info WHERE name = ?", (name,))
+    row = cursor.fetchone()
+    if row:
+        # 假设row是tuple，转成dict
+        return jsonify({
+            "query": "found",
+            "logo": row["id"],
+            "name": row["name"],
+            "version": row["team"],
+            "author": row["ability"],
+            "characterList": row["image"]
+            # 你需要的其他字段
+        })
+    else:
+        return jsonify({"query": "not_found"})
