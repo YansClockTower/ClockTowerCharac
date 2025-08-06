@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import os
 import shutil
 import sqlite3
@@ -6,8 +7,24 @@ from flask import current_app
 
 # 使用相对路径构造绝对路径
 
+DB_PATH = ''
+
+def db_init():
+    global DB_PATH  # 声明要修改的是全局变量
+    if DB_PATH == '':
+        config = ''
+        # 1. Open the config file
+        with open('./config.txt', 'r', encoding='utf-8') as config_file:
+            # 2. Read the entire file content and parse it as JSON
+            config = json.load(config_file)
+
+        # 3. Get the database path from the config
+        DB_PATH = config['database_path']
+        print("DB_PATH:" + DB_PATH)
+
 def db_backup():
-    DB_PATH = os.path.join(current_app.root_path, '..', 'database')
+    db_init()
+    global DB_PATH  # 声明要修改的是全局变量
     shutil.copy2(DB_PATH+"/edition_latest.sqlite", f'{DB_PATH}/history/{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}_edition.sqlite')
     shutil.copy2(DB_PATH+"/character_latest.sqlite", f'{DB_PATH}/history/{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}_character.sqlite')
     
@@ -17,11 +34,15 @@ def get_db(path):
     return conn
 
 def get_character_db():
-    CHARACTER_DB = os.path.join(current_app.root_path, '..', 'database', 'character_latest.sqlite')
+    db_init()
+    global DB_PATH  # 声明要修改的是全局变量
+    CHARACTER_DB = DB_PATH+"/character_latest.sqlite"
     return get_db(CHARACTER_DB)
 
 def get_edition_db():
-    EDITION_DB   = os.path.join(current_app.root_path, '..', 'database', 'edition_latest.sqlite')
+    db_init()
+    global DB_PATH  # 声明要修改的是全局变量
+    EDITION_DB = DB_PATH+"/edition_latest.sqlite"
     return get_db(EDITION_DB)
 
 def get_editions_info():
