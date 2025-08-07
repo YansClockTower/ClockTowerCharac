@@ -7,7 +7,7 @@ import time
 def insert_character(character_data, editionId, author, database):
     # 提取字段并处理 reminders
     image = character_data.get("image", "")
-    if len(image[0]) > 0:
+    if len(image[0]) > 5:
         image = image[0]
     name = character_data.get("name", "").strip(string.whitespace + string.punctuation)
     team = character_data.get("team", "").strip(string.whitespace + string.punctuation)
@@ -19,17 +19,40 @@ def insert_character(character_data, editionId, author, database):
     otherNightReminder = character_data.get("otherNightReminder", "")
     reminders = json.dumps(character_data.get("reminders", []), ensure_ascii=False)
     remindersGlobal = json.dumps(character_data.get("remindersGlobal", []), ensure_ascii=False)
+    
+    cursor = database.cursor()
 
-    # 连接数据库并插入
-    conn = database
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT id FROM character_info WHERE name = ?', (name,))
+    # 查询是否存在同名角色，并获取其 id 和 fromEdition
+    cursor.execute('SELECT id, fromEdition FROM character_info WHERE name = ?', (name,))
     existing = cursor.fetchone()
 
     if existing:
-        print(f"{name} exists with ID {existing[0]}. Skipped.")
-        # 已存在，返回已存在的 ID
+        # 如果存在，且 fromEdition 不同，则跳过插入
+        if existing[1] != editionId:
+            print(f"{name} exists with ID {existing[0]} from edition {existing[1]}. Skipped.")
+        else:
+            cursor.execute('''
+                UPDATE character_info SET
+                    image = ?, team = ?, ability = ?, setup = ?,
+                    firstNight = ?, otherNight = ?,
+                    firstNightReminder = ?, otherNightReminder = ?,
+                    reminders = ?, remindersGlobal = ?,
+                    lastUpdated = ?
+                WHERE id = ?
+            ''', (
+                image,
+                team,
+                ability,
+                setup,
+                firstNight,
+                otherNight,
+                firstNightReminder,
+                otherNightReminder,
+                reminders,
+                remindersGlobal,
+                int(time.time()),
+                existing[0]
+            ))
         return existing[0]
     else:
         cursor.execute('''
@@ -132,23 +155,17 @@ def import_from_json(json_file, edition_base, character_base):
         ))
         editionId = cursor.lastrowid
 
-    print("01121")
 ######################################
 ### save the character info
 ###
     characters = []
     for ch in json_file:
-        print(ch['id'])
         if ch['id'] != '_meta' and 'jinx' not in ch['team']:
             if 'travel' in ch['team']:
                 ch['team'] = 'traveler'
             ids = insert_character(ch, editionId, author, character_base)
             characters.append(ids)
-            image_url = ''
-            if 'image' in ch:
-                image_url = ch['image']
-        
-    print("0111")
+
     cursor.execute('''
         UPDATE editions_info
         SET characterList = ?

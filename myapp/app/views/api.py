@@ -53,11 +53,12 @@ def edition_info():
         # 假设row是tuple，转成dict
         return jsonify({
             "query": "found",
-            "logo": row["id"],
+            "id": row["id"],
+            "logo": row["logo"],
             "name": row["name"],
-            "version": row["team"],
-            "author": row["ability"],
-            "characterList": row["image"]
+            "version": row["version"],
+            "author": row["author"],
+            "characterList": row["characterList"]
             # 你需要的其他字段
         })
     else:

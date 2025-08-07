@@ -91,6 +91,14 @@ async function fetchDbCharacters(names) {
     });
     return response.json();
 }
+async function fetchDbEdition(name) {
+    const response = await fetch('/api/edition_info', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({"name": name})
+    });
+    return response.json();
+}
 
 async function parseJson() {
     const input = document.getElementById('json-input').value;
@@ -130,6 +138,8 @@ async function parseJson() {
         // 请求数据库角色数据
         const dbData = await fetchDbCharacters(names);
 
+        const edData = await fetchDbEdition(meta.name);
+
         // 准备最终渲染HTML
         let charHtml = '<ul>';
 
@@ -138,13 +148,25 @@ async function parseJson() {
                 if (dbData.found && dbData.found[ch.name]) {
                     // ✅ 数据库中存在角色
                     const d = dbData.found[ch.name];
-                    charHtml += `
+
+                    // 如果是剧本原创角色，且当前剧本是已有的（非新建）
+                    if (edData.query === 'found' && d.fromEdition === edData.id) {
+                        charHtml += `
+                        <li>
+                            <strong>${ch.name || ch.id}</strong> - ${ch.team || ''}
+                            <small style="color: red;">（来自该剧本的角色，将更新）</small>
+                            <br><small>${ch.ability || ''}</small>
+                        </li>`;
+                     } else {
+                        charHtml += `
                         <li>
                             <strong>${d.name}</strong> - ${d.team}
-                            <small style="color: gray;">（角色已被收录过）</small>
+                            <small style="color: gray;">（角色已其他剧本被收录过）</small>
                         </li>`;
+                    }
+
                 } else {
-                    // ❌ 数据库中不存在角色，使用 JSON 内容显示
+                    // 数据库中不存在角色，使用 JSON 内容显示
                     charHtml += `
                         <li>
                             <strong>${ch.name || ch.id}</strong> - ${ch.team || ''}
