@@ -42,8 +42,6 @@ def character_info():
 @api_bp.route('/api/edition_info', methods=['POST'])
 def edition_info():
     name = request.json.get('name', '')
-    found = {}
-    not_found = []
 
     conn = get_edition_db()
     cursor = conn.cursor()
@@ -64,3 +62,4 @@ def edition_info():
         })
     else:
         return jsonify({"query": "not_found"})
+    

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ character.name }} - 角色信息</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/view_character.css') }}">
+</head>
+<body>
+
+    <div class="content_body">
+            <!-- Header -->
+        <div class="header">
+            <div class="title-section">
+                <h1 class="text-4xl font-bold mb-2">{{ character.name or '（未命名角色）' }}</h1>
+                <div class="subtitle">
+                    {{ (almanac.designer or '未知设计者') ~ ' · ' ~ (almanac.drawer or '未知画师') if almanac else '暂无信息' }}
+                </div>
+                <br>
+                <div class="value italic">{{ (almanac.overview if almanac else None) or '"暂无信息"' }}</div>
+            </div>
+
+            {% if character.image %}
+                <img src="{{ character.image }}" alt="角色图片" class="image-preview">
+            {% endif %}
+        </div>
+
+        <!-- Ability -->
+        <div class="section">
+            <div class="section-title">能力</div>
+            <div class="value">{{ character.ability or '暂无信息' }}</div>
+        </div>
+
+        <!-- Examples -->
+        <div class="section">
+            <div class="section-title">示例</div>
+            <div class="value">{{ (almanac.examples if almanac else None) or '暂无信息' }}</div>
+        </div>
+
+        <!-- How to Run -->
+        <div class="section">
+            <div class="section-title">运行方式</div>
+            <div class="value">{{ (almanac.howtorun if almanac else None) or '暂无信息' }}</div>
+        </div>
+
+        <!-- Tips -->
+        <div class="section">
+            <div class="section-title">规则细节与提示</div>
+            <div class="value">{{ (almanac.tips if almanac else None) or '暂无信息' }}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">角色信息</div>
+            <div class="value">角色类型：{{ character.team | team_name }}</div>
+            <div class="value">能力标签：{{ character.tags if character.tags else '无' }}</div>
+        </div>
+        <!-- Last Updated -->
+        <hr class="my-6 border-gray-300">
+        <p class="text-center text-sm text-gray-500">
+        最后更新: {{ character.lastUpdated | datetime if character.lastUpdated else '暂无信息' }}
+        </p>
+
+        <!-- Footer links -->
+        <div class="footer-links">
+            <a href="{{ url_for('index') }}">← 返回列表</a>
+            &nbsp;|&nbsp;
+            <a href="{{ url_for('character.edit', char_id=character.id) }}">✏️ 编辑角色</a>
+        </div>
+
+    </div>
+
+</body>
+</html>

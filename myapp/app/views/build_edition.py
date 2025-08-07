@@ -71,9 +71,11 @@ def submit_selection():
     edition_version = request.form.get('editionVersion', '').strip()
 
     json_str = generate_edition_json(
-        edition_name,
-        edition_author,
-        edition_version,
+        {
+            "name": edition_name,
+            "author": edition_author,
+            "version": edition_version,
+        },
         selected_ids
     )
     

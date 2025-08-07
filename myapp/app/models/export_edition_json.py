@@ -1,7 +1,7 @@
 import json
 from .database import get_character_db  # 假设你已有连接数据库的封装
 
-def generate_edition_json(edition_name, edition_author, edition_version, selected_ids):
+def generate_edition_json(edition_meta, selected_ids):
     """
     根据表单和所选角色 ID 生成剧本 JSON。
     :param edition_name: 剧本标题
@@ -13,12 +13,9 @@ def generate_edition_json(edition_name, edition_author, edition_version, selecte
     result = []
 
     # 添加 meta 信息
-    meta = {
-        "id": "_meta",
-        "name": edition_name,
-        "author": edition_author,
-        "version": edition_version
-    }
+    meta = edition_meta;
+    meta['id'] = "_meta"
+
     result.append(meta)
 
     if not selected_ids:

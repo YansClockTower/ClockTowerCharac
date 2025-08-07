@@ -16,20 +16,48 @@
             gap: 12px;
         }
 
-        .edition-link {
-            display: block;
+        .edition-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             background: white;
             padding: 1em;
             border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            text-decoration: none;
-            color: #333;
-            font-size: 18px;
-            transition: all 0.2s ease;
         }
 
-        .edition-link:hover {
-            background-color: #f0f0ff;
+        .edition-name {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .button {
+            padding: 0.5em 1em;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            background-color: #4a90e2;
+            transition: background-color 0.2s ease;
+        }
+
+        .button:hover {
+            background-color: #357bd8;
+        }
+
+        .button.download {
+            background-color: #5cb85c;
+        }
+
+        .button.download:hover {
+            background-color: #4cae4c;
         }
     </style>
 </head>
@@ -37,10 +65,27 @@
     <h2>剧本列表</h2>
     <div class="edition-list">
         {% for id, name in editions.items() %}
-            <a class="edition-link" href="{{ url_for('editionpdf.render_edition', id=id) }}">
-                {{ name }}
-            </a>
+            <div class="edition-item">
+                <div class="edition-name">{{ name }}</div>
+                <div class="buttons">
+                    <a class="button" href="{{ url_for('editionpdf.render_edition', id=id) }}">查看剧本图</a>
+
+                    <!-- 下载按钮通过 JS 触发表单提交 -->
+                    <form id="download-form-{{ id }}" method="POST" action="{{ url_for('editionpdf.download_edition_json', id=id) }}" style="display: none;"></form>
+                    <button class="button download" onclick="downloadJson('{{ id }}')">下载 JSON</button>
+                </div>
+            </div>
+
         {% endfor %}
     </div>
+    <script>
+    function downloadJson(id) {
+        const form = document.getElementById('download-form-' + id);
+        if (form) {
+            form.submit();
+        }
+    }
+</script>
+
 </body>
 </html>

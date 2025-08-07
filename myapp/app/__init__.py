@@ -4,11 +4,12 @@ def create_app():
     app = Flask(__name__, static_url_path='/static', static_folder='static')
 
     # 注册过滤器
-    from .filter import format_timestamp, team_label_filter
+    from .filter import format_timestamp, team_label_filter, team_color_filter
 
     app.add_template_filter(format_timestamp, 'datetime')
     app.add_template_filter(team_label_filter, 'team_name')
-    
+    app.add_template_filter(team_color_filter, 'team_color')
+
     # 注册 blueprint
     from .views.character_info import character_bp
     from .views.build_edition import buildedition_bp

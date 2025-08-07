@@ -4,13 +4,37 @@ from app.models.database import get_character_db, get_editions_info, get_filtere
 
 character_bp = Blueprint("character", __name__)
 
+@character_bp.route('/view')
+def character_list():
+        team_filter = request.args.get('team', '')
+        edition_filter = request.args.get('fromEdition', type=int)
+        search_query = request.args.get('q', '')
+
+        characters = get_filtered_characters(team_filter, edition_filter, search_query)
+
+        conn = get_character_db()
+        teams = conn.execute('SELECT DISTINCT team FROM character_info WHERE team != ""').fetchall()
+        conn.close()
+
+        editions_info = get_editions_info()
+
+        return render_template(
+            'list_characters.html',
+            characters=characters,
+            teams=teams,
+            editions_info=editions_info,
+            current_team=team_filter,
+            current_edition=edition_filter,
+            current_query=search_query
+        )
+
 @character_bp.route("/edit/<int:char_id>")
 def edit(char_id):
     conn = get_character_db()
     character = conn.execute("SELECT * FROM character_info WHERE id = ?", (char_id,)).fetchone()
     almanac = conn.execute("SELECT * FROM character_almanac WHERE id = ?", (char_id,)).fetchone()
     conn.close()
-    return render_template("edit.html", character=character, almanac=almanac)
+    return render_template("edit_character.html", character=character, almanac=almanac)
 
 @character_bp.route("/view/<int:char_id>")
 def view(char_id):
@@ -18,7 +42,7 @@ def view(char_id):
     character = conn.execute("SELECT * FROM character_info WHERE id = ?", (char_id,)).fetchone()
     almanac = conn.execute("SELECT * FROM character_almanac WHERE id = ?", (char_id,)).fetchone()
     conn.close()
-    return render_template("view.html", character=character, almanac=almanac)
+    return render_template("view_character.html", character=character, almanac=almanac)
 
 # @character_bp.route("/edit/<int:char_id>", methods=["POST"])
 # def edit_info(char_id):

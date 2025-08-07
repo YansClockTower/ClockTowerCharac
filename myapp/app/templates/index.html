@@ -1,108 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-    <title>角色列表</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <meta charset="UTF-8">
+    <title>索引页</title>
     <style>
-        .character-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            padding: 10px;
-            list-style-type: none;
-        }
-        .character-icon {
-            width: 50px;            /* 固定宽度 */
-            height: 50px;           /* 固定高度，保持正方形 */
-            object-fit: cover;      /* 保证图片填满容器并裁剪多余 */
-            border-radius: 5px;     /* 可选：微圆角，不想要可以设为 0 */
-            margin-right: 10px;
-            background-color: #eee; /* 防止加载失败时出现透明 */
-        }
-
-        .character-card {
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            padding: 10px;
-            background-color: #f9f9f9;
-            text-align: center;
-            transition: box-shadow 0.2s;
-        }
-        .card-content {
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
             display: flex;
-            align-items: center;     /* 垂直居中 */
-            flex-direction: row;     /* 横向排列（默认其实就是 row，可写明） */
-            gap: 10px;               /* 元素之间留白，或使用 margin-right 也可以 */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f7f7f7;
         }
-        .character-card:hover {
-            box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 40px;
         }
-
-        .character-card a {
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 200px;
+        }
+        .button-container a {
+            display: block;
+            text-align: center;
+            padding: 15px;
+            background-color: #3498db;
+            color: white;
             text-decoration: none;
-            color: #333;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 1.2em;
+            transition: background-color 0.2s ease;
         }
-        /* 表单元素 */
-input[type="text"],
-input[type="password"],
-input[type="search"],
-select,
-textarea {
-  max-width: 200px;
-  box-sizing: border-box;
-}
+        .button-container a:hover {
+            background-color: #2980b9;
+        }
     </style>
 </head>
 <body>
-    <h1>角色列表</h1>
-
-    <form method="get">
-        <label>筛选阵营:</label>
-        <select name="team" onchange="this.form.submit()">
-            <option value="">全部</option>
-            {% for team in teams %}
-                <option value="{{ team.team }}" {% if team.team == current_team %}selected{% endif %}>
-                    {{ team.team }}
-                </option>
-            {% endfor %}
-        </select>
-
-        <label>筛选来源版本:</label>
-        <select name="fromEdition" onchange="this.form.submit()">
-            <option value="">全部</option>
-            {% for edition_id, edition_name in editions_info.items() %}
-                <option value="{{ edition_id }}" {% if edition_id == current_edition %}selected{% endif %}>
-                    {{ edition_name }}
-                </option>
-            {% endfor %}
-        </select>
-
-        <label>搜索名称:</label>
-        <input type="text" name="q" value="{{ current_query }}">
-        <button type="submit">搜索</button>
-    </form>
-
-
-    <hr>
-
-<ul class="character-grid">
-    {% for character in characters %}
-        <li class="character-card">
-            <a href="{{ url_for('character.view', char_id=character.id) }}">
-                <div class="card-content">
-                    <img class="character-icon" src="{{ character.image }}" alt="头像" onerror="this.src='/static/default-icon.png'">
-                    <div class="character-info">
-                        <div class="team">[{{ character.team | team_name}}]</div>
-                        <div class="name">{{ character.name }}</div>
-                    </div>
-                </div>
-            </a>
-        </li>
-    {% endfor %}
-</ul>
-
-
-
+    <h1>欢迎访问</h1>
+    <div class="button-container">
+        <a href="/view">浏览已收录角色</a>
+        <a href="/viewedition">浏览已收录剧本</a>
+        <a href="/grimoire/">电子魔典</a>
+        <a href="/select">自制剧本</a>
+        <a href="/import">收录新剧本</a>
+    </div>
 </body>
 </html>

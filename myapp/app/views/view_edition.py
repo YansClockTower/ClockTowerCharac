@@ -1,9 +1,11 @@
-from flask import Blueprint, render_template
+from io import BytesIO
+from flask import Blueprint, render_template, send_file
 from app.models.database import get_character_db, get_edition_db, get_editions_info
 import datetime
 import json
 from collections import defaultdict
-from app.filter import team_mapping
+from app.filter import team_mapping, team_colors
+from app.models.export_edition_json import generate_edition_json
 
 viewedition_bp = Blueprint("editionpdf", __name__)
 
@@ -60,15 +62,7 @@ def group_characters_by_team(character_dict):
         teams[team].append(char)
     return teams
 
-team_colors = {
-        "旅行者": '#1f1f1f',
-        "镇民": '#2d7ccd',
-        "外来者": '#2d7ccd',
-        "爪牙": '#cc2625',
-        "恶魔": '#cc2625',
-        "传奇角色": '#ffc600',
-        "相克规则": '#1f1f1f'
-}
+
 
 def get_ordered_teams(character_dict):
     grouped = group_characters_by_team(character_dict)
@@ -78,7 +72,7 @@ def get_ordered_teams(character_dict):
         chars = grouped.get(key, [])
         if not chars:
             continue  # 跳过空团队
-        color = team_colors.get(label, "#444")  # 默认颜色
+        color = team_colors.get(key, "#444")  # 默认颜色
         ordered_teams.append((label, color, chars))
     return ordered_teams
 
@@ -127,3 +121,39 @@ def render_edition(id):
                            teams_dict=teams_dict,
                            ordered_teams=ordered_teams,
                            today=today)
+
+@viewedition_bp.route('/downloadedition/<id>', methods=['POST'])
+def download_edition_json(id):
+    # 读取所选角色 ID
+    meta = load_meta(id)
+    char_ids = json.loads(meta.get('characterList', '[]'))
+    meta_json = {
+        "id": "_meta",
+        "name": meta.get('name', 'NewEdition'),
+        "author": meta.get('author', 'Unknown'),
+        "version": meta.get('version', 'beta'),
+        "logo": meta.get('logo', 'https://clocktower.gstonegames.com/images/logo.png'),
+        "description": meta.get('description', ''),
+        "states": meta.get('states', '')
+    }
+
+    # 生成 JSON 文件名（回退为 NewEdition.json）
+    safe_name = meta.get('name', 'NewEdition')
+    filename = f"{safe_name}.json"
+
+    json_str = generate_edition_json(
+        meta_json,
+        char_ids
+    )
+    # 将 JSON 内容写入内存中的 BytesIO 对象
+    file_io = BytesIO()
+    file_io.write(json_str.encode('utf-8'))
+    file_io.seek(0)
+
+    # 返回文件下载响应
+    return send_file(
+        file_io,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/json'
+    )
