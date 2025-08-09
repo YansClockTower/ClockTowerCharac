@@ -61,7 +61,7 @@ input[type="button"] {
   background-color: #007bff;
   border: none;
   color: white;
-  padding: 0.5em 1em;
+  padding: 0.25em 1em;
   font-size: 1rem;
   border-radius: 4px;
   cursor: pointer;
@@ -88,7 +88,7 @@ textarea {
   outline-color: transparent;
   transition: outline-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
   width: 100%;
-  max-width: 300px;
+  max-width: 600px;
   box-sizing: border-box;
 }
 

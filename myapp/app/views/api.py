@@ -63,4 +63,3 @@ def edition_info():
         })
     else:
         return jsonify({"query": "not_found"})
-    

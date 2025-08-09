@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from app.models.database import get_edition_db
+
 team_mapping = {
         'townsfolk': '镇民',
         'outsider': '外来者',
@@ -32,3 +34,22 @@ def team_label_filter(team):
 
 def team_color_filter(team):
     return team_colors.get(team, '#1f1f1f')
+
+edition_cache = {}
+
+def edition_name_filter(edition_id):
+    if edition_id in edition_cache:
+        return edition_cache[edition_id]
+    
+    conn = get_edition_db()
+    cursor = conn.execute('SELECT name FROM editions_info WHERE id = ?', (edition_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        edition_name = row[0]
+    else:
+        edition_name = f'未知剧本({edition_id})'
+    
+    edition_cache[edition_id] = edition_name
+    return edition_name

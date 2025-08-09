@@ -7,31 +7,25 @@
     <style>
         body {
             font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-            margin: 40px auto;
-            max-width: 800px;
+            margin: 0;
             background-color: #f8f9fa;
             color: #333;
         }
 
-        h2 {
-            border-left: 4px solid #007bff;
-            padding-left: 10px;
-            color: #007bff;
+        .container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: auto;
         }
 
-        form {
+        .column {
+            flex: 1;
             background: #fff;
             padding: 20px;
-            margin-bottom: 40px;
             border-radius: 8px;
             box-shadow: 0 0 8px rgba(0,0,0,0.05);
-        }
-
-        label {
-            font-weight: bold;
-            display: block;
-            margin-top: 16px;
-            margin-bottom: 6px;
         }
 
         input[type="text"],
@@ -73,106 +67,208 @@
             border: 1px solid #ccc;
         }
 
-        a {
-            color: #007bff;
-            text-decoration: none;
-        }
-
-        a:hover {
-            text-decoration: underline;
-        }
-
-        hr {
-            margin: 40px 0;
-            border: none;
-            border-top: 1px solid #ddd;
-        }
 
         b {
             color: #555;
         }
+
+        /* ===== Sticky Header 样式优化 ===== */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            padding: 10px 10px;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .sticky-fields {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+        }
+
+        .sticky-field {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sticky-field label {
+            font-weight: bold;
+            min-width: 80px;
+            white-space: nowrap;
+        }
+
+        .sticky-field input,
+        .sticky-field select {
+            padding: 6px 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            height: 32px;
+        }
+
+.sticky-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.sticky-actions button,
+.sticky-actions .btn-secondary {
+    padding: 0 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    text-decoration: none;
+    height: 36px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.sticky-actions button {
+    background-color: #007bff;
+    border: none;
+    color: white;
+}
+
+.sticky-actions button:hover {
+    background-color: #0056b3;
+}
+
+.sticky-actions .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.sticky-actions .btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+ label {
+            font-weight: bold;
+            display: block;
+            margin-top: 16px;
+            margin-bottom: 6px;
+        }
+        
     </style>
 </head>
 <body>
+<form method="post" action="{{ url_for('character.edit_submit', char_id=character.id) }}">
+    <div class="sticky-header">
+        <div class="sticky-fields">
+            <div class="sticky-field">
+                <label>名称:</label>
+                <input type="text" name="name" value="{{ character.name }}">
+            </div>
 
-    <h2>编辑角色 #{{character.id}} ({{ character.name }}) 信息</h2>
-    <form method="post" action="{{ url_for('character.edit_info', char_id=character.id) }}">
-        <label>名称:</label>
-        <input type="text" name="name" value="{{ character.name }}">
+            <div class="sticky-field">
+                <label>出自剧本:</label>
+                <input type="number" name="fromEdition" value="{{ character.fromEdition }}">
+            </div>
 
-        <label>团队:</label>
-        <input type="text" name="team" value="{{ character.team}}">
+            <div class="sticky-field">
+                <label>是否发布:</label>
+                <select name="released">
+                    <option value="1" {% if character.released %}selected{% endif %}>True</option>
+                    <option value="0" {% if not character.released %}selected{% endif %}>False</option>
+                </select>
+            </div>
 
-        <label>能力:</label>
-        <textarea name="ability" rows="4">{{ character.ability }}</textarea>
+        </div>
 
-        <label>是否改变配版:</label>
-        <select name="setup">
-            <option value="1" {% if character.setup %}selected{% endif %}>True</option>
-            <option value="0" {% if not character.setup %}selected{% endif %}>False</option>
-        </select>
+        <div class="sticky-actions">
+            <button type="submit">保存所有修改</button>
+            <a href="{{ url_for('character.character_list') }}" class="btn-secondary">返回列表</a>
+            <div class="sticky-field" style="white-space: nowrap; margin-left: 20px; color:#555; font-weight: normal;">
+                <b>最后更新：</b> {{ character.lastUpdated | datetime }}
+            </div>
+        </div>
+    </div>
 
-        <label>首夜顺序:</label>
-        <input type="number" name="firstNight" value="{{ character.firstNight }}">
+    <div class="container">
+        <!-- 左列：角色信息 -->
+        <div class="column">
+            <h2>角色信息</h2>
+            <label>团队:</label>
+            <input type="text" name="team" value="{{ character.team}}">
 
-        <label>其他夜晚顺序:</label>
-        <input type="number" name="otherNight" value="{{ character.otherNight }}">
+            <label>能力:</label>
+            <textarea name="ability" rows="4">{{ character.ability }}</textarea>
 
-        <label>首夜提示:</label>
-        <textarea name="firstNightReminder" rows="3">{{ character.firstNightReminder }}</textarea>
+            <label>是否改变配版:</label>
+            <select name="setup">
+                <option value="1" {% if character.setup %}selected{% endif %}>True</option>
+                <option value="0" {% if not character.setup %}selected{% endif %}>False</option>
+            </select>
 
-        <label>其他夜晚提示:</label>
-        <textarea name="otherNightReminder" rows="3">{{ character.otherNightReminder }}</textarea>
+            <label>首夜顺序:</label>
+            <input type="number" name="firstNight" value="{{ character.firstNight }}">
 
-        <label>Token:</label>
-        <textarea name="reminders" rows="3">{{ character.reminders }}</textarea>
+            <label>其他夜晚顺序:</label>
+            <input type="number" name="otherNight" value="{{ character.otherNight }}">
 
-        <label>全局token:</label>
-        <textarea name="remindersGlobal" rows="3">{{ character.remindersGlobal }}</textarea>
+            <label>首夜提示:</label>
+            <textarea name="firstNightReminder" rows="4">{{ character.firstNightReminder }}</textarea>
 
-        <label>图片链接 (image):</label>
-        <textarea name="image" rows="2">{{ character.image }}</textarea>
+            <label>其他夜晚提示:</label>
+            <textarea name="otherNightReminder" rows="4">{{ character.otherNightReminder }}</textarea>
 
-        {% if character.image %}
-            <img src="{{ character.image }}" alt="图片预览" class="image-preview">
-        {% endif %}
+            <label>Token:</label>
+            <textarea name="reminders" rows="3">{{ character.reminders }}</textarea>
 
-        <label>角色标签 (tags):</label>
-        <textarea name="tags" rows="3">{{ character.tags }}</textarea>
+            <label>全局token:</label>
+            <textarea name="remindersGlobal" rows="3">{{ character.remindersGlobal }}</textarea>
 
-        <label>出自剧本 (fromEdition):</label>
-        <input type="number" name="fromEdition" value="{{ character.fromEdition }}">
+            <label>图片链接 (image):</label>
+            <textarea name="image" rows="2">{{ character.image }}</textarea>
 
-        <b>最后更新：</b> {{ character.lastUpdated | datetime }}
+            {% if character.image %}
+                <img src="{{ character.image }}" alt="图片预览" class="image-preview">
+            {% endif %}
 
-        <br><button type="submit">保存角色信息</button>
-    </form>
+        </div>
 
-    <h2>编辑角色 #{{character.id}} ({{ character.name }}) 历书</h2>
-    <form method="post" action="{{ url_for('character.edit_almanac', char_id=character.id) }}">
-        <label>设计者 (designer):</label>
-        <input type="text" name="designer" value="{{ almanac.designer if almanac else '' }}">
+        <!-- 右列：历书内容 -->
+        <div class="column">
+            <h2>角色历书</h2>
 
-        <label>画师 (drawer):</label>
-        <input type="text" name="drawer" value="{{ almanac.drawer if almanac else '' }}">
+            <label>设计者 (designer):</label>
+            <input type="text" name="designer" value="{{ almanac.designer if almanac else '' }}">
 
-        <label>概要 (overview):</label>
-        <textarea name="overview" rows="3">{{ almanac.overview if almanac else '' }}</textarea>
+            <label>画师 (drawer):</label>
+            <input type="text" name="drawer" value="{{ almanac.drawer if almanac else '' }}">
 
-        <label>示例 (examples):</label>
-        <textarea name="examples" rows="3">{{ almanac.examples if almanac else '' }}</textarea>
+            <label>概要 (overview):</label>
+            <textarea name="overview" rows="10">{{ almanac.overview if almanac else '' }}</textarea>
 
-        <label>运行建议 (howtorun):</label>
-        <textarea name="howtorun" rows="3">{{ almanac.howtorun if almanac else '' }}</textarea>
+            <label>示例 (examples):</label>
+            <textarea name="examples" rows="10">{{ almanac.examples if almanac else '' }}</textarea>
 
-        <label>提示 (tips):</label>
-        <textarea name="tips" rows="3">{{ almanac.tips if almanac else '' }}</textarea>
+            <label>运行建议 (howtorun):</label>
+            <textarea name="howtorun" rows="10">{{ almanac.howtorun if almanac else '' }}</textarea>
 
-        <b>最后更新：</b> {{ almanac.lastUpdated | datetime }}
+            <label>提示 (tips):</label>
+            <textarea name="tips" rows="5">{{ almanac.tips if almanac else '' }}</textarea>
+            
+            <label>角色标签 (tags):</label>
+            <textarea name="tags" rows="3">{{ character.tags }}</textarea>
+            <!-- 这里移除了右侧的最后更新 -->
+        </div>
+    </div>
+</form>
 
-        <br><button type="submit">保存角色历书</button>
-    </form>
 
-    <a href="{{ url_for('index') }}">← 返回列表</a>
 </body>
 </html>

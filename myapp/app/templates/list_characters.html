@@ -91,9 +91,9 @@ textarea {
             <label>筛选来源:</label>
             <select name="fromEdition" onchange="this.form.submit()">
                 <option value="">全部</option>
-                {% for edition_id, edition_name in editions_info.items() %}
+                {% for edition_id in filter_editions %}
                     <option value="{{ edition_id }}" {% if edition_id == current_edition %}selected{% endif %}>
-                        {{ edition_name }}
+                        {{ edition_id | edition_name }}
                     </option>
                 {% endfor %}
             </select>

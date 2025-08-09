@@ -24,6 +24,7 @@
         <input type="hidden" name="edition_name" id="edition-name-hidden">
         <input type="hidden" name="edition_author" id="edition-author-hidden">
         <input type="hidden" name="edition_version" id="edition-version-hidden">
+        <input type="hidden" name="edition_statements" id="edition-statements-hidden">
         
         <input type="hidden" name="selected_ids" id="selected-ids-hidden">
 
@@ -32,17 +33,17 @@
             <option value="">全部</option>
             {% for team in teams %}
                 <option value="{{ team.team }}" {% if team.team == current_team %}selected{% endif %}>
-                    {{ team.team }}
+                    {{ team.team  | team_name }}
                 </option>
             {% endfor %}
         </select>
         <br>
-        <label>筛选来源版本:</label><br>
+        <label>筛选来源:</label><br>
         <select name="fromEdition" onchange="submitWithSelectedIds()">
             <option value="">全部</option>
-            {% for edition_id, edition_name in editions_info.items() %}
+            {% for edition_id in filter_editions %}
                 <option value="{{ edition_id }}" {% if edition_id == current_edition %}selected{% endif %}>
-                    {{ edition_name }}
+                    {{ edition_id | edition_name }}
                 </option>
             {% endfor %}
         </select>
@@ -90,7 +91,11 @@
     <label for="editionVersion">剧本版本:</label>
     <input type="text" id="editionVersion" name="editionVersion" value="{{ editionVersion or '' }}">
     
-    <button type="submit">确认选择</button>
+    <label for="editionStatements">私货规则:</label>
+    <textarea id="editionStatements" name="editionStatements" rows="10">{{ editionStatements or '' }}</textarea>
+
+    <button type="submit" name="action" value="json">导出JSON</button>
+    <button type="submit" name="action" value="preview">预览图片</button>
   </form>
 </div>
 
@@ -188,10 +193,12 @@ function preserveFormContent() {
     const editionName = document.getElementById('editionName').value;
     const editionAuthor = document.getElementById('editionAuthor').value;
     const editionVersion = document.getElementById('editionVersion').value;
+    const editionStatements = document.getElementById('editionStatements').value;
 
     document.getElementById('edition-name-hidden').value = editionName;
     document.getElementById('edition-author-hidden').value = editionAuthor;
     document.getElementById('edition-version-hidden').value = editionVersion;
+    document.getElementById('edition-statements-hidden').value = editionStatements;
 }
 
 window.onload = function () {
@@ -200,10 +207,12 @@ window.onload = function () {
     const name = params.get('edition_name');
     const author = params.get('edition_author');
     const version = params.get('edition_version');
+    const statements = params.get('edition_statements');
 
     if (name !== null) document.getElementById('editionName').value = name;
     if (author !== null) document.getElementById('editionAuthor').value = author;
     if (version !== null) document.getElementById('editionVersion').value = version;
+    if (statements !== null) document.getElementById('editionStatements').value = statements;
 
 
     const existingIds = "{{ selected_ids }}".split(',');

@@ -6,10 +6,12 @@ import time
 
 def insert_character(character_data, editionId, author, database):
     # 提取字段并处理 reminders
+
+    name = character_data.get("name", "").strip(string.whitespace + string.punctuation)
+    print("inserting character: ", name)
     image = character_data.get("image", "")
     if len(image[0]) > 5:
         image = image[0]
-    name = character_data.get("name", "").strip(string.whitespace + string.punctuation)
     team = character_data.get("team", "").strip(string.whitespace + string.punctuation)
     ability = character_data.get("ability", "")
     setup = int(character_data.get("setup", False))
@@ -82,7 +84,7 @@ def insert_character(character_data, editionId, author, database):
         cursor.execute('''
             INSERT INTO character_almanac (
                 designer, lastUpdated
-            ) VALUES (?,  ?)
+            ) VALUES (?, ?)
         ''', (
             author,
             int(time.time())
@@ -101,6 +103,7 @@ def import_from_json(json_file, edition_base, character_base):
     author = 'unknown'
     logo = ''
     description = ''
+    states = ''
     editionId = 0
     for ch in json_file:
         
@@ -114,6 +117,23 @@ def import_from_json(json_file, edition_base, character_base):
                 logo = ch['logo']
             if 'description' in ch:
                 description = ch['description']
+            if 'state' in ch:
+                if len(ch['state']) == 1:
+                    states = {
+                        "name": ch['state'][0].get('stateName').strip(),
+                        "description": ch['state'][0].get('stateDescription').strip()
+                        }
+                if len(ch['state']) > 1:
+                    state_lines = []
+                    for item in ch['state']:
+                        name = item.get('stateName', '').strip()
+                        desc = item.get('stateDescription', '').strip()
+                        if name and desc:
+                            state_lines.append(f"{name}：{desc}")
+                    states = {
+                        "name": "私货商人",
+                        "description": "\n".join(state_lines)
+                        }
             break
     
         # 保存到 editions_info 表
@@ -123,13 +143,13 @@ def import_from_json(json_file, edition_base, character_base):
     # 查询是否已存在同名剧本
     cursor.execute('SELECT id FROM editions_info WHERE name = ?', (editionName,))
     existing = cursor.fetchone()
-
+    print("inserting character bbbb")
     if existing:
         # 已存在则执行 UPDATE
         editionId = existing[0]
         cursor.execute('''
             UPDATE editions_info
-            SET logo = ?, description = ?, version = ?, author = ?, lastUpdated = ?
+            SET logo = ?, description = ?, version = ?, author = ?, lastUpdated = ?, states = ?
             WHERE id = ?
         ''', (
             logo,
@@ -137,24 +157,26 @@ def import_from_json(json_file, edition_base, character_base):
             version,
             author,
             int(time.time()),
-            editionId
+            json.dumps(states),
+            editionId,
         ))
     else:
         # 不存在则 INSERT
         cursor.execute('''
             INSERT INTO editions_info (
-                logo, name, description, version, author, lastUpdated
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                logo, name, description, version, author, lastUpdated, states
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             logo,
             editionName,
             description,
             version,
             author,
-            int(time.time())
+            int(time.time()),
+            json.dumps(states)
         ))
         editionId = cursor.lastrowid
-
+    print("inserting aaaa")
 ######################################
 ### save the character info
 ###
@@ -163,6 +185,8 @@ def import_from_json(json_file, edition_base, character_base):
         if ch['id'] != '_meta' and 'jinx' not in ch['team']:
             if 'travel' in ch['team']:
                 ch['team'] = 'traveler'
+            if 'jinx' in ch['team']:
+                ch['team'] = 'jinx'
             ids = insert_character(ch, editionId, author, character_base)
             characters.append(ids)
 

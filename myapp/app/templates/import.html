@@ -18,11 +18,11 @@
             overflow-y: auto;
         }
         .left-panel {
-            width: 25%;
+            width: 30%;
             border-right: 1px solid #ccc;
         }
         .middle-panel {
-            width: 50%;
+            width: 45%;
             border-right: 1px solid #ccc;
         }
         .right-panel {
@@ -116,8 +116,35 @@ async function parseJson() {
             metaHtml += `<p><strong>作者：</strong>${meta.author || 'Unknown'}</p>`;
             metaHtml += `<p><strong>版本：</strong>${meta.version || 'beta'}</p>`;
             if (meta.logo) {
-                metaHtml += `<div><img src="${meta.logo}" alt="剧本图片" style="max-width: 100%; max-height: 200px; margin-top: 10px; border: 1px solid #ccc;"></div>`;
+                metaHtml += `<div><img src="${meta.logo}" alt="剧本图片" style="max-width: 100%; max-height: 160px; border: 1px solid #ccc;"></div>`;
             }
+
+            // 新增读取 state 字段，状态列表为固定高度滚动框
+            if (meta.state) {
+                if (Array.isArray(meta.state)) {
+                    let valid = true;
+                    let stateHtml = `<strong>状态列表：</strong>
+                    <div style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 8px; margin-top: 10px;">
+                                        <ul style="margin-top: 6px;">`;
+                    for (const item of meta.state) {
+                        if (typeof item.stateName === 'string' && typeof item.stateDescription === 'string') {
+                            stateHtml += `<li><strong>${item.stateName}:</strong> ${item.stateDescription}</li>`;
+                        } else {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    stateHtml += '</ul></div>';
+                    if (valid) {
+                        metaHtml += stateHtml;
+                    } else {
+                        metaHtml += `<p style="color:red;">警告：state格式错误，期待包含stateName和stateDescription字符串字段的列表。</p>`;
+                    }
+                } else {
+                    metaHtml += `<p style="color:red;">警告：state字段应为数组格式。</p>`;
+                }
+            }
+
             metaInfoDiv.innerHTML = metaHtml;
         } else {
             metaInfoDiv.innerHTML = '<p style="color:red;">找不到 _meta 剧本信息</p>';

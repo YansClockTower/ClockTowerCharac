@@ -1,6 +1,6 @@
 from io import BytesIO
 from flask import Blueprint, render_template, send_file
-from app.models.database import get_character_db, get_edition_db, get_editions_info
+from app.models.database import get_character_db, get_edition_db, get_editions_info, get_night_order, load_character_dict_by_ids, load_edition_meta
 import datetime
 import json
 from collections import defaultdict
@@ -11,49 +11,14 @@ viewedition_bp = Blueprint("editionpdf", __name__)
 
 # ---- 数据库加载函数 ----
 
-def load_meta(edition_id):
-    conn = get_edition_db()
-    cursor = conn.execute("SELECT * FROM editions_info WHERE id = ?", (edition_id,))
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
-        raise ValueError(f"Edition '{edition_id}' not found")
-    return dict(row)
-
-def load_character_dict_by_ids(char_ids):
-    if not char_ids:
-        return {}
-
-    placeholders = ','.join(['?'] * len(char_ids))
-    conn = get_character_db()
-    cursor = conn.execute(f'''
-        SELECT * FROM character_info
-        WHERE id IN ({placeholders})
-    ''', char_ids)
-
-    result = {}
-    for row in cursor.fetchall():
-        char = dict(row)
-        result[char['id']] = char  # 以 id 为键
-    conn.close()
-    return result
-
-
 def get_statement(meta):
     states = meta.get("states")
     if states:
         try:
-            return json.loads(states)
+            return json.loads(states) # return a python dict
         except Exception as e:
             print(f"[Warning] Failed to parse states for edition id={meta.get('id')}: {e}")
     return None
-
-def get_night_order(character_dict, key):
-    # 过滤掉 key 对应值为 None 或 0
-    filtered = [char for char in character_dict.values() if char.get(key) not in (None, 0)]
-    sorted_chars = sorted(filtered, key=lambda c: c[key])
-    return [char['id'] for char in sorted_chars]
 
 def group_characters_by_team(character_dict):
     teams = defaultdict(list)
@@ -85,7 +50,7 @@ def view_all_editions():
 
 @viewedition_bp.route("/viewedition/<id>")
 def render_edition(id):
-    meta = load_meta(id)
+    meta = load_edition_meta(id)
     char_ids = json.loads(meta.get('characterList', '[]'))
 
     # 一次性加载全部角色信息
@@ -103,6 +68,8 @@ def render_edition(id):
     version = meta.get("version", "1.0")
     author = meta.get("author", "匿名")
     logo = meta.get("logo", 'https://clocktower.gstonegames.com/images/logo.png')
+    minPlayer = meta.get("minPlayer", 7)
+    maxPlayer = meta.get("maxPlayer", 5)
     today = datetime.date.today()
 
     grouped = group_characters_by_team(character_dict)
@@ -114,6 +81,8 @@ def render_edition(id):
                            author=author,
                            edition_name=edition_name,
                            version=version,
+                           minPlayer=minPlayer,
+                           maxPlayer=maxPlayer,
                            state=state,
                            character_dict=character_dict,
                            first_night=first_night,
@@ -125,7 +94,21 @@ def render_edition(id):
 @viewedition_bp.route('/downloadedition/<id>', methods=['POST'])
 def download_edition_json(id):
     # 读取所选角色 ID
-    meta = load_meta(id)
+    meta = load_edition_meta(id)
+
+    statesdict = []
+    states_raw = meta.get('states', '')
+    if states_raw:
+        try:
+            data = json.loads(states_raw)
+            statesdict = [{
+                "stateName": data.get('name', ''),
+                "stateDescription": data.get('description', '')
+            }]
+        except Exception as e:
+            print(f"解析states失败: {e}")
+            statesdict = []
+
     char_ids = json.loads(meta.get('characterList', '[]'))
     meta_json = {
         "id": "_meta",
@@ -134,7 +117,7 @@ def download_edition_json(id):
         "version": meta.get('version', 'beta'),
         "logo": meta.get('logo', 'https://clocktower.gstonegames.com/images/logo.png'),
         "description": meta.get('description', ''),
-        "states": meta.get('states', '')
+        "state": statesdict
     }
 
     # 生成 JSON 文件名（回退为 NewEdition.json）

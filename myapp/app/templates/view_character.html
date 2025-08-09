@@ -6,11 +6,42 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/view_character.css') }}">
+    <style>
+      /* 右侧浮窗书签容器 */
+      .sidebar-bookmarks {
+        position: fixed;
+        top: 75%;
+        right: 0;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 1000;
+      }
+      /* 按钮统一样式 */
+      .sidebar-bookmarks a {
+        display: block;
+        background-color: #3b82f6; /* Tailwind blue-500 */
+        color: white;
+        padding: 10px 16px;
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgb(59 130 246 / 0.5);
+        transition: background-color 0.3s ease;
+        white-space: nowrap;
+        text-align: center;
+        width: max-content;
+      }
+      .sidebar-bookmarks a:hover {
+        background-color: #2563eb; /* Tailwind blue-600 */
+      }
+    </style>
 </head>
 <body>
 
     <div class="content_body">
-            <!-- Header -->
+        <!-- Header -->
         <div class="header">
             <div class="title-section">
                 <h1 class="text-4xl font-bold mb-2">{{ character.name or '（未命名角色）' }}</h1>
@@ -29,7 +60,7 @@
         <!-- Ability -->
         <div class="section">
             <div class="section-title">能力</div>
-            <div class="value">{{ character.ability or '暂无信息' }}</div>
+            <div class="value"><strong>{{ character.ability or '暂无信息' }}</strong></div>
         </div>
 
         <!-- Examples -->
@@ -55,19 +86,18 @@
             <div class="value">角色类型：{{ character.team | team_name }}</div>
             <div class="value">能力标签：{{ character.tags if character.tags else '无' }}</div>
         </div>
+
         <!-- Last Updated -->
         <hr class="my-6 border-gray-300">
         <p class="text-center text-sm text-gray-500">
-        最后更新: {{ character.lastUpdated | datetime if character.lastUpdated else '暂无信息' }}
+            最后更新: {{ character.lastUpdated | datetime if character.lastUpdated else '暂无信息' }}
         </p>
+    </div>
 
-        <!-- Footer links -->
-        <div class="footer-links">
-            <a href="{{ url_for('index') }}">← 返回列表</a>
-            &nbsp;|&nbsp;
-            <a href="{{ url_for('character.edit', char_id=character.id) }}">✏️ 编辑角色</a>
-        </div>
-
+    <!-- 右侧浮窗书签 -->
+    <div class="sidebar-bookmarks">
+        <a href="{{ url_for('character.character_list') }}">← 返回列表</a>
+        <a href="{{ url_for('character.edit', char_id=character.id) }}">✏️ 编辑角色</a>
     </div>
 
 </body>

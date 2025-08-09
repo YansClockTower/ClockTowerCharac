@@ -13,6 +13,26 @@
         src: url("{{ url_for('static', filename='font/fzhy_GBK.TTF') }}") format("truetype");
         font-display: swap;
     }
+    /* 让 <a> 链接像 div 一样占满整个格子 */
+.item-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    text-decoration: none;
+}
+
+/* 卡片基础样式 */
+.item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 8px;
+}
+
+/* 悬停效果：放大+阴影 */
+.item:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+
     </style>
 </head>
 <body>
@@ -23,14 +43,14 @@
             <img style="height: 120px;" src="{{ logo }}">
             <div style="text-align: left; font-size: 14px;">
                 剧本作者：{{ author }}<br>
-                支持人数：{{ '任意数量小镇做题家' if minPlayer else '7-15人' }}
+                支持人数：{{ minPlayer if minPlayer else '7'}}-{{maxPlayer if maxPlayer else '15'}}人
             </div>
         </div>
 
         {% if state %}
         <div class="statement">
             <b>{{ state.name }}</b><br><br>
-            {{ state.ability }}
+            {{ state.description }}
         </div>
         {% endif %}
     </div>
@@ -49,18 +69,20 @@
         <!-- grid 网格 -->
         <div class="team-grid">
             {% for item in chars %}
-            <div class="item"
-                 data-name="{{ item.name }}"
-                 data-team="{{ item.team }}"
-                 data-tag="{{ (item.tags or []) | join('_') }}_">
-                <img src="{{ item.image }}"
-                     alt="{{ item.name }}"
-                     onerror="this.onerror=null; this.src='https://111.229.112.80/editions/unknown.png';">
-                <p>
-                    <b>{{ item.name.split('__')[1] if '__' in item.name else item.name }}</b><br>
-                    {{ item.ability }}
-                </p>
-            </div>
+            <a href="/view/{{ item.id }}" class="item-link">
+                <div class="item"
+                    data-name="{{ item.name }}"
+                    data-team="{{ item.team }}"
+                    data-tag="{{ (item.tags or []) | join('_') }}_">
+                    <img src="{{ item.image }}"
+                        alt="{{ item.name }}"
+                        onerror="this.onerror=null; this.src='https://111.229.112.80/editions/unknown.png';">
+                    <p>
+                        <b>{{ item.name }}</b><br>
+                        {{ item.ability }}
+                    </p>
+                </div>
+            </a>
             {% endfor %}
         </div>
     </div>
