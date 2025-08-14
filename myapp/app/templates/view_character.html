@@ -49,23 +49,36 @@
                     {{ (almanac.designer or '未知设计者') ~ ' · ' ~ (almanac.drawer or '未知画师') if almanac else '暂无信息' }}
                 </div>
                 <br>
-                <div class="value italic">{{ (almanac.overview if almanac else None) or '"暂无信息"' }}</div>
+                <div class="value italic">{{ (almanac.flavor if almanac else None) or '"暂无信息"' }}</div>
             </div>
 
             {% if character.image %}
                 <img src="{{ character.image }}" alt="角色图片" class="image-preview">
             {% endif %}
         </div>
-
+        <!-- TODO: official link. -->
+        {% if character.fromEdition <= 4 %}
+        <div style="border: 2px solid red; background-color: #ffe5e5; padding: 15px; margin: 10px 0; font-weight: bold; text-align: center;">
+            注意！这是一个官方角色。该页面内容仅供参考，并以官方百科为准:  
+            <a href="https://clocktower-wiki.gstonegames.com/index.php?title={{ character.name }}" target="_blank" style="color: blue; text-decoration: underline;">
+                点这里跳转
+            </a>
+        </div>
+        {% endif %}
         <!-- Ability -->
         <div class="section">
-            <div class="section-title">能力</div>
+            <div class="section-title">角色能力</div>
             <div class="value"><strong>{{ character.ability or '暂无信息' }}</strong></div>
         </div>
-
+        
+        <!-- Overview -->
+        <div class="section">
+            <div class="section-title">角色简介</div>
+            <div class="value">{{ (almanac.overview if almanac else None) or '暂无信息' }}</div>
+        </div>
         <!-- Examples -->
         <div class="section">
-            <div class="section-title">示例</div>
+            <div class="section-title">运行示例</div>
             <div class="value">{{ (almanac.examples if almanac else None) or '暂无信息' }}</div>
         </div>
 

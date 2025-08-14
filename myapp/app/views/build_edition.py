@@ -176,7 +176,6 @@ def import_json():
             edb = get_edition_db()
             cdb = get_character_db()
             import_from_json(data, edb, cdb)
-            print("aaa")
             edb.commit()
             edb.close()
             cdb.commit()

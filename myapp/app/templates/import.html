@@ -58,7 +58,7 @@
 <body>
 
 <div class="panel left-panel">
-    <h2>粘贴 JSON 数据</h2>
+    <h2>粘贴JSON数据</h2>
     <textarea id="json-input" placeholder='请粘贴剧本 JSON 数据...'></textarea>
     <button onclick="parseJson()">解析</button>
 </div>
@@ -109,7 +109,6 @@ async function parseJson() {
     try {
         const json = JSON.parse(input);
         hiddenInput.value = JSON.stringify(json);
-
         const meta = json.find(obj => obj.id === "_meta");
         if (meta) {
             let metaHtml = `<p><strong>标题：</strong>${meta.name || 'NewEdition'}</p>`;
