@@ -36,6 +36,13 @@
       .sidebar-bookmarks a:hover {
         background-color: #2563eb; /* Tailwind blue-600 */
       }
+      .line-box {
+            gap: 8px;
+            padding: 5px 10px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            white-space: pre-wrap; /* 保留空格和换行 */
+      }
     </style>
 </head>
 <body>
@@ -79,7 +86,13 @@
         <!-- Examples -->
         <div class="section">
             <div class="section-title">运行示例</div>
-            <div class="value">{{ (almanac.examples if almanac else None) or '暂无信息' }}</div>
+                {% if almanac and almanac.examples %}
+                    {% for line in almanac.examples.split('\n') %}
+                        <p class="line-box">{{ line }}</p>
+                    {% endfor %}
+                {% else %}
+                    暂无信息
+                {% endif %}
         </div>
 
         <!-- How to Run -->

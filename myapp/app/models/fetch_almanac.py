@@ -29,15 +29,23 @@ def fetch_bloodstar_almanac(url):
         block_data = {}
         # 针对 synopsis 和 overview 特殊处理
         if li_id in ("synopsis", "overview"):
-            block_data = target_div.get_text(separator="\n", strip=True)
+            # 保留 <p> 和 <br> 换行
+            paragraphs = []
+            for p in target_div.find_all("p"):
+                # 替换 <br> 为换行符
+                text = p.get_text(separator="\n", strip=True)
+                if text:
+                    paragraphs.append(text)
+            # 如果没有 <p>，就直接获取整个内容
+            if not paragraphs:
+                block_data = target_div.get_text(separator="\n", strip=True)
+            else:
+                block_data = "\n".join(paragraphs)
         else:
-            # 按原来规则解析直接子元素
             for child in target_div.find_all(recursive=False):
                 tag_name = child.name
-
                 class_list = child.get("class")
                 label = ".".join(class_list) if class_list else tag_name
-
                 label = id_map.get(label, label)
 
                 if tag_name == "img":
@@ -50,7 +58,8 @@ def fetch_bloodstar_almanac(url):
                     if text:
                         li_id = text
                 else:
-                    text = child.get_text(strip=True)
+                    # 保留 <br> 换行
+                    text = child.get_text(separator="\n", strip=True)
                     if text:
                         block_data[label] = text
 
