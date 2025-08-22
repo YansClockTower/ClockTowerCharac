@@ -1,7 +1,9 @@
 from flask import Flask
-
+from flask_cors import CORS
 def create_app():
     app = Flask(__name__, static_url_path='/static', static_folder='static')
+
+    CORS(app)
 
     # 注册过滤器
     from .filter import format_timestamp, team_label_filter, team_color_filter, edition_name_filter
