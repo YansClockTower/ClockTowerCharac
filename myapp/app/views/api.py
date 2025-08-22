@@ -69,7 +69,7 @@ def edition_json(id):
     # 读取所选角色 ID
     meta = load_edition_meta(id)
 
-    if(!meta): 
+    if not meta: 
         return jsonify({})
     
     statesdict = []
