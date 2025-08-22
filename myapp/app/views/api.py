@@ -78,10 +78,23 @@ def edition_json(id):
     if states_raw:
         try:
             data = json.loads(states_raw)
-            statesdict = [{
-                "stateName": data.get('name', ''),
-                "stateDescription": data.get('description', '')
-            }]
+            if isinstance(data, dict):
+                # 单个对象
+                statesdict = [{
+                    "stateName": data.get('name', ''),
+                    "stateDescription": data.get('description', '')
+                }]
+            elif isinstance(data, list):
+                # 列表里的每个对象
+                for item in data:
+                    statesdict.append({
+                        "stateName": item.get('name', ''),
+                        "stateDescription": item.get('description', '')
+                    })
+            else:
+                print("states数据类型未知:", type(data))
+                statesdict = []
+
         except Exception as e:
             print(f"解析states失败: {e}")
             statesdict = []
