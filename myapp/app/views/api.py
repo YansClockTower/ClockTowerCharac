@@ -75,7 +75,7 @@ def edition_json(id):
     
     statesdict = []
     states_raw = meta.get('states', '')
-    if states_raw:
+    if states_raw and states_raw.length > 5:
         try:
             data = json.loads(states_raw)
             if isinstance(data, dict):
