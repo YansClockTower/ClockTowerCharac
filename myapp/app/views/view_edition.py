@@ -111,7 +111,7 @@ def download_edition_json(id):
 
     char_ids = json.loads(meta.get('characterList', '[]'))
     meta_json = {
-        "id": "_meta",
+        "id": "_meta", 
         "name": meta.get('name', 'NewEdition'),
         "author": meta.get('author', 'Unknown'),
         "version": meta.get('version', 'beta'),
@@ -128,6 +128,7 @@ def download_edition_json(id):
         meta_json,
         char_ids
     )
+
     # 将 JSON 内容写入内存中的 BytesIO 对象
     file_io = BytesIO()
     file_io.write(json_str.encode('utf-8'))

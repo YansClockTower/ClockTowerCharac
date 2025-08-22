@@ -63,3 +63,83 @@ def edition_info():
         })
     else:
         return jsonify({"query": "not_found"})
+
+@api_bp.route('/api/edition_json/<id>', methods=['POST'])
+def edition_json(id):
+    # 读取所选角色 ID
+    meta = load_edition_meta(id)
+
+    if(!meta): 
+        return jsonify({})
+    
+    statesdict = []
+    states_raw = meta.get('states', '')
+    if states_raw:
+        try:
+            data = json.loads(states_raw)
+            statesdict = [{
+                "stateName": data.get('name', ''),
+                "stateDescription": data.get('description', '')
+            }]
+        except Exception as e:
+            print(f"解析states失败: {e}")
+            statesdict = []
+
+    char_ids = json.loads(meta.get('characterList', '[]'))
+    meta_json = {
+        "id": "_meta",
+        "name": meta.get('name', 'NewEdition'),
+        "author": meta.get('author', 'Unknown'),
+        "version": meta.get('version', 'beta'),
+        "logo": meta.get('logo', 'https://clocktower.gstonegames.com/images/logo.png'),
+        "description": meta.get('description', ''),
+        "state": statesdict
+    }
+
+    # 生成 JSON 文件名（回退为 NewEdition.json）
+    safe_name = meta.get('name', 'NewEdition')
+    filename = f"{safe_name}.json"
+
+    json_str = generate_edition_json(
+        meta_json,
+        char_ids
+    )
+    return jsonify(json_str)
+
+@api_bp.route('/api/edition_list', methods=['POST'])
+def edition_list():
+    begin = request.json.get('begin', 0)
+    size = request.json.get('size', 100)
+    search = request.json.get('search', '')
+
+    conn = get_edition_db()
+    conn.row_factory = sqlite3.Row  # 确保能 dict 取值
+    cursor = conn.cursor()
+
+    # 构建 SQL
+    if search:
+        search = f"%{search.strip()}%"
+        cursor.execute(
+            "SELECT * FROM editions_info WHERE name LIKE ? LIMIT ? OFFSET ?",
+            (search, size, begin)
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM editions_info LIMIT ? OFFSET ?",
+            (size, begin)
+        )
+
+    rows = cursor.fetchall()
+
+    editions = []
+    for row in rows:
+        editions.append({
+            "id": row["id"],
+            "logo": row["logo"],
+            "name": row["name"],
+            "version": row["version"],
+            "author": row["author"],
+        })
+
+    return jsonify(editions)
+
