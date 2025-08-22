@@ -113,7 +113,7 @@ def edition_list():
     search = request.json.get('search', '')
 
     conn = get_edition_db()
-    conn.row_factory = sqlite3.Row  # 确保能 dict 取值
+
     cursor = conn.cursor()
 
     # 构建 SQL
