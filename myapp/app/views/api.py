@@ -5,7 +5,8 @@ from io import BytesIO
 
 from app.models.database import (
     get_character_db,
-    get_edition_db
+    get_edition_db,
+    load_edition_meta
 )
 from app.models.export_edition_json import generate_edition_json
 
@@ -95,10 +96,6 @@ def edition_json(id):
         "description": meta.get('description', ''),
         "state": statesdict
     }
-
-    # 生成 JSON 文件名（回退为 NewEdition.json）
-    safe_name = meta.get('name', 'NewEdition')
-    filename = f"{safe_name}.json"
 
     json_str = generate_edition_json(
         meta_json,
