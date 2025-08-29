@@ -1,13 +1,14 @@
 from io import BytesIO
-from flask import Blueprint, render_template, send_file
+from flask import Blueprint, redirect, render_template, send_file, url_for
 from app.models.database import get_character_db, get_edition_db, get_editions_info, get_night_order, load_character_dict_by_ids, load_edition_meta
 import datetime
 import json
 from collections import defaultdict
 from app.filter import team_mapping, team_colors
 from app.models.export_edition_json import generate_edition_json
+from app.models.crypt import user_me
 
-viewedition_bp = Blueprint("editionpdf", __name__)
+viewedition_bp = Blueprint("editionpdf", __name__, url_prefix="/edition")
 
 # ---- 数据库加载函数 ----
 
@@ -43,12 +44,12 @@ def get_ordered_teams(character_dict):
 
 # ---- 路由函数 ----
 
-@viewedition_bp.route("/viewedition")
+@viewedition_bp.route("/")
 def view_all_editions():
     editions = get_editions_info()  # 返回 {id: name}
     return render_template("list_editions.html", editions=editions)
 
-@viewedition_bp.route("/viewedition/<id>")
+@viewedition_bp.route("/view/<id>")
 def render_edition(id):
     meta = load_edition_meta(id)
     char_ids = json.loads(meta.get('characterList', '[]'))
@@ -91,8 +92,14 @@ def render_edition(id):
                            ordered_teams=ordered_teams,
                            today=today)
 
-@viewedition_bp.route('/downloadedition/<id>', methods=['POST'])
+@viewedition_bp.route('/download/<id>', methods=['POST'])
 def download_edition_json(id):
+    user = user_me()
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_storyteller']:
+        return "❌ 您没有权限下载json，请联系管理员。"
+
     # 读取所选角色 ID
     meta = load_edition_meta(id)
 

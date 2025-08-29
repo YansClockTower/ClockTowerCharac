@@ -1,7 +1,16 @@
 from flask import request, render_template
-from .models.database import get_character_db, get_editions_info, get_filtered_characters
+
+from app.models.crypt import user_me
 
 def register_routes(app):
     @app.route('/')
     def index():
-        return render_template("index.html")
+        user = user_me()
+        username = ""
+        if user:
+            username = user['name']
+        else:
+            username = "游客"
+
+        return render_template("index.html",
+            username=username)

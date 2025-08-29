@@ -1,6 +1,7 @@
 {
     "development": true,
     "database_path": "/home/ubuntu/ClockTower_database",
-    "database_path_dev": "./database"
+    "database_path_dev": "./database",
+    "secret_key": "yanicesno1"
 }
 

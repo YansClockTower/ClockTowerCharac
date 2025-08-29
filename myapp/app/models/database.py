@@ -5,6 +5,8 @@ import shutil
 import sqlite3
 from flask import current_app
 
+from app.models.config import get_config
+
 # 使用相对路径构造绝对路径
 
 DB_PATH = ''
@@ -12,18 +14,13 @@ DB_PATH = ''
 def db_init():
     global DB_PATH  # 声明要修改的是全局变量
     if DB_PATH == '':
-        config = ''
-        # 1. Open the config file
-        with open('./config.txt', 'r', encoding='utf-8') as config_file:
-            # 2. Read the entire file content and parse it as JSON
-            config = json.load(config_file)
 
         # 3. Get the database path from the config
-        if config['development']:
-            DB_PATH = config['database_path_dev']
+        if get_config('development'):
+            DB_PATH = get_config('database_path_dev')
             print("DB_PATH_DEV: " + DB_PATH)
         else:
-            DB_PATH = config['database_path']
+            DB_PATH = get_config('database_path')
             print("DB_PATH: " + DB_PATH)
 
 def db_backup():
@@ -42,6 +39,12 @@ def get_character_db():
     global DB_PATH  # 声明要修改的是全局变量
     CHARACTER_DB = DB_PATH+"/character_latest.sqlite"
     return get_db(CHARACTER_DB)
+
+def get_user_db():
+    db_init()
+    global DB_PATH  # 声明要修改的是全局变量
+    USER_DB = DB_PATH+"/user_latest.sqlite"
+    return get_db(USER_DB)
 
 def get_edition_db():
     db_init()

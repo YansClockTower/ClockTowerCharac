@@ -1,10 +1,11 @@
 import time
 from flask import Blueprint, render_template, request, redirect, url_for
 from app.models.database import get_all_edition_from_released_characters, get_character_db, get_editions_info, get_filtered_characters
+from app.models.crypt import user_me
 
-character_bp = Blueprint("character", __name__)
+character_bp = Blueprint("character", __name__, url_prefix="/character")
 
-@character_bp.route('/view')
+@character_bp.route('/')
 def character_list():
         team_filter = request.args.get('team', '')
         edition_filter = request.args.get('fromEdition', type=int)
@@ -32,6 +33,11 @@ def edit(char_id):
     character = conn.execute("SELECT * FROM character_info WHERE id = ?", (char_id,)).fetchone()
     almanac = conn.execute("SELECT * FROM character_almanac WHERE id = ?", (char_id,)).fetchone()
     conn.close()
+    user = user_me()
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_manage_own_editions']:
+        return "❌ 您没有权限编辑角色，请联系管理员。"
     return render_template("edit_character.html", character=character, almanac=almanac)
 
 @character_bp.route("/view/<int:char_id>")
@@ -56,6 +62,12 @@ def view(char_id):
 
 @character_bp.route('/submit/<int:char_id>', methods=['POST'])
 def edit_submit(char_id):
+    user = user_me()
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_manage_own_editions']:
+        return "❌ 您没有权限编辑角色，请联系管理员。"
+        
     form = request.form
     conn = get_character_db()
 

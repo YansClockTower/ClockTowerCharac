@@ -10,9 +10,9 @@ from app.models.database import (
 )
 from app.models.export_edition_json import generate_edition_json
 
-api_bp = Blueprint("api", __name__)
+api_bp = Blueprint("api", __name__, url_prefix="/api")
 
-@api_bp.route('/api/character_info', methods=['POST'])
+@api_bp.route('/character_info', methods=['POST'])
 def character_info():
     names = request.json.get('names', [])
     found = {}
@@ -40,7 +40,7 @@ def character_info():
             not_found.append(cid)
     return jsonify({"found": found, "not_found": not_found})
 
-@api_bp.route('/api/edition_info', methods=['POST'])
+@api_bp.route('/edition_info', methods=['POST'])
 def edition_info():
     name = request.json.get('name', '')
 
@@ -65,7 +65,7 @@ def edition_info():
     else:
         return jsonify({"query": "not_found"})
 
-@api_bp.route('/api/edition_json/<id>', methods=['POST'])
+@api_bp.route('/edition_json/<id>', methods=['POST'])
 def edition_json(id):
     # 读取所选角色 ID
     meta = load_edition_meta(id)
@@ -116,7 +116,7 @@ def edition_json(id):
     )
     return jsonify(json_str)
 
-@api_bp.route('/api/edition_list', methods=['POST'])
+@api_bp.route('/edition_list', methods=['POST'])
 def edition_list():
     begin = request.json.get('begin', 0)
     size = request.json.get('size', 100)

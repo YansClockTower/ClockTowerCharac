@@ -19,6 +19,7 @@ from app.models.database import (
 )
 from app.models.export_edition_json import generate_edition_json
 from app.filter import team_mapping, team_colors
+from app.models.crypt import user_me
 
 buildedition_bp = Blueprint("edition", __name__)
 
@@ -168,6 +169,15 @@ def submit_selection():
 @buildedition_bp.route('/import', methods=['GET', 'POST'])
 def import_json():
     if request.method == 'POST':
+        user = user_me()
+        if not user:
+            return """❌ 导入失败：请先登录。
+            <a href="/user" style="display:inline-block; margin-top:15px; padding:8px 16px; background-color:#4CAF50; color:white; text-decoration:none; border-radius:4px;">
+                前往登录
+            </a>"""
+        if not user['permission_manage_create_editions']:
+            return "❌ 导入失败：您没有权限导入剧本，请联系管理员。"
+
         json_data_str = request.form.get('json_data', '')
         from app.models.fetch_json import import_from_json
         try:

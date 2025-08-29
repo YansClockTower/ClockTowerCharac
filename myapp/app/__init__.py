@@ -18,11 +18,13 @@ def create_app():
     from .views.build_edition import buildedition_bp
     from .views.view_edition import viewedition_bp
     from .views.api import api_bp
+    from .views.users import users_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(character_bp)
     app.register_blueprint(buildedition_bp)
     app.register_blueprint(viewedition_bp)
+    app.register_blueprint(users_bp)
     
     # 注册首页路由
     from .route import register_routes
