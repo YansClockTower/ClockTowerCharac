@@ -81,7 +81,7 @@ def login():
         algorithm="HS256"
     )
 
-    resp = make_response(jsonify({"status": "success", "token": token}))
+    resp = make_response(jsonify({"status": "success", "id": user['id'], "token": token}))
 
     # generate cookies
     resp.set_cookie("token", token, httponly=True, samesite="Lax")
@@ -110,6 +110,28 @@ def me(current_user):
             "permission_storyteller": current_user['permission_storyteller'],
             "permission_storyteller_vocal": current_user['permission_storyteller_vocal'],
             "lastLogin": current_user['lastLogin']
+        }
+    )
+
+@users_bp.route("/view_user/<int:user_id>", methods=["POST"])
+def view_user(user_id):
+    user_db = get_user_db()
+    user = user_db.execute("SELECT * FROM user_info WHERE id=?", (user_id,)).fetchone()
+    user_db.close()
+    if not user:
+        return jsonify({"status": "failed", "reason": "User not found"})
+    return jsonify(
+        {
+            "status": "success", 
+            "username": user['name'],
+            "id": user['id'],
+            "permission_manage_accounts": user['permission_manage_accounts'],
+            "permission_manage_own_editions": user['permission_manage_own_editions'],
+            "permission_manage_all_editions": user['permission_manage_all_editions'],
+            "permission_manage_create_editions": user['permission_manage_create_editions'],
+            "permission_storyteller": user['permission_storyteller'],
+            "permission_storyteller_vocal": user['permission_storyteller_vocal'],
+            "lastLogin": user['lastLogin']
         }
     )
 
