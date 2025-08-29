@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>编辑用户权限</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    h2 { margin-top: 0; }
+    label { display: block; margin: 8px 0; }
+    input[type="text"] { width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box; }
+    button { padding: 10px 16px; margin-top: 12px; }
+    .status { margin-top: 16px; color: #333; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>编辑用户权限</h2>
+    <label>用户名：
+      <input type="text" id="username" placeholder="请输入要编辑的用户名">
+    </label>
+
+    <fieldset>
+      <legend>权限设置</legend>
+      <label><input type="checkbox" id="perm_manage_accounts"> 管理账户(编辑其他账户的权限)</label>
+      <label><input type="checkbox" id="perm_manage_own_editions"> 管理自己的剧本(暂未实现)</label>
+      <label><input type="checkbox" id="perm_manage_all_editions"> 管理所有剧本(编辑角色、剧本信息)</label>
+      <label><input type="checkbox" id="perm_manage_create_editions"> 创建剧本(导入剧本json)</label>
+      <label><input type="checkbox" id="perm_storyteller"> 说书人(魔典创建房间、下载json)</label>
+      <label><input type="checkbox" id="perm_storyteller_vocal"> 在线说书人(魔典创建内置语音房间)</label>
+    </fieldset>
+
+    <button id="saveBtn">保存权限</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    document.getElementById("saveBtn").onclick = async () => {
+      const username = document.getElementById("username").value.trim();
+      if (!username) {
+        alert("请输入用户名");
+        return;
+      }
+
+      const payload = {
+        username: username,
+        permission_manage_accounts: document.getElementById("perm_manage_accounts").checked ? 1 : 0,
+        permission_manage_own_editions: document.getElementById("perm_manage_own_editions").checked ? 1 : 0,
+        permission_manage_all_editions: document.getElementById("perm_manage_all_editions").checked ? 1 : 0,
+        permission_manage_create_editions: document.getElementById("perm_manage_create_editions").checked ? 1 : 0,
+        permission_storyteller: document.getElementById("perm_storyteller").checked ? 1 : 0,
+        permission_storyteller_vocal: document.getElementById("perm_storyteller_vocal").checked ? 1 : 0,
+      };
+
+      try {
+        const res = await fetch("/user/permission_update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+        const statusDiv = document.getElementById("status");
+
+        if (data.status === "success") {
+          statusDiv.textContent = "✅ 权限更新成功！";
+          statusDiv.className = "status success";
+        } else {
+          statusDiv.textContent = "❌ 更新失败：" + (data.reason || "未知错误");
+          statusDiv.className = "status error";
+        }
+      } catch (e) {
+        console.error(e);
+        const statusDiv = document.getElementById("status");
+        statusDiv.textContent = "❌ 网络错误或服务器异常";
+        statusDiv.className = "status error";
+      }
+    };
+  </script>
+</body>
+</html>

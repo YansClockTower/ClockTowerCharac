@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify, make_response
+from flask import Blueprint, redirect, render_template, request, jsonify, make_response, url_for
 import jwt
 import datetime
 from functools import wraps
 
 from app.models.database import get_user_db
-from app.models.crypt import hash_password, verify_password
+from app.models.crypt import hash_password, user_me, verify_password
 from app.models.config import get_config
 
 # 注意：db和app在主程序中初始化，然后注入
@@ -112,3 +112,56 @@ def me(current_user):
             "lastLogin": current_user['lastLogin']
         }
     )
+
+@users_bp.route("/edit_user", methods=["GET"])
+def edit_user():
+    user = user_me()
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_manage_accounts']:
+        return "❌ 您没有权限编辑其他用户，请联系管理员。"
+    return render_template("edit_user.html")
+
+@users_bp.route("/permission_update", methods=["POST"])
+def permission_update():
+    user = user_me()
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_manage_accounts']:
+        return jsonify({"status": "failed", "reason": "您没有权限编辑其他用户"})
+    
+    username = request.form.get("username") or (request.json.get("username") if request.is_json else None)
+
+    permission_manage_accounts = request.form.get("permission_manage_accounts") or (request.json.get("permission_manage_accounts") if request.is_json else None)
+    permission_manage_own_editions = request.form.get("permission_manage_own_editions") or (request.json.get("permission_manage_own_editions") if request.is_json else None)
+    permission_manage_all_editions = request.form.get("permission_manage_all_editions") or (request.json.get("permission_manage_all_editions") if request.is_json else None)
+    permission_manage_create_editions = request.form.get("permission_manage_create_editions") or (request.json.get("permission_manage_create_editions") if request.is_json else None)
+    permission_storyteller = request.form.get("permission_storyteller") or (request.json.get("permission_storyteller") if request.is_json else None)
+    permission_storyteller_vocal = request.form.get("permission_storyteller_vocal") or (request.json.get("permission_storyteller_vocal") if request.is_json else None)
+
+    user_db = get_user_db()
+    user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
+    if not user:
+        return jsonify({"status": "failed", "reason": "目标用户不存在"})
+
+    user_db.execute("""UPDATE user_info SET 
+    permission_manage_accounts=?,
+    permission_manage_own_editions=?, 
+    permission_manage_all_editions=?, 
+    permission_manage_create_editions=?, 
+    permission_storyteller=?, 
+    permission_storyteller_vocal=? 
+    WHERE name=?""", 
+        (
+        permission_manage_accounts,
+        permission_manage_own_editions, 
+        permission_manage_all_editions, 
+        permission_manage_create_editions, 
+        permission_storyteller, 
+        permission_storyteller_vocal, 
+        username)
+    )
+    user_db.commit()
+    user_db.close()
+
+    return jsonify({"status": "success"})
