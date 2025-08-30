@@ -117,7 +117,7 @@
           } else if (data && data.token) {
             location.reload();
           } else {
-            alert('登录失败：请检查账号或后端返回。');
+            alert('登录失败：请检查用户名或密码。');
           }
         } catch (e) {
           console.error(e);
@@ -140,8 +140,33 @@
             body: JSON.stringify({ username, password })
           });
           const data = await res.json().catch(() => ({}));
-          if (data && (data.success || data.ok)) {
-            alert('注册成功，请登录。');
+          if (data && (data.status || data.status === 'success')) {
+            alert('注册成功。');
+            // 注册成功后自动登录
+            try {
+              const res = await fetch('/user/login_submit', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              const data = await res.json().catch(() => ({}));
+
+              if (data && data.token) localStorage.setItem('token', data.token);
+              if (data && (data.username || data.user)) {
+                localStorage.setItem('username', data.username || data.user);
+              }
+
+              const me = await fetchMe();
+              if (me && (me.username || me.user || me.authenticated)) {
+                localStorage.setItem('username', me.username || me.user || '');
+                location.reload();
+              } else if (data && data.token) {
+                location.reload();
+              }
+            } catch (e) {
+              console.error(e);
+            }
           } else {
             alert('注册失败，请检查用户名是否已存在。');
           }
