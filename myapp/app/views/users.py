@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 from flask import Blueprint, redirect, render_template, request, jsonify, make_response, url_for
 import jwt
 import datetime
@@ -22,6 +25,8 @@ def token_required(f):
             data = jwt.decode(token, get_config('secret_key'), algorithms=["HS256"])
             user_db = get_user_db()
             current_user = user_db.execute("SELECT * FROM user_info WHERE id=?", (data['user_id'],)).fetchone()
+            user_db.execute("UPDATE user_info SET lastLogin=? WHERE id=?", (datetime.datetime.utcnow(), data['user_id']))
+            user_db.commit()
             user_db.close()
         except Exception:
             return jsonify({"status": "failed", "reason": "Invalid token"}), 401
@@ -76,7 +81,7 @@ def login():
         return jsonify({"status": "failed", "reason": "Invalid username or password"})
 
     token = jwt.encode(
-        {"user_id": user['id'], "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)},
+        {"user_id": user['id'], "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365)},
         get_config('secret_key'),
         algorithm="HS256"
     )
@@ -98,20 +103,34 @@ def logout():
 @users_bp.route("/me", methods=["GET"])
 @token_required
 def me(current_user):
-    return jsonify(
-        {
-            "status": "success", 
-            "username": current_user['name'],
-            "id": current_user['id'],
-            "permission_manage_accounts": current_user['permission_manage_accounts'],
-            "permission_manage_own_editions": current_user['permission_manage_own_editions'],
-            "permission_manage_all_editions": current_user['permission_manage_all_editions'],
-            "permission_manage_create_editions": current_user['permission_manage_create_editions'],
-            "permission_storyteller": current_user['permission_storyteller'],
-            "permission_storyteller_vocal": current_user['permission_storyteller_vocal'],
-            "lastLogin": current_user['lastLogin']
-        }
-    )
+    secret_key = get_config('secret_key')
+
+    # 用户信息数据（不含签名）
+    user_data = {
+        "status": "success", 
+        "username": current_user['name'],
+        "id": current_user['id'],
+        "permission_manage_accounts": current_user['permission_manage_accounts'],
+        "permission_manage_own_editions": current_user['permission_manage_own_editions'],
+        "permission_manage_all_editions": current_user['permission_manage_all_editions'],
+        "permission_manage_create_editions": current_user['permission_manage_create_editions'],
+        "permission_storyteller": current_user['permission_storyteller'],
+        "permission_storyteller_vocal": current_user['permission_storyteller_vocal'],
+        "lastLogin": current_user['lastLogin']
+    }
+
+    # 序列化为字符串（确保顺序一致）
+    payload = json.dumps(user_data, sort_keys=True, separators=(",", ":"))
+
+    # 使用 HMAC-SHA256 生成签名
+    signature = hmac.new(
+        secret_key.encode("utf-8"), 
+        payload.encode("utf-8"), 
+        hashlib.sha256
+    ).hexdigest()
+
+    # 返回带签名的数据
+    return jsonify({**user_data, "signature": signature})
 
 @users_bp.route("/view_user/<int:user_id>", methods=["POST"])
 def view_user(user_id):

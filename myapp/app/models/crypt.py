@@ -27,7 +27,10 @@ def verify_password(stored: str, password: str) -> bool:
 def user_me():
     token = request.cookies.get('token')
     if token:
-        token_data = jwt.decode(token, get_config('secret_key'), algorithms=["HS256"])
+        try:
+            token_data = jwt.decode(token, get_config('secret_key'), algorithms=["HS256"])
+        except Exception:
+            return {}
         user_db = get_user_db()
         current_user = user_db.execute("SELECT * FROM user_info WHERE id=?", (token_data['user_id'],)).fetchone()
         user_db.close()
