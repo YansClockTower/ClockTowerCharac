@@ -3,7 +3,9 @@ from flask_cors import CORS
 def create_app():
     app = Flask(__name__, static_url_path='/static', static_folder='static')
 
-    CORS(app)
+    CORS(app,
+     supports_credentials=True,
+     origins=["http://localhost:8080", "https://yanices.site"])  # 允许前端地址
 
     # 注册过滤器
     from .filter import format_timestamp, team_label_filter, team_color_filter, edition_name_filter
