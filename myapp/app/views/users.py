@@ -58,7 +58,11 @@ def register():
 
     hashed_pw = hash_password(password)
     new_user = (username, hashed_pw, '', '', False, False, False, False, False, False, datetime.datetime.utcnow())
-    user_db.execute("INSERT INTO user_info (name, password_hash, icon, title, permission_manage_accounts, permission_manage_own_editions, permission_manage_all_editions, permission_manage_create_editions, permission_storyteller, permission_storyteller_vocal, lastLogin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", new_user)
+    user_db.execute("""INSERT INTO user_info 
+    (name, password_hash, icon, title, 
+    permission_manage_accounts, permission_manage_own_editions, permission_manage_all_editions, permission_manage_create_editions, permission_storyteller, permission_storyteller_vocal, 
+    lastLogin) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", new_user)
     user_db.commit()
     user_db.close()
 
@@ -120,8 +124,7 @@ def me(current_user):
     }
 
     # 序列化为字符串（确保顺序一致）
-    payload = json.dumps(user_data, sort_keys=True, separators=(",", ":"))
-
+    payload = json.dumps(user_data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     # 使用 HMAC-SHA256 生成签名
     signature = hmac.new(
         secret_key.encode("utf-8"), 
