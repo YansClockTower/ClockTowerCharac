@@ -14,6 +14,30 @@
     .muted { color: #666; font-size: 14px; }
     .center { text-align: center; }
     .spacer { height: 10px; }
+    .permissions-card {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .permissions-card h3 {
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+    .permissions-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .permissions-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .permissions-table tr:last-child td {
+      border-bottom: none;
+    }
   </style>
 </head>
 <body>
@@ -45,17 +69,31 @@
       }
     }
 
-    function renderLoggedIn(username) {
+    function renderLoggedIn(username, me) {
       const root = document.getElementById('view');
+      const editUserBtn = me.permission_manage_accounts 
+    ? `<button id="editUserBtn">编辑用户权限</button>` 
+    : "";
       root.innerHTML = `
         <p class="center">欢迎，<b>${username}</b></p>
-        <div class="spacer"></div>
+        <table class="permissions-table">
+            <tr><td>用户权限管理</td><td>${me.permission_manage_accounts ? '✅ 是' : '❌ 否'}</td></tr>
+            <tr><td>个人剧本管理</td><td>${me.permission_manage_own_editions ? '✅ 是' : '❌ 否'}</td></tr>
+            <tr><td>全部剧本管理</td><td>${me.permission_manage_all_editions ? '✅ 是' : '❌ 否'}</td></tr>
+            <tr><td>剧本导入与创建</td><td>${me.permission_manage_create_editions ? '✅ 是' : '❌ 否'}</td></tr>
+            <tr><td>魔典说书人</td><td>${me.permission_storyteller ? '✅ 是' : '❌ 否'}</td></tr>
+            <tr><td>语音说书人</td><td>${me.permission_storyteller_vocal ? '✅ 是' : '❌ 否'}</td></tr>
+          </table>
+        ${editUserBtn}
         <button id="backBtn">返回首页</button>
         <button id="logoutBtn">退出登录</button>
         <p class="muted center">退出将清除本地 token，并尝试让后端清理会话。</p>
       `;
       document.getElementById('backBtn').onclick = async () => {
         location.href = '/';
+      };
+      document.getElementById('editUserBtn').onclick = async () => {
+        location.href = '/user/edit_user';
       };
       document.getElementById('logoutBtn').onclick = async () => {
         localStorage.removeItem('token');
@@ -182,7 +220,7 @@
       if (me && (me.username || me.user)) {
         const name = me.username || me.user;
         localStorage.setItem('username', name);
-        renderLoggedIn(name);
+        renderLoggedIn(name, me);
       } else {
         renderAuthForms();
       }
