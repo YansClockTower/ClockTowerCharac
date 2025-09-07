@@ -42,7 +42,7 @@ def select_characters():
 
     # 获取筛选参数
     team = request.args.get('team', '')
-    from_edition = request.args.get('fromEdition', 0)
+    from_edition = request.args.get('fromEdition', '')
     from_edition = int(from_edition) if from_edition and from_edition.isdigit() else 0
     query = request.args.get('q', '')
 
