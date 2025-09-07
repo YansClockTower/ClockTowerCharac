@@ -59,7 +59,7 @@ def get_editions_info():
     conn.close()
     return editions
 
-def get_filtered_characters(team_filter='', edition_filter=None, search_query='', onlyReleased=False):
+def get_filtered_characters(team_filter='', edition_filter=0, search_query='', onlyReleased=False):
     conn = get_character_db()
     query = 'SELECT id, name, team, fromEdition, image, ability FROM character_info WHERE 1=1'
     params = []
@@ -68,7 +68,7 @@ def get_filtered_characters(team_filter='', edition_filter=None, search_query=''
         query += ' AND team = ?'
         params.append(team_filter)
 
-    if edition_filter is not None:
+    if edition_filter and edition_filter != 0:
         query += ' AND fromEdition = ?'
         params.append(edition_filter)
 

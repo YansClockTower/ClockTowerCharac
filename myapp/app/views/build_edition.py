@@ -25,18 +25,7 @@ buildedition_bp = Blueprint("edition", __name__)
 
 @buildedition_bp.route('/select', methods=['GET'])
 def select_characters():
-    # 获取筛选参数
-    team = request.args.get('team', '')
-    from_edition = request.args.get('fromEdition', type=int)
-    query = request.args.get('q', '')
-
-    # 查询角色信息
-    characters = get_filtered_characters(team, from_edition, query)
-
-    # 获取筛选器数据
-    teams = get_all_teams()
-    editions_info = get_editions_info()
-
+    # 恢复已选择角色（最优先）
     selected_ids_str = request.args.get('selected_ids', '')
     selected_ids = selected_ids_str.split(',') if selected_ids_str else []
 
@@ -50,6 +39,19 @@ def select_characters():
         q = f"SELECT id, name, team, image, ability FROM character_info WHERE id IN ({','.join(['?']*len(selected_ids))})"
         selected_characters = [dict(row) for row in conn.execute(q, selected_ids).fetchall()]
         conn.close()
+
+    # 获取筛选参数
+    team = request.args.get('team', '')
+    from_edition = request.args.get('fromEdition', 0)
+    from_edition = int(from_edition) if from_edition and from_edition.isdigit() else 0
+    query = request.args.get('q', '')
+
+    # 查询角色信息
+    characters = get_filtered_characters(team, from_edition, query)
+
+    # 获取筛选器数据
+    teams = get_all_teams()
+    editions_info = get_editions_info()
 
     from app.filter import team_mapping
 
