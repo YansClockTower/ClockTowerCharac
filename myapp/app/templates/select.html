@@ -201,7 +201,8 @@ function preserveFormContent() {
     document.getElementById('edition-statements-hidden').value = editionStatements;
 }
 
-window.onload = function () {
+document.addEventListener("DOMContentLoaded", function() {
+//window.onload = function () {
     
     const params = new URLSearchParams(window.location.search);
     const name = params.get('edition_name');
@@ -229,8 +230,7 @@ window.onload = function () {
         }
     }
 }
-
-
+);
 
 async function fetchDbEdition(name) {
     const response = await fetch('/api/edition_info', {
