@@ -21,17 +21,18 @@ def get_statement(meta):
             print(f"[Warning] Failed to parse states for edition id={meta.get('id')}: {e}")
     return None
 
-def group_characters_by_team(character_dict):
+def group_characters_by_team(char_ids, character_dict):
     teams = defaultdict(list)
-    for char in character_dict.values():
+    for char_id in char_ids:
+        char = character_dict.get(char_id)
         team = char.get('team') or 'unknown'
         teams[team].append(char)
     return teams
 
 
 
-def get_ordered_teams(character_dict):
-    grouped = group_characters_by_team(character_dict)
+def get_ordered_teams(char_ids, character_dict):
+    grouped = group_characters_by_team(char_ids, character_dict)
     ordered_teams = []
     for key in team_mapping:
         label = team_mapping[key]
@@ -62,7 +63,7 @@ def render_edition(id):
     first_night = get_night_order(character_dict, 'firstNight')
     other_night = get_night_order(character_dict, 'otherNight')
 
-    teams_dict = group_characters_by_team(character_dict)
+    teams_dict = group_characters_by_team(char_ids, character_dict)
 
     # 获取基本字段
     edition_name = meta.get("name", "未知剧本")
@@ -73,9 +74,7 @@ def render_edition(id):
     maxPlayer = meta.get("maxPlayer", 5)
     today = datetime.date.today()
 
-    grouped = group_characters_by_team(character_dict)
-
-    ordered_teams = get_ordered_teams(character_dict)
+    ordered_teams = get_ordered_teams(char_ids, character_dict)
 
     return render_template("view_edition.html",
                            logo=logo,
