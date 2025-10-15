@@ -28,41 +28,46 @@ def generate_edition_json(edition_meta, selected_ids):
     rows = conn.execute(query, selected_ids).fetchall()
     characters = [dict(row) for row in rows]
     conn.close()
+    
+    for char_id in selected_ids:
+        for row in characters:
 
-    for row in characters:
-        item = {
-            "id": "_"+str(row["id"]),
-            "name": row["name"],
-            "image": row["image"],
-            "team": row["team"],
-            "ability": row.get("ability", ""),
-        }
+            if int(row['id']) != int(char_id):
+                continue
 
-        # 可选字段（如果存在就加）
-        if row.get("firstNight"):
-            item["firstNight"] = row["firstNight"]
-        if row.get("firstNightReminder"):
-            item["firstNightReminder"] = row["firstNightReminder"]
+            item = {
+                "id": "_"+str(row["id"]),
+                "name": row["name"],
+                "image": row["image"],
+                "team": row["team"],
+                "ability": row.get("ability", ""),
+            }
 
-        if row.get("otherNight"):
-            item["otherNight"] = row["otherNight"]
-        if row.get("otherNightReminder"):
-            item["otherNightReminder"] = row["otherNightReminder"]
-        
-        if row.get("reminders"):
-            # 假设数据库中是 JSON 字符串
-            try:
-                item["reminders"] = json.loads(row["reminders"])
-            except:
-                item["reminders"] = [row["reminders"]]
+            # 可选字段（如果存在就加）
+            if row.get("firstNight"):
+                item["firstNight"] = row["firstNight"]
+            if row.get("firstNightReminder"):
+                item["firstNightReminder"] = row["firstNightReminder"]
 
-        if row.get("remindersGlobal"):
-            # 假设数据库中是 JSON 字符串
-            try:
-                item["remindersGlobal"] = json.loads(row["remindersGlobal"])
-            except:
-                item["remindersGlobal"] = [row["remindersGlobal"]]
+            if row.get("otherNight"):
+                item["otherNight"] = row["otherNight"]
+            if row.get("otherNightReminder"):
+                item["otherNightReminder"] = row["otherNightReminder"]
+            
+            if row.get("reminders"):
+                # 假设数据库中是 JSON 字符串
+                try:
+                    item["reminders"] = json.loads(row["reminders"])
+                except:
+                    item["reminders"] = [row["reminders"]]
 
-        result.append(item)
+            if row.get("remindersGlobal"):
+                # 假设数据库中是 JSON 字符串
+                try:
+                    item["remindersGlobal"] = json.loads(row["remindersGlobal"])
+                except:
+                    item["remindersGlobal"] = [row["remindersGlobal"]]
+
+            result.append(item)
 
     return json.dumps(result, ensure_ascii=False, indent=2)

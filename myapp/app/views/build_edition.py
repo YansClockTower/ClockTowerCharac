@@ -37,7 +37,13 @@ def select_characters():
     if selected_ids:
         conn = get_character_db()
         q = f"SELECT id, name, team, image, ability FROM character_info WHERE id IN ({','.join(['?']*len(selected_ids))})"
-        selected_characters = [dict(row) for row in conn.execute(q, selected_ids).fetchall()]
+        
+        tmp_selected_characters = [dict(row) for row in conn.execute(q, selected_ids).fetchall()]
+        for char_id in selected_ids:
+            for char_info in tmp_selected_characters:
+                if char_info["id"] == char_id:
+                    selected_characters.append(char_info)
+
         conn.close()
 
     # 获取筛选参数
