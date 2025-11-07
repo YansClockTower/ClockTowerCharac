@@ -102,7 +102,7 @@
 <script>
     const TEAM_LABELS = {{ team_mapping | tojson | safe }};
     let selectedMap = new Map();
-
+    let selectedIds = [];
     function toggleByRow(row) {
         const checkbox = row.querySelector('input[type="checkbox"]');
         checkbox.checked = !checkbox.checked;
@@ -113,31 +113,59 @@
         const character = JSON.parse(checkbox.getAttribute('data-character'));
         if (checkbox.checked) {
             selectedMap.set(character.id, character);
+            selectedIds.push(character.id);
+            console.log(selectedIds);
         } else {
             selectedMap.delete(character.id);
+            selectedIds = selectedIds.filter(id => id !== character.id);
         }
         updateSelectedPanel();
     }
 
-function updateSelectedPanel() {
+    function updateSelectedPanel() {
     const list = document.getElementById('selected-list');
     const hidden = document.getElementById('selected-ids');
     list.innerHTML = '';
 
-    let ids = [];
-    let teamGroups = new Map();  // team => [characters]
-
-    // 分组
-    for (let [id, char] of selectedMap) {
-        ids.push(id);
+    // 根据 selectedIds 的顺序显示
+    let teamGroups = new Map(
+        [
+            ["townsfolk", []],
+            ["outsider", []],
+            ["minion", []],
+            ["demon", []],
+            ["fabled", []],
+            ["traveler", []],
+            ["jinx", []]
+        ]
+    );  // team => [characters]
+    for (let id of selectedIds) {
+        const char = selectedMap.get(id);
+        if (!char) continue;
         if (!teamGroups.has(char.team)) {
             teamGroups.set(char.team, []);
         }
         teamGroups.get(char.team).push(char);
     }
 
+    selectedIds_grouporder = [];
+    for (let [team, chars] of teamGroups) {
+        if (chars.length === 0) continue;
+        for (let id of selectedIds) {
+            if (chars.some(char => char.id === id)) {
+                selectedIds_grouporder.push(id);
+            }
+        }
+    }
+    selectedIds = selectedIds_grouporder;
+
+    hidden.value = selectedIds.join(',');
+
     // 渲染分组
     for (let [team, chars] of teamGroups) {
+
+        if (chars.length === 0) continue;
+
         const teamHeader = document.createElement('h3');
         const teamLabel = TEAM_LABELS[team] || team;
         teamHeader.textContent = `[${teamLabel}]`;
@@ -148,29 +176,82 @@ function updateSelectedPanel() {
             div.className = 'selected-item';
             div.setAttribute('data-id', char.id);
             div.style.cursor = 'pointer';
-            div.innerHTML = `
-                <div style="display:flex;align-items:center;margin-bottom:8px;">
-                    <img src="${char.image}" loading="lazy" style="width:50px;height:50px;margin-right:10px;" onerror="this.src='/static/default-icon.png'">
-                    <div style="display:flex;flex-direction:column;">
-                        <strong style="font-size: 14px;">${char.name}</strong>
-                        <span style="font-size: 12px; color: #555;">${char.ability || ''}</span>
-                    </div>
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.justifyContent = 'space-between';
+            div.style.marginBottom = '8px';
+
+            // 左侧角色信息
+            const infoDiv = document.createElement('div');
+            infoDiv.style.display = 'flex';
+            infoDiv.style.alignItems = 'center';
+            infoDiv.innerHTML = `
+                <img src="${char.image}" loading="lazy"
+                    style="width:50px;height:50px;margin-right:10px;"
+                    onerror="this.src='/static/default-icon.png'">
+                <div style="display:flex;flex-direction:column;">
+                    <strong style="font-size: 14px;">${char.name}</strong>
+                    <span style="font-size: 12px; color: #555;">${char.ability || ''}</span>
                 </div>
             `;
-            div.addEventListener('click', () => unselectCharacter(char.id));
+            infoDiv.addEventListener('click', () => unselectCharacter(char.id));
+            div.appendChild(infoDiv);
+
+            // 右侧按钮区
+            const btnContainer = document.createElement('div');
+            btnContainer.style.display = 'flex';
+            btnContainer.style.gap = '6px';
+
+            const upBtn = document.createElement('button');
+            upBtn.textContent = '↑';
+            upBtn.title = '上移';
+            upBtn.style.padding = '2px 6px';
+            upBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                moveItem(char.id, -1);
+            });
+
+            const downBtn = document.createElement('button');
+            downBtn.textContent = '↓';
+            downBtn.title = '下移';
+            downBtn.style.padding = '2px 6px';
+            downBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                moveItem(char.id, 1);
+            });
+
+            btnContainer.appendChild(upBtn);
+            btnContainer.appendChild(downBtn);
+            div.appendChild(btnContainer);
             list.appendChild(div);
         }
-
     }
 
-    hidden.value = ids.join(',');
+    // 同步隐藏输入框
+    hidden.value = selectedIds.join(',');
+
+    // 内部函数：移动元素
+    function moveItem(id, direction) {
+        const index = selectedIds.indexOf(id);
+        if (index === -1) return;
+
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= selectedIds.length) return;
+
+        // 交换顺序
+        [selectedIds[index], selectedIds[newIndex]] = [selectedIds[newIndex], selectedIds[index]];
+
+        // 更新隐藏域并重新渲染
+        hidden.value = selectedIds.join(',');
+        updateSelectedPanel();
+    }
 }
 
 
 function unselectCharacter(id) {
     // 从 Map 删除
     selectedMap.delete(id);
-
+    selectedIds = selectedIds.filter(i => i !== id);
     // 取消左侧 checkbox 选中状态
     const checkbox = document.querySelector(`input[type="checkbox"][value="${id}"]`);
     if (checkbox) {
@@ -216,14 +297,18 @@ document.addEventListener("DOMContentLoaded", function() {
     if (statements !== null) document.getElementById('editionStatements').value = statements;
 
 
-    const existingIds = "{{ selected_ids }}".split(',');
+    selectedIds = "{{ selected_ids }}".split(',')
+    .filter(id => id.trim() !== '')   // 去除空字符串
+    .map(id => parseInt(id, 10));     // 转为整数
+
+    console.log(selectedIds);
     {% for char in selected_characters %}
         selectedMap.set({{ char.id }}, {{ char | tojson | safe }});
     {% endfor %}
     updateSelectedPanel();
 
     // 勾选左边 checkbox
-    for (let id of existingIds) {
+    for (let id of selectedIds) {
         const checkbox = document.querySelector(`input[type="checkbox"][value="${id}"]`);
         if (checkbox) {
             checkbox.checked = true;

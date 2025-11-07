@@ -13,7 +13,7 @@
         .edition-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 6px;
         }
 
         .edition-item {
@@ -21,19 +21,20 @@
             justify-content: space-between;
             align-items: center;
             background: white;
-            padding: 1em;
-            border-radius: 8px;
+            padding: 0.6em;
+            border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
         .edition-name {
-            font-size: 18px;
+            font-size: 16px;
             color: #333;
         }
 
         .buttons {
             display: flex;
             gap: 10px;
+            margin-left: 2px;
         }
 
         .button {
@@ -64,28 +65,140 @@
 <body>
     <h2>剧本列表</h2>
     <div class="edition-list">
-        {% for id, name in editions.items() %}
-            <div class="edition-item">
-                <div class="edition-name">{{ name }}</div>
-                <div class="buttons">
-                    <a class="button" href="{{ url_for('editionpdf.render_edition', id=id) }}">查看剧本图</a>
-
-                    <!-- 下载按钮通过 JS 触发表单提交 -->
-                    <form id="download-form-{{ id }}" method="POST" action="{{ url_for('editionpdf.download_edition_json', id=id) }}" style="display: none;"></form>
-                    <button class="button download" onclick="downloadJson('{{ id }}')">下载 JSON</button>
+        {# 先分组 category 不为空的剧本 #}
+        {% set grouped = {} %}
+        {% set uncategorized = [] %}
+        {% for id, name, author, category in editions %}
+            {% if category and category not in ['default'] %}
+                {% if category not in grouped %}
+                    {% set _ = grouped.update({category: []}) %}
+                {% endif %}
+                {% set _ = grouped[category].append((id, name, author, category)) %}
+            {% else %}
+                {% set _ = uncategorized.append((id, name, author, category)) %}
+            {% endif %}
+        {% endfor %}
+    
+        {# 渲染有 category 的剧本组，默认折叠 #}
+        {% for category, items in grouped.items() %}
+            <div class="category-block">
+                <h3 class="category-header" onclick="toggleCategory('{{ category }}')">
+                    {{ category }}
+                    <span class="arrow" id="arrow-{{ category }}">►</span>
+                </h3>
+    
+                <div class="category-content" id="category-{{ category }}" style="display: none;">
+                    {% for id, name, author, category in items %}
+                        <div class="edition-item">
+                            <div class="edition-name">
+                                <strong>{{ name }}</strong>
+                                <span style="margin-left:8px; color:#666;">{{ author }}</span>
+                            </div>
+    
+                            <div class="buttons">
+                                <a class="button" href="{{ url_for('editionpdf.render_edition', id=id) }}">查看剧本图</a>
+    
+                                <form id="download-form-{{ id }}" method="POST" action="{{ url_for('editionpdf.download_edition_json', id=id) }}" style="display: none;"></form>
+                                <button class="button download" onclick="downloadJson('{{ id }}')">下载 JSON</button>
+    
+                                <button class="button set-category" onclick="setCategory('{{ id }}')">设置类别</button>
+                            </div>
+                        </div>
+                    {% endfor %}
                 </div>
             </div>
-
         {% endfor %}
+    
+        {# 渲染未分类剧本，默认展示 #}
+        {% if uncategorized %}
+            <!-- <div class="category-block">
+                <h3 class="category-header">未分类剧本</h3> -->
+                <!-- <div class="category-content" style="display: block;"> -->
+                    {% for id, name, author, category in uncategorized %}
+                        <div class="edition-item">
+                            <div class="edition-name">
+                                <strong>{{ name }}</strong>
+                                <span style="margin-left:8px; color:#666;">{{ author }}</span>
+                            </div>
+    
+                            <div class="buttons">
+                                <a class="button" href="{{ url_for('editionpdf.render_edition', id=id) }}">查看剧本图</a>
+    
+                                <form id="download-form-{{ id }}" method="POST" action="{{ url_for('editionpdf.download_edition_json', id=id) }}" style="display: none;"></form>
+                                <button class="button download" onclick="downloadJson('{{ id }}')">下载 JSON</button>
+    
+                                <button class="button set-category" onclick="setCategory('{{ id }}')">设置类别</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                <!-- </div> -->
+            <!-- </div> -->
+        {% endif %}
     </div>
-    <script>
+
+<script>
     function downloadJson(id) {
         const form = document.getElementById('download-form-' + id);
         if (form) {
             form.submit();
         }
     }
+    function toggleCategory(category) {
+        const content = document.getElementById(`category-${category}`);
+        const arrow = document.getElementById(`arrow-${category}`);
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            arrow.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            arrow.textContent = '►';
+        }
+    }
+    function setCategory(id) {
+        const category = prompt("请输入该剧本的类别：");
+        if (!category) return;
+
+        fetch(`/edition/set_category/${id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ category: category })
+        })
+        .then(res => {
+            if (res.ok) {
+                alert("剧本类别已更新成功！");
+            } else {
+                alert("更新失败，请检查后端日志。");
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("请求出错。");
+        });
+    }
 </script>
 
+<style>
+    .category-header {
+        cursor: pointer;
+        background: #dfdfdf;
+        padding: 6px 10px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .category-header:hover {
+        background: #d0d0d0;
+    }
+    .category-content {
+        margin-top: -8px;
+        margin-bottom: 8px;
+        padding-left: 18px;
+    }
+    .arrow {
+        font-size: 12px;
+        color: #555;
+    }
+    </style>
 </body>
 </html>

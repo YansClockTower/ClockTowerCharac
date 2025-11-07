@@ -1,6 +1,6 @@
 from io import BytesIO
-from flask import Blueprint, redirect, render_template, send_file, url_for
-from app.models.database import get_character_db, get_edition_db, get_editions_info, get_night_order, load_character_dict_by_ids, load_edition_meta
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file, url_for
+from app.models.database import get_character_db, get_db, get_edition_db, get_editions_info, get_night_order, load_character_dict_by_ids, load_edition_meta
 import datetime
 import json
 from collections import defaultdict
@@ -47,7 +47,7 @@ def get_ordered_teams(char_ids, character_dict):
 
 @viewedition_bp.route("/")
 def view_all_editions():
-    editions = get_editions_info()  # 返回 {id: name}
+    editions = get_editions_info()  # 返回 {id, name, author, category}
     return render_template("list_editions.html", editions=editions)
 
 @viewedition_bp.route("/view/<id>")
@@ -147,3 +147,16 @@ def download_edition_json(id):
         download_name=filename,
         mimetype='application/json'
     )
+
+@viewedition_bp.route('/set_category/<int:id>', methods=['POST'])
+def set_category(id):
+    data = request.get_json()
+    category = data.get('category')
+    if not category:
+        return jsonify({'error': 'No category provided'}), 400
+
+    db = get_edition_db()
+    db.execute('UPDATE editions_info SET category = ? WHERE id = ?', (category, id))
+    db.commit()
+
+    return jsonify({'success': True})

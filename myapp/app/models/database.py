@@ -54,8 +54,8 @@ def get_edition_db():
 
 def get_editions_info():
     conn = get_edition_db()
-    cursor = conn.execute("SELECT id, name FROM editions_info")
-    editions = {row["id"]: row["name"] for row in cursor.fetchall()}
+    cursor = conn.execute("SELECT id, name, author, category FROM editions_info")
+    editions = [(row["id"], row["name"], row["author"], row["category"]) for row in cursor.fetchall()]
     conn.close()
     return editions
 
