@@ -122,12 +122,13 @@
                             </div>
     
                             <div class="buttons">
+                                
+                                <button class="button set-category" onclick="setCategory('{{ id }}')">设置类别</button>
+
                                 <a class="button" href="{{ url_for('editionpdf.render_edition', id=id) }}">查看剧本图</a>
     
                                 <form id="download-form-{{ id }}" method="POST" action="{{ url_for('editionpdf.download_edition_json', id=id) }}" style="display: none;"></form>
                                 <button class="button download" onclick="downloadJson('{{ id }}')">下载 JSON</button>
-    
-                                <button class="button set-category" onclick="setCategory('{{ id }}')">设置类别</button>
                             </div>
                         </div>
                     {% endfor %}
@@ -167,12 +168,12 @@
             if (res.ok) {
                 alert("剧本类别已更新成功！");
             } else {
-                alert("更新失败，请检查后端日志。");
+                alert("您没有权限管理剧本，请联系管理员。");
             }
         })
         .catch(err => {
             console.error(err);
-            alert("请求出错。");
+            alert("您没有权限管理剧本，请联系管理员。");
         });
     }
 </script>

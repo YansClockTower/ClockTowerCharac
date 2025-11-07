@@ -150,6 +150,12 @@ def download_edition_json(id):
 
 @viewedition_bp.route('/set_category/<int:id>', methods=['POST'])
 def set_category(id):
+    user = user_me()
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_manage_all_editions']:
+        return jsonify({'error': '❌ 您没有权限管理剧本，请联系管理员。'}), 400
+
     data = request.get_json()
     category = data.get('category')
     if not category:

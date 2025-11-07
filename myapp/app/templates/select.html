@@ -269,7 +269,7 @@ function submitWithSelectedIds() {
 function preserveFormContent() {
     // 将 selectedMap 的 key 转为 id 列表并放入隐藏字段
     const hidden = document.getElementById('selected-ids-hidden');
-    hidden.value = Array.from(selectedMap.keys()).join(',');
+    hidden.value = selectedIds.join(',');
 
     const editionName = document.getElementById('editionName').value;
     const editionAuthor = document.getElementById('editionAuthor').value;
