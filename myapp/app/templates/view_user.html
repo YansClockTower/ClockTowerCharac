@@ -100,9 +100,7 @@
 
     // 辅助函数：获取带 token 的请求头 (退出登录时仍需要)
     const getAuthHeaders = () => {
-      const token = localStorage.getItem('token');
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       return headers;
     };
 
@@ -117,10 +115,6 @@
     }
 
     async function handleLogout() {
-        // 清除本地存储
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
-        
         // 尝试通知后端清除会话
         try {
             await fetch('/user/logout', { 

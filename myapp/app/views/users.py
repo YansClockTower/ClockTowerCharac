@@ -56,7 +56,7 @@ def get_user_data_from_request():
         
     except Exception as e:
         # Token 无效或过期
-        # print(f"Token error: {e}") # 调试用
+        print(f"Token error: {e}") # 调试用
         return None
 
 # --- 新装饰器：用于渲染模板的视图函数 ---
@@ -70,7 +70,7 @@ def login_required_template(f):
             # 注意：使用 url_for('users.user_login') 确保路径正确
             response = make_response(redirect(url_for('users.user_login')))
             # 清除可能存在的无效 token cookie
-            response.delete_cookie('token')
+            # response.delete_cookie('token')
             return response
         
         # 将 user_info 传递给视图函数

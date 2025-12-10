@@ -48,10 +48,11 @@
     // 定义常量和工具函数
     const INFO_PAGE_URL = "/user"; // 假设用户信息页面的新路径是 /user/profile
     
+    // 修正后的 getAuthHeaders 函数 
     const getAuthHeaders = () => {
-      const token = localStorage.getItem('token');
+      // 只需要设置内容类型，不需要手动添加 Authorization Header
+      // 浏览器会自动携带 Cookie (因为后端设置了 httponly=True)
       const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       return headers;
     };
 
@@ -86,8 +87,6 @@
             const data = await res.json().catch(() => ({}));
 
             if (data && data.token) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username || data.user || '');
 
                 // 再次确认登录状态（虽然不是必须，但更严谨）
                 const me = await fetchMe();
@@ -165,7 +164,6 @@
         
         if (me && (me.username || me.user)) {
             // 已登录：存储信息并直接跳转
-            localStorage.setItem('username', me.username || me.user || '');
             loadingMsg.textContent = "已登录，正在跳转...";
             location.href = INFO_PAGE_URL;
         } else {
