@@ -22,18 +22,18 @@
         .button-container {
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            width: 200px;
+            gap: 12px;
+            width: 180px;
         }
         .button-container a {
             display: block;
             text-align: center;
-            padding: 15px;
+            padding: 10px;
             background-color: #3498db;
             color: white;
             text-decoration: none;
             border-radius: 8px;
-            font-size: 1.2em;
+            font-size: 1em;
             transition: background-color 0.2s ease;
         }
         .button-container a:hover {
@@ -42,7 +42,13 @@
     </style>
 </head>
 <body>
+    <img id="user-avatar" 
+        src="{{ url_for('users.read_icon', id=userid) }}"
+        alt="用户头像" 
+        style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin: 10px auto; border: 2px solid #ddd;"
+    >
     <h1>欢迎访问, <a href="/user/">{{ username }}</a></h1>
+
     <div class="button-container">
         <a href="/character">浏览已收录角色</a>
         <a href="/edition">浏览已收录剧本</a>

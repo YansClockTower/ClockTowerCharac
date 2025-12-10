@@ -7,10 +7,14 @@ def register_routes(app):
     def index():
         user = user_me()
         username = ""
+        userid = ""
         if user:
             username = user['name']
+            userid = user['id']
         else:
             username = "游客"
+            userid = "0"
 
         return render_template("index.html",
-            username=username)
+            username=username,
+            userid=userid)

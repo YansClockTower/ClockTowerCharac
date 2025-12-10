@@ -14,39 +14,40 @@
     .muted { color: #666; font-size: 14px; }
     .center { text-align: center; }
     .spacer { height: 10px; }
-    .permissions-card {
-      max-width: 400px;
-      margin: 0 auto;
-      padding: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      background: #fafafa;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .permissions-card h3 {
-      margin-bottom: 10px;
-      font-size: 18px;
-    }
-    .permissions-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .permissions-table td {
-      padding: 6px 8px;
-      border-bottom: 1px solid #eee;
-    }
-    .permissions-table tr:last-child td {
-      border-bottom: none;
-    }
+    /* ... 移除不必要的权限样式 ... */
   </style>
 </head>
 <body>
   <div class="card">
     <h2>用户认证</h2>
-    <div id="view"></div>
+    <div id="view">
+      <div id="auth-forms">
+        <div>
+          <h3>登录</h3>
+          <input id="login-username" placeholder="用户名" />
+          <input id="login-password" type="password" placeholder="密码" />
+          <button id="loginBtn">登录</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="spacer"></div>
+        <div>
+          <h3>注册</h3>
+          <input id="reg-username" placeholder="用户名" />
+          <input id="reg-password" type="password" placeholder="密码" />
+          <input id="reg-password2" type="password" placeholder="确认密码" />
+          <div class="row">
+            <button id="registerBtn">注册</button>
+          </div>
+        </div>
+      </div>
+      <p id="loading-msg" class="center">正在检查登录状态...</p>
+    </div>
   </div>
 
   <script>
+    // 定义常量和工具函数
+    const INFO_PAGE_URL = "/user"; // 假设用户信息页面的新路径是 /user/profile
+    
     const getAuthHeaders = () => {
       const token = localStorage.getItem('token');
       const headers = { 'Content-Type': 'application/json' };
@@ -69,101 +70,58 @@
       }
     }
 
-    function renderLoggedIn(username, me) {
-      const root = document.getElementById('view');
-      const editUserBtn = me.permission_manage_accounts 
-    ? `<button id="editUserBtn">编辑用户权限</button>` 
-    : "";
-      root.innerHTML = `
-        <p class="center">欢迎，<b>${username}</b></p>
-        <table class="permissions-table">
-            <tr><td>用户权限管理</td><td>${me.permission_manage_accounts ? '✅ 是' : '❌ 否'}</td></tr>
-            <tr><td>个人剧本管理</td><td>${me.permission_manage_own_editions ? '✅ 是' : '❌ 否'}</td></tr>
-            <tr><td>全部剧本管理</td><td>${me.permission_manage_all_editions ? '✅ 是' : '❌ 否'}</td></tr>
-            <tr><td>剧本导入与创建</td><td>${me.permission_manage_create_editions ? '✅ 是' : '❌ 否'}</td></tr>
-            <tr><td>魔典说书人</td><td>${me.permission_storyteller ? '✅ 是' : '❌ 否'}</td></tr>
-            <tr><td>语音说书人</td><td>${me.permission_storyteller_vocal ? '✅ 是' : '❌ 否'}</td></tr>
-          </table>
-        ${editUserBtn}
-        <button id="backBtn">返回首页</button>
-        <button id="logoutBtn">退出登录</button>
-        <p class="muted center">退出将清除本地 token，并尝试让后端清理会话。</p>
-      `;
-      document.getElementById('backBtn').onclick = async () => {
-        location.href = '/';
-      };
-      document.getElementById('editUserBtn').onclick = async () => {
-        location.href = '/user/edit_user';
-      };
-      document.getElementById('logoutBtn').onclick = async () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
+    /**
+     * @param {string} username 
+     * @param {string} password 
+     * @returns {boolean} 成功返回 true，失败返回 false
+     */
+    async function handleLogin(username, password) {
         try {
-          await fetch('/user/logout', { method: 'POST', credentials: 'include', headers: getAuthHeaders() });
+            const res = await fetch('/user/login_submit', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (data && data.token) {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username || data.user || '');
+
+                // 再次确认登录状态（虽然不是必须，但更严谨）
+                const me = await fetchMe();
+                if (me && (me.username || me.user || me.authenticated)) {
+                    return true;
+                } else if (data && data.token) {
+                    // 如果 token 存在但 /user/me 失败，仍视为成功尝试跳转
+                    return true; 
+                }
+            }
+            alert('登录失败：请检查用户名或密码。');
+            return false;
         } catch (e) {
-          console.warn('Logout request failed (ignored):', e);
+            console.error(e);
+            alert('登录请求失败');
+            return false;
         }
-        location.reload();
-      };
     }
 
-    function renderAuthForms() {
-      const root = document.getElementById('view');
-      root.innerHTML = `
-        <div>
-          <h3>登录</h3>
-          <input id="login-username" placeholder="用户名" />
-          <input id="login-password" type="password" placeholder="密码" />
-          <button id="loginBtn">登录</button>
-        </div>
-        <div class="spacer"></div>
-        <div class="spacer"></div>
-        <div>
-          <h3>注册</h3>
-          <input id="reg-username" placeholder="用户名" />
-          <input id="reg-password" type="password" placeholder="密码" />
-          <input id="reg-password2" type="password" placeholder="确认密码" />
-          <div class="row">
-            <button id="registerBtn">注册</button>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('loginBtn').onclick = async () => {
+    // 登录事件处理
+    const loginsubmit = async () => {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
         if (!username || !password) return alert('请输入用户名和密码');
 
-        try {
-          const res = await fetch('/user/login_submit', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-          });
-          const data = await res.json().catch(() => ({}));
-
-          if (data && data.token) localStorage.setItem('token', data.token);
-          if (data && (data.username || data.user)) {
-            localStorage.setItem('username', data.username || data.user);
-          }
-
-          const me = await fetchMe();
-          if (me && (me.username || me.user || me.authenticated)) {
-            localStorage.setItem('username', me.username || me.user || '');
-            location.reload();
-          } else if (data && data.token) {
-            location.reload();
-          } else {
-            alert('登录失败：请检查用户名或密码。');
-          }
-        } catch (e) {
-          console.error(e);
-          alert('登录请求失败');
+        const success = await handleLogin(username, password);
+        if (success) {
+            // 成功跳转到用户信息页
+            location.href = INFO_PAGE_URL;
         }
-      };
+    };
 
-      document.getElementById('registerBtn').onclick = async () => {
+    // 注册事件处理
+    const registersubmit = async () => {
         const username = document.getElementById('reg-username').value.trim();
         const password = document.getElementById('reg-password').value;
         const password2 = document.getElementById('reg-password2').value;
@@ -171,60 +129,58 @@
         if (password !== password2) return alert('两次输入的密码不一致');
 
         try {
-          const res = await fetch('/user/register_submit', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-          });
-          const data = await res.json().catch(() => ({}));
-          if (data && (data.status || data.status === 'success')) {
-            alert('注册成功。');
-            // 注册成功后自动登录
-            try {
-              const res = await fetch('/user/login_submit', {
+            // 1. 提交注册
+            const res = await fetch('/user/register_submit', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
-              });
-              const data = await res.json().catch(() => ({}));
+            });
+            const data = await res.json().catch(() => ({}));
 
-              if (data && data.token) localStorage.setItem('token', data.token);
-              if (data && (data.username || data.user)) {
-                localStorage.setItem('username', data.username || data.user);
-              }
-
-              const me = await fetchMe();
-              if (me && (me.username || me.user || me.authenticated)) {
-                localStorage.setItem('username', me.username || me.user || '');
-                location.reload();
-              } else if (data && data.token) {
-                location.reload();
-              }
-            } catch (e) {
-              console.error(e);
+            if (data && (data.status === 'success' || data.success)) {
+                alert('注册成功。正在尝试自动登录...');
+                
+                // 2. 自动登录并跳转
+                const success = await handleLogin(username, password);
+                if (success) {
+                    location.href = INFO_PAGE_URL;
+                }
+            } else {
+                alert('注册失败，请检查用户名是否已存在。');
             }
-          } else {
-            alert('注册失败，请检查用户名是否已存在。');
-          }
         } catch (e) {
-          console.error(e);
-          alert('注册请求失败');
+            console.error(e);
+            alert('注册请求失败');
         }
-      };
-    }
+    };
 
-    (async function init() {
-      const me = await fetchMe();
-      if (me && (me.username || me.user)) {
-        const name = me.username || me.user;
-        localStorage.setItem('username', name);
-        renderLoggedIn(name, me);
-      } else {
-        renderAuthForms();
-      }
-    })();
+    // 初始化和事件绑定
+    document.addEventListener('DOMContentLoaded', async () => {
+        const authForms = document.getElementById('auth-forms');
+        const loadingMsg = document.getElementById('loading-msg');
+        
+        // 1. 检查登录状态
+        const me = await fetchMe();
+        
+        if (me && (me.username || me.user)) {
+            // 已登录：存储信息并直接跳转
+            localStorage.setItem('username', me.username || me.user || '');
+            loadingMsg.textContent = "已登录，正在跳转...";
+            location.href = INFO_PAGE_URL;
+        } else {
+            // 未登录：显示表单，隐藏加载提示
+            loadingMsg.style.display = 'none';
+            authForms.style.display = 'block';
+
+            // 2. 绑定事件
+            document.getElementById('loginBtn').addEventListener('click', loginsubmit);
+            document.getElementById('registerBtn').addEventListener('click', registersubmit);
+        }
+    });
+
+    // 确保 auth-forms 默认隐藏，在 JS 检查状态后再显示
+    document.getElementById('auth-forms').style.display = 'none';
   </script>
 </body>
 </html>
