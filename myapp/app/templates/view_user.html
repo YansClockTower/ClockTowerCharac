@@ -185,6 +185,9 @@ uploadCropBtn.addEventListener('click', async () => {
             return;
         }
 
+        //TODO: 请为我在这里补充图片压缩逻辑，确保图片大小小于512KB。
+        //TODO: 允许使用主流浏览器支持的第三方库。
+
         // 1. 使用 FormData 封装文件数据
         const formData = new FormData();
         formData.append('image', file); // 'image' 是后端 Flask 接收文件时使用的 key
@@ -202,6 +205,12 @@ uploadCropBtn.addEventListener('click', async () => {
                 },
                 body: formData
             });
+
+            // 🌟 关键修正点 START: 捕获 413 状态码 🌟
+            if (res.status === 413) {
+                alert("上传失败：文件体积过大！请上传小于2MB的图片。");
+                return; // 立即退出处理
+            }
 
             const data = await res.json().catch(() => ({}));
 
