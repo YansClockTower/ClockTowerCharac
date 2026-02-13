@@ -1,4 +1,5 @@
 install_app:
+    sudo apt-get install libsqlite3-dev
 	sudo rm -rf /var/www/edition_app
 	sudo cp myapp/ /var/www/edition_app -r
 
