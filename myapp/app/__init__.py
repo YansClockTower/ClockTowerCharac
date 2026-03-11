@@ -5,7 +5,7 @@ def create_app():
 
     CORS(app,
      supports_credentials=True,
-     origins=["http://localhost:8080", "https://yanices.site"])  # 允许前端地址
+     origins=["http://localhost:8080", "https://yanice.online"])  # 允许前端地址
 
     # 注册过滤器
     from .filter import format_timestamp, team_label_filter, team_color_filter, edition_name_filter
