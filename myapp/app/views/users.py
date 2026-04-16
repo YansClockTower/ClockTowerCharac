@@ -47,6 +47,30 @@ def _is_temporary_user(user_row) -> bool:
     return password_hash is None or password_hash == ""
 
 
+def _serialize_user_profile(user):
+    return {
+        "status": "success",
+        "username": user['name'],
+        "id": user['id'],
+        "permission_manage_account": user[MANAGE_ACCOUNT_PERMISSION],
+        "permission_manage_accounts": user['permission_manage_accounts'],
+        "permission_manage_own_editions": user['permission_manage_own_editions'],
+        "permission_manage_all_editions": user['permission_manage_all_editions'],
+        "permission_manage_create_editions": user['permission_manage_create_editions'],
+        "permission_storyteller": user['permission_storyteller'],
+        "permission_storyteller_vocal": user['permission_storyteller_vocal'],
+        SCRIPT_BITMAP_COLUMN: user[SCRIPT_BITMAP_COLUMN],
+        LIGHTBOARD_BITMAP_COLUMN: user[LIGHTBOARD_BITMAP_COLUMN],
+        ASSOCIATION_ROLE_COLUMN: user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
+        SOCIAL_ROLE_COLUMN: user.get(SOCIAL_ROLE_COLUMN, "保密"),
+        CONTACT_INFO_COLUMN: user.get(CONTACT_INFO_COLUMN, "保密"),
+        ACTIVITY_ORGANIZED_COUNT_COLUMN: user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
+        ACTIVITY_JOINED_COUNT_COLUMN: user.get(ACTIVITY_JOINED_COUNT_COLUMN, 0),
+        ACTIVITY_ABSENT_COUNT_COLUMN: user.get(ACTIVITY_ABSENT_COUNT_COLUMN, 0),
+        "lastLogin": user['lastLogin'],
+    }
+
+
 # ---------------- 路由 ----------------
 @users_bp.route("/")
 @login_required_template
@@ -254,29 +278,31 @@ def view_user(user_id):
     if not user:
         return jsonify({"status": "failed", "reason": "User not found"})
     user = enrich_user_permissions(dict(user))
-    return jsonify(
-        {
-            "status": "success", 
-            "username": user['name'],
-            "id": user['id'],
-            "permission_manage_account": user[MANAGE_ACCOUNT_PERMISSION],
-            "permission_manage_accounts": user['permission_manage_accounts'],
-            "permission_manage_own_editions": user['permission_manage_own_editions'],
-            "permission_manage_all_editions": user['permission_manage_all_editions'],
-            "permission_manage_create_editions": user['permission_manage_create_editions'],
-            "permission_storyteller": user['permission_storyteller'],
-            "permission_storyteller_vocal": user['permission_storyteller_vocal'],
-            SCRIPT_BITMAP_COLUMN: user[SCRIPT_BITMAP_COLUMN],
-            LIGHTBOARD_BITMAP_COLUMN: user[LIGHTBOARD_BITMAP_COLUMN],
-            ASSOCIATION_ROLE_COLUMN: user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
-            SOCIAL_ROLE_COLUMN: user.get(SOCIAL_ROLE_COLUMN, "保密"),
-            CONTACT_INFO_COLUMN: user.get(CONTACT_INFO_COLUMN, "保密"),
-            ACTIVITY_ORGANIZED_COUNT_COLUMN: user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
-            ACTIVITY_JOINED_COUNT_COLUMN: user.get(ACTIVITY_JOINED_COUNT_COLUMN, 0),
-            ACTIVITY_ABSENT_COUNT_COLUMN: user.get(ACTIVITY_ABSENT_COUNT_COLUMN, 0),
-            "lastLogin": user['lastLogin']
-        }
-    )
+    return jsonify(_serialize_user_profile(user))
+
+
+@users_bp.route("/view_user_by_name", methods=["POST"])
+def view_user_by_name():
+    operator = get_current_user(update_last_login=False)
+    if not operator:
+        return jsonify({"status": "failed", "reason": "请先登录"}), 401
+    if not operator['permission_manage_accounts']:
+        return jsonify({"status": "failed", "reason": "您没有权限查看其他用户档案"}), 403
+
+    payload = request.get_json(silent=True) if request.is_json else {}
+    if payload is None:
+        payload = {}
+    username = request.form.get("username") or payload.get("username")
+    if not username:
+        return jsonify({"status": "failed", "reason": "缺少用户名"})
+
+    user_db = get_user_db()
+    user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
+    user_db.close()
+    if not user:
+        return jsonify({"status": "failed", "reason": "目标用户不存在"})
+    user = enrich_user_permissions(dict(user))
+    return jsonify(_serialize_user_profile(user))
 
 @users_bp.route("/edit_user", methods=["GET"])
 def edit_user():

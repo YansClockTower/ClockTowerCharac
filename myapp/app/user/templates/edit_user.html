@@ -13,6 +13,13 @@
     .status { margin-top: 16px; color: #333; }
     .success { color: green; }
     .error { color: red; }
+    .profile-view { margin-top: 20px; padding: 14px; border: 1px solid #ddd; border-radius: 10px; background: #fafafa; display: none; }
+    .profile-view h3 { margin-top: 0; margin-bottom: 10px; }
+    .profile-view table { width: 100%; border-collapse: collapse; }
+    .profile-view td { padding: 6px 4px; border-bottom: 1px solid #eee; }
+    .profile-view tr:last-child td { border-bottom: none; }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row button { flex: 1; }
   </style>
 </head>
 <body>
@@ -42,9 +49,32 @@
       </select>
     </fieldset>
 
-    <button id="saveBtn">保存权限</button>
-    <button id="saveAssociationBtn">保存协会身份</button>
+    <div class="btn-row">
+      <button id="saveBtn">保存权限</button>
+      <button id="saveAssociationBtn">保存协会身份</button>
+      <button id="viewProfileBtn" type="button">查看档案</button>
+    </div>
     <div class="status" id="status"></div>
+
+    <div class="profile-view" id="profileView">
+      <h3>用户档案</h3>
+      <table>
+        <tr><td>用户名</td><td id="profile_username">-</td></tr>
+        <tr><td>用户ID</td><td id="profile_id">-</td></tr>
+        <tr><td>协会身份</td><td id="profile_association_role">-</td></tr>
+        <tr><td>社会身份</td><td id="profile_social_role">-</td></tr>
+        <tr><td>联系方式</td><td id="profile_contact_info">-</td></tr>
+        <tr><td>组织活动次数</td><td id="profile_activity_organized_count">0</td></tr>
+        <tr><td>参与活动次数</td><td id="profile_activity_joined_count">0</td></tr>
+        <tr><td>缺席活动次数</td><td id="profile_activity_absent_count">0</td></tr>
+        <tr><td>用户权限管理</td><td id="profile_permission_manage_accounts">❌ 否</td></tr>
+        <tr><td>个人剧本管理</td><td id="profile_permission_manage_own_editions">❌ 否</td></tr>
+        <tr><td>全部剧本管理</td><td id="profile_permission_manage_all_editions">❌ 否</td></tr>
+        <tr><td>剧本导入与创建</td><td id="profile_permission_manage_create_editions">❌ 否</td></tr>
+        <tr><td>魔典说书人</td><td id="profile_permission_storyteller">❌ 否</td></tr>
+        <tr><td>语音说书人</td><td id="profile_permission_storyteller_vocal">❌ 否</td></tr>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -52,6 +82,28 @@
       const statusDiv = document.getElementById("status");
       statusDiv.textContent = text;
       statusDiv.className = ok ? "status success" : "status error";
+    }
+
+    function toYesNo(value) {
+      return value ? "✅ 是" : "❌ 否";
+    }
+
+    function renderProfile(data) {
+      document.getElementById("profileView").style.display = "block";
+      document.getElementById("profile_username").textContent = data.username || "-";
+      document.getElementById("profile_id").textContent = data.id ?? "-";
+      document.getElementById("profile_association_role").textContent = data.association_role || "普通玩家";
+      document.getElementById("profile_social_role").textContent = data.social_role || "保密";
+      document.getElementById("profile_contact_info").textContent = data.contact_info || "保密";
+      document.getElementById("profile_activity_organized_count").textContent = data.activity_organized_count ?? 0;
+      document.getElementById("profile_activity_joined_count").textContent = data.activity_joined_count ?? 0;
+      document.getElementById("profile_activity_absent_count").textContent = data.activity_absent_count ?? 0;
+      document.getElementById("profile_permission_manage_accounts").textContent = toYesNo(!!data.permission_manage_accounts);
+      document.getElementById("profile_permission_manage_own_editions").textContent = toYesNo(!!data.permission_manage_own_editions);
+      document.getElementById("profile_permission_manage_all_editions").textContent = toYesNo(!!data.permission_manage_all_editions);
+      document.getElementById("profile_permission_manage_create_editions").textContent = toYesNo(!!data.permission_manage_create_editions);
+      document.getElementById("profile_permission_storyteller").textContent = toYesNo(!!data.permission_storyteller);
+      document.getElementById("profile_permission_storyteller_vocal").textContent = toYesNo(!!data.permission_storyteller_vocal);
     }
 
     document.getElementById("saveBtn").onclick = async () => {
@@ -112,6 +164,30 @@
           setStatus(true, `✅ 协会身份已更新为：${data.association_role}`);
         } else {
           setStatus(false, "❌ 更新失败：" + (data.reason || "未知错误"));
+        }
+      } catch (e) {
+        setStatus(false, "❌ 网络错误或服务器异常");
+      }
+    };
+
+    document.getElementById("viewProfileBtn").onclick = async () => {
+      const username = document.getElementById("username").value.trim();
+      if (!username) {
+        alert("请输入用户名");
+        return;
+      }
+      try {
+        const res = await fetch("/user/view_user_by_name", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+        const data = await res.json();
+        if (data.status === "success") {
+          renderProfile(data);
+          setStatus(true, "✅ 档案读取成功");
+        } else {
+          setStatus(false, "❌ 读取失败：" + (data.reason || "未知错误"));
         }
       } catch (e) {
         setStatus(false, "❌ 网络错误或服务器异常");
