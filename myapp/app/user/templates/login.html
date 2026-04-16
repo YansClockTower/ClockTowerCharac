@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>用户登录</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 420px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    h2 { margin: 0 0 12px; }
+    input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .center { text-align: center; }
+    .spacer { height: 10px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>用户认证</h2>
+    <div id="view">
+      <div id="auth-forms">
+        <div>
+          <h3>登录</h3>
+          <input id="login-username" placeholder="用户名" />
+          <input id="login-password" type="password" placeholder="密码" />
+          <button id="loginBtn">登录</button>
+        </div>
+        <div class="spacer"></div>
+        <div class="spacer"></div>
+        <div>
+          <h3>注册</h3>
+          <input id="reg-username" placeholder="用户名" />
+          <input id="reg-password" type="password" placeholder="密码" />
+          <input id="reg-password2" type="password" placeholder="确认密码" />
+          <div class="row">
+            <button id="registerBtn">注册</button>
+          </div>
+        </div>
+      </div>
+      <p id="loading-msg" class="center">正在检查登录状态...</p>
+    </div>
+  </div>
+
+  <script>
+    const INFO_PAGE_URL = "/user";
+    const getAuthHeaders = () => ({ "Content-Type": "application/json" });
+
+    async function fetchMe() {
+      try {
+        const res = await fetch("/user/me", {
+          method: "GET",
+          credentials: "include",
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function handleLogin(username, password) {
+      try {
+        const res = await fetch("/user/login_submit", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (data && data.token) {
+          const me = await fetchMe();
+          if (me && (me.username || me.user || me.authenticated)) {
+            return true;
+          } else if (data && data.token) {
+            return true;
+          }
+        }
+        alert("登录失败：请检查用户名或密码。");
+        return false;
+      } catch (e) {
+        alert("登录请求失败");
+        return false;
+      }
+    }
+
+    const loginsubmit = async () => {
+      const username = document.getElementById("login-username").value.trim();
+      const password = document.getElementById("login-password").value;
+      if (!username || !password) return alert("请输入用户名和密码");
+
+      const success = await handleLogin(username, password);
+      if (success) {
+        location.href = INFO_PAGE_URL;
+      }
+    };
+
+    const registersubmit = async () => {
+      const username = document.getElementById("reg-username").value.trim();
+      const password = document.getElementById("reg-password").value;
+      const password2 = document.getElementById("reg-password2").value;
+      if (!username || !password || !password2) return alert("请输入完整的注册信息");
+      if (password !== password2) return alert("两次输入的密码不一致");
+
+      try {
+        const res = await fetch("/user/register_submit", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (data && (data.status === "success" || data.success)) {
+          alert("注册成功。正在尝试自动登录...");
+          const success = await handleLogin(username, password);
+          if (success) {
+            location.href = INFO_PAGE_URL;
+          }
+        } else {
+          alert("注册失败，请检查用户名是否已存在。");
+        }
+      } catch (e) {
+        alert("注册请求失败");
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const authForms = document.getElementById("auth-forms");
+      const loadingMsg = document.getElementById("loading-msg");
+      const me = await fetchMe();
+
+      if (me && (me.username || me.user)) {
+        loadingMsg.textContent = "已登录，正在跳转...";
+        location.href = INFO_PAGE_URL;
+      } else {
+        loadingMsg.style.display = "none";
+        authForms.style.display = "block";
+        document.getElementById("loginBtn").addEventListener("click", loginsubmit);
+        document.getElementById("registerBtn").addEventListener("click", registersubmit);
+      }
+    });
+
+    document.getElementById("auth-forms").style.display = "none";
+  </script>
+</body>
+</html>

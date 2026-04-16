@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}轻桌游聚集地 - 活动板{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{{ url_for('events.static', filename='browse.css') }}">
+{% endblock %}
+
+{% block content %}
+
+    <div class="event-list">
+        <h2>活动列表 (共{{ events|length }}个)</h2>
+
+        <a href="{{ url_for('events.add_event_route') }}" class="base-btn corner-button">
+            + 新活动
+        </a>
+
+        {% for event in events %}
+            {% set status_class = "" %}
+            {% set status_text = "" %}
+
+            {% if event.maxplayer and event.attendee_count >= event.maxplayer %}
+                {% set status_class = "status-full" %}
+                {% set status_text = "(名额已满)" %}
+            {% elif event.minplayer and event.attendee_count < event.minplayer %}
+                {% set status_class = "status-min-not-met" %}
+                {% set status_text = "(人数不足)" %}
+            {% elif event.starttime_obj < now() %}
+                {% set status_class = "status-started" %}
+                {% set status_text = "(活动已开始)" %}
+            {% elif event.locktime_obj < now() %}
+                {% set status_class = "status-lock" %}
+                {% set status_text = "(名单已确认)" %}
+            {% elif event.attendee_count > 0 %}
+                {% set status_class = "status-min-met" %}
+                {% set status_text = "(人数达标)" %}
+            {% endif %}
+
+            <div class="event-item {{ status_class }}">
+                <div class="event-details">
+                    <div class="event-info">
+                        <h3>{{ event.name }}
+                            {% if status_text %}
+                                <span class="status-tag {{ status_class }}">{{ status_text }}</span>
+                            {% endif %}
+                            {% if event.inviter == current_user %}
+                                <span style="font-size: 0.7em; color: green; font-weight: bold;">(我的活动)</span>
+                            {% endif %}
+                        </h3>
+                        {% if event.description %}
+                            {{ event.description }}
+                        {% endif %}
+                        <br>
+                        <p>
+                            <strong>活动类型:</strong> {{ event.event_type or '其他' }}<br>
+                            <strong>组织者:</strong> {{ event.inviter }}<br>
+                            <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
+                            <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
+                            <strong>活动地点:</strong> {{ event.location }}
+                        </p>
+                    </div>
+
+                    <div class="action-buttons">
+                        {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
+                        {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
+                        {% set is_full = (status_class == "status-full") %}
+                            {% if event.is_attending %}
+                                {% if event.locktime_obj < now() %}
+                                <button type="button" class="base-btn set-note-btn">
+                                    无法取消
+                                </button>
+                                {% else %}
+                                    <form method="POST" action="{{ url_for('events.leave_event_route', event_id=event.id) }}">
+                                        <button type="submit" class="base-btn leave-btn">取消报名</button>
+                                    </form>
+                                    {% if event.attendee_count < event.maxplayer %}
+                                    <button type="button" class="base-btn set-note-btn" onclick="editFriend({{ event.id }},'+')">
+                                        +随行人
+                                    </button>
+                                    {% endif %}
+                                    {% if event.user_friends != '0' %}
+                                    <button type="button" class="base-btn set-note-btn" onclick="editFriend({{ event.id }},'-')">
+                                        -随行人
+                                    </button>
+                                    {% endif %}
+                                {% endif %}
+                                <button type="button" class="base-btn set-note-btn" onclick="promptForNote({{ event.id }})">
+                                    设置备注
+                                </button>
+                            {% elif is_full %}
+                                <button type="button" class="base-btn leave-btn" disabled>
+                                    名额已满
+                                </button>
+                            {% elif event.inviter != current_user %}
+                                {% if event.locktime_obj < now() %}
+                                <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}"
+                                    onsubmit="return confirm('确定空降吗？报名后无法取消！')">
+                                    <button type="submit" class="base-btn join-btn">
+                                        空降报名
+                                    </button>
+                                </form>
+                                {% else %}
+                                <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}">
+                                    <button type="submit" class="base-btn join-btn">
+                                        报名参加
+                                    </button>
+                                </form>
+                                {% endif %}
+                            {% endif %}
+
+                        {% if event_owner_or_admin %}
+                            <button onclick="refToEdit({{event.id}})" class="base-btn edit-btn">编辑</button>
+                            <form method="POST"
+                                  action="{{ url_for('events.delete_event_route', event_id=event.id) }}"
+                                  onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除活动及所有报名记录吗？{% endif %}')">
+                                <button type="submit" class="base-btn leave-btn">
+                                    {% if can_end_event %}结束活动{% else %}删除活动{% endif %}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="event-summary">
+                    <strong>当前报名:</strong>
+                    <span style="font-weight: bold; color: #007bff;">{{ event.attendee_count }} 人</span>
+                    {% if event.minplayer or event.maxplayer %}
+                        /
+                        {% if event.minplayer %}最少 {{ event.minplayer }} 人{% endif %}
+                        {% if event.minplayer and event.maxplayer %} / {% endif %}
+                        {% if event.maxplayer %}最多 {{ event.maxplayer }} 人{% endif %}
+                    {% endif %}
+
+                    {% if event.attendee_list %}
+                        <br>
+                        {% if event.starttime_obj < now() %}
+                            <span class="player-list">
+                            {% for attendance in event.attendee_notes %}
+                            {% if attendance.signed > 0 %}
+                                {% set player_id = attendance.player %}
+                                {% set player_note = attendance.note %}
+                                {% set player_friends = attendance.friends %}
+                                <span class="player-tag {% if player_id == current_user %}current-player-tag{% endif %}">
+                                    {{ player_id }}
+                                    {% if player_note %}({{player_note}}){% endif %}
+                                    {% if player_friends and player_friends != 0 %}+{{player_friends}}人{% endif %}
+                                </span>
+                            {% endif %}
+                            {% endfor %}
+                            {% for attendance in event.attendee_notes %}
+                            {% if attendance.signed == 0 %}
+                                {% set player_id = attendance.player %}
+                                {% set player_note = attendance.note %}
+                                {% set player_friends = attendance.friends %}
+                                <span class="player-tag unsigned-player-tag {% if player_id == current_user %}current-player-tag{% endif %}">
+                                    {{ player_id }}
+                                    {% if player_note %}({{player_note}}){% endif %}
+                                    {% if player_friends and player_friends != 0 %}+{{player_friends}}人{% endif %}
+                                </span>
+                            {% endif %}
+                            {% endfor %}
+                            </span>
+                        {% else %}
+                            <span class="player-list">
+                                {% for attendance in event.attendee_notes %}
+                                {% set player_id = attendance.player %}
+                                {% set player_note = attendance.note %}
+                                {% set player_friends = attendance.friends %}
+                                <span class="player-tag {% if player_id == current_user %}current-player-tag{% endif %}">
+                                    {{ player_id }}
+                                    {% if player_note %}({{player_note}}){% endif %}
+                                    {% if player_friends and player_friends != '0' %}+{{player_friends}}人{% endif %}
+                                </span>
+                                {% endfor %}
+                            </span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                {% if event.starttime_obj < now() %}
+                <div class="event-summary">
+                    {% if event.inviter == current_user or current_user_is_admin %}
+                    <p><strong>活动签到码:</strong> {{ event.signcode }}</p>
+                    <p>请将签到码 <strong>线下</strong> 告知到场的成员，并邀请他们打开此公告板输入该码以完成签到。</p>
+                    {% endif %}
+                    {% if event.is_attending %}
+                        {% if not event.user_signed %}
+                            <input type="text" class="base-btn" id="input_signcode" name="input_signcode" placeholder="请输入活动签到码">
+                            <button type="button" class="base-btn sign-btn" onclick="signIn({{ event.id }}, document.getElementById('input_signcode').value)">签到</button>
+                            <p>请留意活动组织者线下宣布的 <strong>签到码</strong>，将其输入以完成签到。</p>
+                        {% else %}
+                            <p><strong>已签到，感谢你的支持！</strong></p>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <p>目前还没有活动信息。去 <a href="{{ url_for('events.add_event_route') }}">添加一个</a> 吧！</p>
+        {% endfor %}
+    </div>
+
+    <script>
+        function refToEdit(eventId) {
+            const urlTemplate = "{{ url_for('events.edit_event_route', event_id=7777) }}";
+            window.location.href = urlTemplate.replace("7777", eventId);
+        }
+        function signIn(eventId, signcode) {
+            const urlTemplate = "{{ url_for('events.signin_event_route', event_id=7777) }}";
+            fetch(urlTemplate.replace("7777", eventId), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ signcode: signcode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert("签到失败:" + data.message);
+                }
+            })
+            .catch(() => alert("提交请求出错，请稍后再试。"));
+        }
+        function promptForNote(eventId) {
+            const note = prompt("请输入您要设置的备注：");
+            if (note !== null) {
+                const urlTemplate = "{{ url_for('events.set_joininfo_route', event_id=7777) }}";
+                fetch(urlTemplate.replace("7777", eventId), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ note: note })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("备注设置成功！");
+                        window.location.reload();
+                    } else {
+                        alert("设置备注失败");
+                    }
+                })
+                .catch(() => alert("提交请求出错，请稍后再试。"));
+            }
+        }
+        function editFriend(eventId, isMore) {
+            const urlTemplate = "{{ url_for('events.set_joininfo_route', event_id=7777) }}";
+            fetch(urlTemplate.replace("7777", eventId), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ friend: isMore })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert("随行人设置失败:" + data.message);
+                }
+            })
+            .catch(() => alert("提交请求出错，请稍后再试。"));
+        }
+    </script>
+{% endblock %}

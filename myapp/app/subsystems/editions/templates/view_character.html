@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ character.name }} - 角色信息</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('edition.static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('edition.static', filename='css/view_character.css') }}">
+    <style>
+      .sidebar-bookmarks {
+        position: fixed;
+        top: 75%;
+        right: 0;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 1000;
+      }
+      .sidebar-bookmarks a {
+        display: block;
+        background-color: #3b82f6;
+        color: white;
+        padding: 10px 16px;
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgb(59 130 246 / 0.5);
+        transition: background-color 0.3s ease;
+        white-space: nowrap;
+        text-align: center;
+        width: max-content;
+      }
+      .sidebar-bookmarks a:hover {
+        background-color: #2563eb;
+      }
+      .line-box {
+            gap: 8px;
+            padding: 5px 10px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+      }
+    </style>
+</head>
+<body>
+    <div class="content_body">
+        <div class="header">
+            <div class="title-section">
+                <h1 class="text-4xl font-bold mb-2">{{ character.name or '（未命名角色）' }}</h1>
+                <div class="subtitle">
+                    {{ (almanac.designer or '未知设计者') ~ ' · ' ~ (almanac.drawer or '未知画师') if almanac else '暂无信息' }}
+                </div>
+                <br>
+                <div class="value italic">{{ (almanac.flavor if almanac else None) or '"暂无信息"' }}</div>
+            </div>
+            {% if character.image %}
+                <img src="{{ character.image }}" alt="角色图片" class="image-preview">
+            {% endif %}
+        </div>
+        {% if character.fromEdition <= 4 %}
+        <div style="border: 2px solid red; background-color: #ffe5e5; padding: 15px; margin: 10px 0; font-weight: bold; text-align: center;">
+            注意！这是一个官方角色。该页面内容仅供参考，并以官方百科为准:
+            <a href="https://clocktower-wiki.gstonegames.com/index.php?title={{ character.name }}" target="_blank" style="color: blue; text-decoration: underline;">
+                点这里跳转
+            </a>
+        </div>
+        {% endif %}
+        <div class="section">
+            <div class="section-title">角色能力</div>
+            <div class="value"><strong>{{ character.ability or '暂无信息' }}</strong></div>
+        </div>
+        <div class="section">
+            <div class="section-title">角色简介</div>
+            <div class="value">{{ (almanac.overview if almanac else None) or '暂无信息' }}</div>
+        </div>
+        <div class="section">
+            <div class="section-title">运行示例</div>
+                {% if almanac and almanac.examples %}
+                    {% for line in almanac.examples.split('\n') %}
+                        <p class="line-box">{{ line }}</p>
+                    {% endfor %}
+                {% else %}
+                    暂无信息
+                {% endif %}
+        </div>
+        <div class="section">
+            <div class="section-title">运行方式</div>
+            <div class="value">{{ (almanac.howtorun if almanac else None) or '暂无信息' }}</div>
+        </div>
+        <div class="section">
+            <div class="section-title">规则细节与提示</div>
+            <div class="value">{{ (almanac.tips if almanac else None) or '暂无信息' }}</div>
+        </div>
+        <div class="section">
+            <div class="section-title">角色信息</div>
+            <div class="value">角色类型：{{ character.team | team_name }}</div>
+            <div class="value">能力标签：{{ character.tags if character.tags else '无' }}</div>
+        </div>
+        <hr class="my-6 border-gray-300">
+        <p class="text-center text-sm text-gray-500">
+            最后更新: {{ character.lastUpdated | datetime if character.lastUpdated else '暂无信息' }}
+        </p>
+    </div>
+
+    <div class="sidebar-bookmarks">
+        <a href="{{ url_for('character.character_list') }}">← 返回列表</a>
+        <a href="{{ url_for('character.edit', char_id=character.id) }}">✏️ 编辑角色</a>
+    </div>
+
+</body>
+</html>

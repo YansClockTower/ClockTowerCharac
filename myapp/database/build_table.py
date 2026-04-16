@@ -10,12 +10,15 @@ conn.execute('''CREATE TABLE user_info (
     password_hash TEXT,
     icon TEXT,
     title TEXT,
-    permission_manage_accounts BOOLEAN,
-    permission_manage_own_editions BOOLEAN,
-    permission_manage_all_editions BOOLEAN,
-    permission_manage_create_editions BOOLEAN,
-    permission_storyteller BOOLEAN,
-    permission_storyteller_vocal BOOLEAN,
+    permission_manage_account BOOLEAN DEFAULT 0,
+    permission_script_bitmap INTEGER DEFAULT 0,
+    permission_lightboard_bitmap INTEGER DEFAULT 0,
+    association_role TEXT DEFAULT '普通玩家' CHECK(association_role IN ('普通玩家', '协会玩家', '核心玩家', '管理员')),
+    social_role TEXT DEFAULT '保密' CHECK(social_role IN ('交大学生', '华师学生', '校外人员', '保密')),
+    contact_info TEXT DEFAULT '保密',
+    activity_organized_count INTEGER DEFAULT 0 CHECK(activity_organized_count >= 0),
+    activity_joined_count INTEGER DEFAULT 0 CHECK(activity_joined_count >= 0),
+    activity_absent_count INTEGER DEFAULT 0 CHECK(activity_absent_count >= 0),
     lastLogin INTEGER
 );''')
 

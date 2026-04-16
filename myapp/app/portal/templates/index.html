@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>索引页</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f7f7f7;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 40px;
+        }
+        .primary-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 280px;
+        }
+        .primary-nav button {
+            width: 100%;
+            text-align: center;
+            padding: 10px;
+            border: none;
+            background-color: #34495e;
+            color: white;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .primary-nav button:hover {
+            background-color: #2c3e50;
+        }
+        .secondary-nav {
+            display: none;
+            margin-top: -4px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #eef2f7;
+        }
+        .secondary-nav.active {
+            display: block;
+        }
+        .secondary-nav a {
+            display: block;
+            text-align: center;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: background-color 0.2s ease;
+            margin-bottom: 8px;
+        }
+        .secondary-nav a:last-child {
+            margin-bottom: 0;
+        }
+        .secondary-nav a:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <img
+        id="user-avatar"
+        src="{{ url_for('users.read_icon', id=userid) }}"
+        alt="用户头像"
+        style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; margin: 10px auto; border: 2px solid #ddd;"
+    >
+    <h1>欢迎访问, <a href="{{ url_for('users.user_page') }}">{{ username }}</a></h1>
+
+    <div class="primary-nav">
+        <button type="button" onclick="toggleSection('club-section')">轻桌游协会</button>
+        <div id="club-section" class="secondary-nav">
+            <a href="{{ url_for('events.browse_events') }}">活动面板</a>
+        </div>
+
+        <button type="button" onclick="toggleSection('botc-tools-section')">《血染钟楼》工具</button>
+        <div id="botc-tools-section" class="secondary-nav">
+            <a href="{{ url_for('character.character_list') }}">浏览已收录角色</a>
+            <a href="{{ url_for('editionpdf.view_all_editions') }}">浏览已收录剧本</a>
+            <a href="{{ url_for('edition.select_characters') }}">自制剧本</a>
+            <a href="{{ url_for('edition.import_json') }}">收录新剧本</a>
+        </div>
+    </div>
+    <p>
+        轻桌游协会资料站 | 粤ICP备2025432638号
+    </p>
+
+    <script>
+        function toggleSection(sectionId) {
+            const target = document.getElementById(sectionId);
+            if (!target) return;
+            target.classList.toggle("active");
+        }
+    </script>
+</body>
+</html>

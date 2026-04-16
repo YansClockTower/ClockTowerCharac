@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>用户中心</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 420px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    h2 { margin: 0 0 12px; }
+    button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    .center { text-align: center; }
+    .permissions-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .permissions-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+    .permissions-table tr:last-child td { border-bottom: none; }
+    .status { margin-top: 10px; min-height: 20px; }
+    .success { color: green; }
+    .error { color: red; }
+    input[type="text"], select { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
+    details { margin-top: 12px; border: 1px solid #eee; border-radius: 8px; padding: 8px 10px; }
+    summary { cursor: pointer; font-weight: 600; }
+    #avatar-container { display: flex; flex-direction: column; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>用户中心</h2>
+    {% if user_info %}
+    <div id="user-profile-view">
+      <p class="center">欢迎，<b>{{ user_info.name or '用户' }}</b></p>
+      <div id="avatar-container" class="center">
+        <img id="user-avatar" src="{{ url_for('users.read_icon', id=user_info.id) }}" alt="用户头像"
+             style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin: 10px auto; border: 2px solid #ddd;">
+        <button id="setAvatarBtn" style="width: 50%; margin-top: 5px;">设置头像</button>
+      </div>
+      <table class="permissions-table">
+        <tr><td>协会身份</td><td>{{ user_info.association_role or '普通玩家' }}</td></tr>
+        <tr><td>社会身份</td><td id="currentSocialRole">{{ user_info.social_role or '保密' }}</td></tr>
+        <tr><td>联系方式</td><td id="currentContactInfo">{{ user_info.contact_info or '保密' }}</td></tr>
+        <tr><td>组织活动次数</td><td>{{ user_info.activity_organized_count or 0 }}</td></tr>
+        <tr><td>参与活动次数</td><td>{{ user_info.activity_joined_count or 0 }}</td></tr>
+        <tr><td>缺席活动次数</td><td>{{ user_info.activity_absent_count or 0 }}</td></tr>
+      </table>
+      <details>
+        <summary>查看权限详情</summary>
+        <table class="permissions-table">
+          <tr><td>用户权限管理</td><td>{{ '✅ 是' if user_info.permission_manage_accounts else '❌ 否' }}</td></tr>
+          <tr><td>个人剧本管理</td><td>{{ '✅ 是' if user_info.permission_manage_own_editions else '❌ 否' }}</td></tr>
+          <tr><td>全部剧本管理</td><td>{{ '✅ 是' if user_info.permission_manage_all_editions else '❌ 否' }}</td></tr>
+          <tr><td>剧本导入与创建</td><td>{{ '✅ 是' if user_info.permission_manage_create_editions else '❌ 否' }}</td></tr>
+          <tr><td>魔典说书人</td><td>{{ '✅ 是' if user_info.permission_storyteller else '❌ 否' }}</td></tr>
+          <tr><td>语音说书人</td><td>{{ '✅ 是' if user_info.permission_storyteller_vocal else '❌ 否' }}</td></tr>
+        </table>
+      </details>
+      <div style="margin-top: 12px;">
+        <label for="socialRoleSelect">修改社会身份：</label>
+        <select id="socialRoleSelect">
+          <option value="交大学生">交大学生</option>
+          <option value="华师学生">华师学生</option>
+          <option value="校外人员">校外人员</option>
+          <option value="保密">保密</option>
+        </select>
+        <label for="contactInfoInput" style="margin-top: 10px; display: block;">修改联系方式（推荐微信号/邮箱）：</label>
+        <input type="text" id="contactInfoInput" maxlength="128" placeholder="例如：wechat_id 或 email@example.com">
+        <button id="saveProfileBtn">保存社会身份与联系方式</button>
+        <div id="profileStatus" class="status"></div>
+      </div>
+      {% if user_info.permission_manage_accounts %}
+      <button onclick="location.href='/user/edit_user'">编辑用户权限</button>
+      {% endif %}
+      <button onclick="location.href='/'">返回首页</button>
+      <button onclick="handleLogout()">退出登录</button>
+    </div>
+
+    <div id="avatarModal" class="modal-backdrop" style="display: none;">
+      <div class="modal-content">
+        <h3>上传头像</h3>
+        <input type="file" id="avatarInput" accept="image/*">
+        <div id="image-preview-area" class="center" style="margin: 15px 0;">
+          <img id="imageToCrop" style="max-width: 100%; max-height: 200px; display: none;" alt="待裁剪图片">
+          <p id="preview-placeholder">请选择图片文件</p>
+        </div>
+        <button id="uploadCropBtn" disabled>确认上传</button>
+        <button onclick="closeModal()">取消</button>
+      </div>
+    </div>
+    {% else %}
+      <p class="center">您尚未登录或会话已过期。</p>
+      <a href="/user/login" style="text-decoration: none;"><button>前往登录</button></a>
+    {% endif %}
+  </div>
+
+  <script>
+    async function handleLogout() {
+      try {
+        await fetch("/user/logout", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (e) {}
+      location.href = "/user/login";
+    }
+
+    const avatarModal = document.getElementById("avatarModal");
+    const avatarInput = document.getElementById("avatarInput");
+    const imageToCrop = document.getElementById("imageToCrop");
+    const previewPlaceholder = document.getElementById("preview-placeholder");
+    const uploadCropBtn = document.getElementById("uploadCropBtn");
+    const setAvatarBtn = document.getElementById("setAvatarBtn");
+    const socialRoleSelect = document.getElementById("socialRoleSelect");
+    const contactInfoInput = document.getElementById("contactInfoInput");
+    const saveProfileBtn = document.getElementById("saveProfileBtn");
+    const currentSocialRole = document.getElementById("currentSocialRole");
+    const currentContactInfo = document.getElementById("currentContactInfo");
+    const profileStatus = document.getElementById("profileStatus");
+
+    if (socialRoleSelect) {
+      socialRoleSelect.value = "{{ user_info.social_role or '保密' }}";
+    }
+    if (contactInfoInput) {
+      contactInfoInput.value = "{{ user_info.contact_info or '保密' }}";
+    }
+
+    function setProfileStatus(ok, text) {
+      if (!profileStatus) return;
+      profileStatus.textContent = text;
+      profileStatus.className = ok ? "status success" : "status error";
+    }
+
+    function closeModal() {
+      if (avatarModal) avatarModal.style.display = "none";
+    }
+
+    if (setAvatarBtn) {
+      setAvatarBtn.addEventListener("click", () => {
+        avatarModal.style.display = "flex";
+        avatarInput.value = "";
+        imageToCrop.style.display = "none";
+        previewPlaceholder.style.display = "block";
+        uploadCropBtn.disabled = true;
+      });
+    }
+
+    if (avatarInput) {
+      avatarInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          imageToCrop.src = e.target.result;
+          imageToCrop.style.display = "block";
+          previewPlaceholder.style.display = "none";
+          uploadCropBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (uploadCropBtn) {
+      uploadCropBtn.addEventListener("click", async () => {
+        const file = avatarInput.files[0];
+        if (!file) {
+          alert("请先选择图片文件。");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("image", file);
+
+        try {
+          const res = await fetch("/user/upload_icon", {
+            method: "POST",
+            credentials: "include",
+            body: formData
+          });
+
+          if (res.status === 413) {
+            alert("上传失败：文件体积过大！请上传小于2MB的图片。");
+            return;
+          }
+
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.status === "success") {
+            closeModal();
+            location.reload();
+          } else {
+            alert(`上传失败: ${data.reason || "服务器错误"}`);
+          }
+        } catch (e) {
+          alert("上传请求失败，请检查网络。");
+        }
+      });
+    }
+
+    if (saveProfileBtn && socialRoleSelect && contactInfoInput) {
+      saveProfileBtn.addEventListener("click", async () => {
+        try {
+          const res = await fetch("/user/profile_update", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              social_role: socialRoleSelect.value,
+              contact_info: contactInfoInput.value.trim(),
+            }),
+          });
+          const data = await res.json();
+          if (data.status === "success") {
+            if (currentSocialRole) currentSocialRole.textContent = data.social_role;
+            if (currentContactInfo) currentContactInfo.textContent = data.contact_info || "保密";
+            setProfileStatus(true, "✅ 社会身份与联系方式已更新");
+          } else {
+            setProfileStatus(false, "❌ 更新失败：" + (data.reason || "未知错误"));
+          }
+        } catch (e) {
+          setProfileStatus(false, "❌ 网络错误或服务器异常");
+        }
+      });
+    }
+  </script>
+
+  <style>
+    .modal-backdrop {
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background-color: #fefefe;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    #avatarInput { padding: 0; border: none; }
+  </style>
+</body>
+</html>

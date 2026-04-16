@@ -4,6 +4,21 @@
     "database_path_dev": "./database",
     "usericon_path": "/home/ubuntu/shares/usericon",
     "usericon_path_dev": "/Users/yanice/shares/usericon",
-    "secret_key": "yanicesno1"
+    "secret_key": "yanicesno1",
+    "permission_bitmap": {
+        "script_subsystem": {
+            "permission_manage_own_editions": 0,
+            "permission_manage_all_editions": 1,
+            "permission_manage_create_editions": 2,
+            "permission_storyteller": 3,
+            "permission_storyteller_vocal": 4
+        },
+        "lightboard_subsystem": {
+            "permission_create_official_event": 0,
+            "permission_manage_all_event": 1,
+            "permission_borrow_games": 2,
+            "permission_manage_games": 3
+        }
+    }
 }
 

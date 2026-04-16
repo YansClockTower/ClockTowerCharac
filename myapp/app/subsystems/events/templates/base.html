@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}活动信息板{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('events.static', filename='style.css') }}">
+    {% block extra_css %}{% endblock %}
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { border-bottom: 2px solid #ccc; padding-bottom: 10px; }
+        .event-form, .event-list { margin-bottom: 30px; padding: 15px; border: 1px solid #eee; border-radius: 5px; }
+        .event-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; }
+        .event-info { flex-grow: 1; }
+        .event-info h3 { margin-top: 0; margin-bottom: 5px; color: #333; }
+        .delete-form button { background: #ff4d4d; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header-status">
+        <span class="welcome-msg">欢迎, {{ current_user if current_user else '用户' }}</span>
+        <a href="{{ url_for('users.user_page') }}" class="user-center-link">用户中心</a>
+        <a href="#" class="logout-btn" onclick="logoutUser(event)">登出</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+
+    <script>
+      async function logoutUser(event) {
+        event.preventDefault();
+        try {
+          await fetch("/user/logout", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" }
+          });
+        } catch (e) {}
+        window.location.href = "/user/login";
+      }
+    </script>
+
+    <style>
+        .header-status {
+            text-align: right;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        .welcome-msg {
+            margin-right: 10px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .user-center-link {
+            margin-right: 10px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .logout-btn {
+            color: #dc3545;
+            text-decoration: none;
+        }
+        .flashes {
+            list-style: none;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .flashes li.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flashes li.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .flashes li.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</body>
+</html>

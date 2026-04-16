@@ -1,0 +1,103 @@
+body {
+        font-family: sans-serif;
+        background-color: #bbaf98;
+        background-size: 100%;                  /* 拉伸以覆盖整个区域 */
+        background-repeat: repeat;            /* 不重复平铺 */
+    }
+    .statement {
+        margin-right: 20px;
+        margin-left: 20px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 10px;
+        text-align: center;
+        background-color: #d9d0be;
+        height: 150px;
+        width: 1500px;
+        font-size: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        z-index: 1001;
+    }
+    .content_body {
+        background-color: #f4ece1;
+        margin-right: 5vw;
+        margin-left: 5vw;
+        padding: 20px;
+    }
+
+    
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 1em;
+            margin-bottom: 2em;
+        }
+
+        .title-section {
+            flex: 1;
+        }
+
+        .subtitle {
+            color: #777;
+            font-size: 1em;
+            margin-top: 0.5em;
+        }
+
+        .image-preview {
+            width: 20vw;
+            height: 20vw;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-left: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .section {
+            margin-bottom: 2.5em;
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 0.3em;
+            margin-bottom: 0.8em;
+            color: #222;
+        }
+
+        .section .value {
+            padding-left: 0.5em;
+            white-space: pre-wrap;
+        }
+
+        .italic {
+            font-style: italic;
+            color: #555;
+            margin-bottom: 1.2em;
+        }
+
+        .empty {
+            color: #aaa;
+            font-style: italic;
+        }
+
+        .footer-links {
+            margin-top: 3em;
+            font-size: 0.95em;
+        }
+
+        .footer-links a {
+            text-decoration: none;
+            color: #007BFF;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin: 0;
+        }

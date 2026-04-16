@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}编辑活动: {{ event.name }}{% endblock %}
+
+{% block content %}
+    <div class="event-form">
+        <h2>✏️ 编辑活动信息</h2>
+        <p>
+            <a href="{{ url_for('events.browse_events') }}">← 取消编辑，返回活动列表</a>
+        </p>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            {% if category == 'error' %}
+            <p class="flash-error">{{ message }}</p>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('events.edit_event_route', event_id=event.id) }}">
+            <p>
+                <label for="name">活动名称 (必填):</label>
+                <input type="text" name="name" required style="width: 98%;" value="{{ event.name }}">
+            </p>
+            <p>
+                <label for="event_type">活动类型 (必填):</label>
+                <select id="event_type" name="event_type" required>
+                    {% set current_event_type = event.event_type or "其他" %}
+                    {% for type_name in event_type_values %}
+                    <option value="{{ type_name }}" {% if type_name == current_event_type %}selected{% endif %}>{{ type_name }}</option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p>
+                <label for="location_select">活动地点 (必填):</label>
+                <select id="location_select" name="location_select" required onchange="checkLocation(this)">
+                    <option value="">-- 请选择地点 --</option>
+                    <option value="交大紫矜街(博雅厅)" {% if event.location == "交大紫矜街(博雅厅)" %}selected{% endif %}>交大紫矜街(博雅厅)</option>
+                    <option value="交大玉兰苑" {% if event.location == "交大玉兰苑" %}selected{% endif %}>交大玉兰苑</option>
+                    <option value="华师秋实" {% if event.location == "华师秋实" %}selected{% endif %}>华师秋实</option>
+                    <option value="华师冬日" {% if event.location == "华师冬日" %}selected{% endif %}>华师冬日</option>
+                    <option value="其他（自己填写）">其他（自己填写）</option>
+                </select>
+            </p>
+            <p id="custom_location_container" style="display: none; margin-top: 5px;">
+                <label for="custom_location">自定义地点:</label>
+                <input type="text" id="custom_location" name="custom_location_temp" placeholder="请输入活动地点" style="width: 98%;">
+            </p>
+            <input type="hidden" id="final_location" name="location">
+            <input type="hidden" id="final_locktime" name="locktime">
+            <p>
+                <label for="starttime">活动开始时间 (必填):</label>
+                <input type="datetime-local" id="starttime" name="starttime" required style="width: 98%;" value="{{ event.starttime }}">
+            </p>
+            <p>
+                <label for="locktime_select">锁定报名时间:</label>
+                <select id="locktime_select" name="locktime_select" required onchange="checkLocktime(this)">
+                    <option value="0" {% if event.locktime_select == "0" %}selected{% endif %}>活动开始时</option>
+                    <option value="1" {% if event.locktime_select == "1" %}selected{% endif %}>提前1小时</option>
+                    <option value="4" {% if event.locktime_select == "4" %}selected{% endif %}>提前4小时</option>
+                    <option value="12" {% if event.locktime_select == "12" %}selected{% endif %}>提前12小时</option>
+                </select>
+            </p>
+            <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+                <p style="flex-grow: 1;">
+                    <label for="minplayer">最小玩家数:</label>
+                    <input type="number" name="minplayer" min="1" style="width: 90%;" value="{{ event.minplayer or '' }}">
+                </p>
+                <p style="flex-grow: 1;">
+                    <label for="maxplayer">最大玩家数:</label>
+                    <input type="number" name="maxplayer" min="1" style="width: 90%;" value="{{ event.maxplayer or '' }}">
+                </p>
+            </div>
+            <p>
+                <label for="description">活动描述 (可选):</label>
+                <textarea name="description" rows="5" style="width: 98%;">{{ event.description or '' }}</textarea>
+            </p>
+            <p>
+                <button type="submit">保存更改</button>
+            </p>
+        </form>
+        <form method="POST" action="{{ url_for('events.delete_event_route', event_id=event.id) }}" class="delete-form">
+            <button type="submit" class="base-btn delete-btn">删除活动</button>
+        </form>
+    </div>
+    <script>
+    function checkLocation(selectElement) {
+        const customContainer = document.getElementById("custom_location_container");
+        const customInput = document.getElementById("custom_location");
+        const finalInput = document.getElementById("final_location");
+
+        if (selectElement.value === "其他（自己填写）") {
+            customContainer.style.display = "block";
+            customInput.required = true;
+            finalInput.name = "location_temp";
+            customInput.name = "location";
+        } else {
+            customContainer.style.display = "none";
+            customInput.required = false;
+            finalInput.value = selectElement.value;
+            finalInput.name = "location";
+            customInput.name = "custom_location_temp";
+        }
+    }
+
+    function checkLocktime(selectElement) {
+        const startTime = document.getElementById("starttime");
+        const finalLocktime = document.getElementById("final_locktime");
+        if (startTime.value) {
+            const startDate = new Date(startTime.value);
+            const hoursBefore = parseInt(selectElement.value) || 0;
+            const lockTimeMs = startDate.getTime() - (hoursBefore * 60 * 60 * 1000);
+            const lockDate = new Date(lockTimeMs);
+            const formattedLockTime = lockDate.toLocaleString("sv-SE").replace(" ", "T").substring(0, 16);
+            finalLocktime.value = formattedLockTime;
+            finalLocktime.name = "locktime";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const locationSelect = document.getElementById("location_select");
+        const eventLocation = "{{ event.location }}";
+        const presetLocations = ["交大紫矜街(博雅厅)", "交大玉兰苑", "华师秋实", "华师冬日"];
+        if (!presetLocations.includes(eventLocation) && eventLocation) {
+            locationSelect.value = "其他（自己填写）";
+            const customContainer = document.getElementById("custom_location_container");
+            const customInput = document.getElementById("custom_location");
+            customContainer.style.display = "block";
+            customInput.value = eventLocation;
+            customInput.required = true;
+            customInput.name = "location";
+            document.getElementById("final_location").name = "location_temp";
+        } else {
+            checkLocation(locationSelect);
+        }
+
+        const startTime = document.getElementById("starttime");
+        const locktimeSelect = document.getElementById("locktime_select");
+        startTime.value = "{{ event.starttime }}".replace(" ", "T").substring(0, 16);
+        checkLocktime(locktimeSelect);
+    });
+
+    document.querySelector('form[action*="/edit/"]').addEventListener("submit", function() {
+        const selectElement = document.getElementById("location_select");
+        const customInput = document.getElementById("custom_location");
+        const finalInput = document.getElementById("final_location");
+        if (selectElement.value === "其他（自己填写）") {
+            finalInput.name = "location";
+            finalInput.value = customInput.value.trim();
+            customInput.name = "custom_location_disabled";
+        } else {
+            finalInput.name = "location";
+            finalInput.value = selectElement.value;
+            customInput.name = "custom_location_temp";
+        }
+
+        const lockSelect = document.getElementById("locktime_select");
+        checkLocktime(lockSelect);
+        lockSelect.name = "locktime_select_disabled";
+    });
+    </script>
+{% endblock %}

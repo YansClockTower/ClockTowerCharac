@@ -1,7 +1,13 @@
 from flask import Flask
 from flask_cors import CORS
+
+
 def create_app():
     app = Flask(__name__, static_url_path='/static', static_folder='static')
+    from .models.config import get_config
+    from .identity.permissions import ensure_user_permission_schema
+    app.config["SECRET_KEY"] = get_config("secret_key")
+    ensure_user_permission_schema()
 
     CORS(app,
      supports_credentials=True,
@@ -16,20 +22,23 @@ def create_app():
     app.add_template_filter(edition_name_filter, 'edition_name')
 
     # 注册 blueprint
-    from .views.character_info import character_bp
-    from .views.build_edition import buildedition_bp
-    from .views.view_edition import viewedition_bp
-    from .views.api import api_bp
+    from .subsystems.editions.character_info import character_bp
+    from .subsystems.editions.build_edition import buildedition_bp
+    from .subsystems.editions.view_edition import viewedition_bp
+    from .subsystems.editions.api import api_bp
     from .views.users import users_bp
+    from .portal.routes import portal_bp
+    from .subsystems.events.routes import events_bp
+    from .subsystems.events.dbutil import close_db as close_events_db
 
     app.register_blueprint(api_bp)
     app.register_blueprint(character_bp)
     app.register_blueprint(buildedition_bp)
     app.register_blueprint(viewedition_bp)
     app.register_blueprint(users_bp)
-    
-    # 注册首页路由
-    from .route import register_routes
-    register_routes(app)
+    app.register_blueprint(events_bp)
+    app.register_blueprint(portal_bp)
+
+    app.teardown_appcontext(close_events_db)
 
     return app

@@ -1,0 +1,143 @@
+.event-list {
+    position: relative;
+}
+.event-item {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid #eee;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+}
+.event-details {
+    width: 95%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.event-info {
+    width: 85%;
+    margin-right: 15px;
+}
+.action-buttons {
+    min-width: 100px;
+    width: 15%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+}
+.event-summary {
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+    font-size: 0.95em;
+    text-align: center;
+}
+.player-list {
+    display: inline;
+    margin-left: 5px;
+    text-align: center;
+}
+.status-tag {
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 3px 6px;
+    margin-left: 10px;
+    border-radius: 4px;
+    vertical-align: middle;
+}
+.event-item.status-min-not-met {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+.status-tag.status-min-not-met {
+    color: #721c24;
+    background-color: #fce8e9;
+}
+.event-item.status-min-met {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+.status-tag.status-min-met {
+    color: #155724;
+    background-color: #e6f6e9;
+}
+.event-item.status-lock {
+    background-color: #ecedd4;
+    border-color: #e4e6c3;
+}
+.status-tag.status-lock {
+    color: #155724;
+    background-color: #e6f6e6;
+}
+.event-item.status-full {
+    background-color: #e9ecef;
+    border-color: #d6d8db;
+    opacity: 0.9;
+}
+.status-tag.status-full {
+    color: #495057;
+    background-color: #f3f4f6;
+}
+.player-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-right: 5px;
+    margin-top: 3px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: normal;
+    background-color: #f0f8ff;
+    border: 1px solid #afd6ff;
+    color: #004085;
+}
+.unsigned-player-tag {
+    background-color: #fce2e2;
+    border: 1px solid #feaeae;
+    color: #851200;
+}
+.current-player-tag {
+    background-color: #68dcf9;
+    border: 1px solid #01c0fa;
+    color: #155724;
+    font-weight: bold;
+}
+.corner-button {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+}
+.corner-button:hover {
+    background-color: #0056b3;
+}
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-left: 15px;
+}
+.join-btn {
+    background: #28a745;
+    color: white;
+}
+.join-btn:hover {
+    background: #1e7e34;
+}
+.leave-btn {
+    background: #17a2b8;
+    color: white;
+}
+.leave-btn:hover {
+    background: #138496;
+}
+.edit-btn {
+    background: #ffc107;
+    color: #343a40;
+}
+.edit-btn:hover {
+    background: #e0a800;
+}

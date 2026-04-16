@@ -1,10 +1,6 @@
 import hashlib, os, binascii
 
-from flask import request
-import jwt
-
-from app.models.config import get_config
-from app.models.database import get_user_db
+from app.identity import get_current_user
 
 def hash_password(password: str) -> str:
     salt = os.urandom(16)  # 生成随机盐
@@ -25,15 +21,7 @@ def verify_password(stored: str, password: str) -> bool:
     return new_dk == stored_dk
 
 def user_me():
-    token = request.cookies.get('token')
-    if token:
-        try:
-            token_data = jwt.decode(token, get_config('secret_key'), algorithms=["HS256"])
-        except Exception:
-            return {}
-        user_db = get_user_db()
-        current_user = user_db.execute("SELECT * FROM user_info WHERE id=?", (token_data['user_id'],)).fetchone()
-        user_db.close()
-        return current_user
-    else:
+    user = get_current_user(update_last_login=False)
+    if user is None:
         return {}
+    return user

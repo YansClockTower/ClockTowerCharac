@@ -1,94 +1,51 @@
 import hashlib
 import hmac
-import io
 import json
-import os
 from flask import Blueprint, redirect, render_template, request, jsonify, make_response, send_file, url_for
 import jwt
 import datetime
-from functools import wraps
 
 from app.models.database import get_user_db
-from app.models.crypt import hash_password, user_me, verify_password
+from app.models.crypt import hash_password, verify_password
 from app.models.config import get_config
-
-from PIL import Image
+from app.identity import get_current_user, login_required_template, token_required
+from app.identity.permissions import (
+    ACTIVITY_ABSENT_COUNT_COLUMN,
+    ACTIVITY_JOINED_COUNT_COLUMN,
+    ACTIVITY_ORGANIZED_COUNT_COLUMN,
+    ASSOCIATION_ROLE_COLUMN,
+    ASSOCIATION_ROLE_VALUES,
+    CONTACT_INFO_COLUMN,
+    MANAGE_ACCOUNT_PERMISSION,
+    SCRIPT_BITMAP_COLUMN,
+    SOCIAL_ROLE_COLUMN,
+    SOCIAL_ROLE_VALUES,
+    LIGHTBOARD_BITMAP_COLUMN,
+    build_permission_update_fields,
+    enrich_user_permissions,
+    ensure_user_permission_schema,
+    permission_bitmap_descriptions,
+)
 
 from app.models.usericon import save_user_icon, user_icon_url
 
 # 注意：db和app在主程序中初始化，然后注入
-users_bp = Blueprint("users", __name__, url_prefix="/user")
+users_bp = Blueprint(
+    "users",
+    __name__,
+    url_prefix="/user",
+    template_folder="../user/templates",
+    static_folder="../user/static",
+    static_url_path="/user/static",
+)
 
-# from . import get_config, get_user_db, hash_password, verify_password 
 
-# --- 辅助函数：从请求中获取用户信息 ---
-def get_user_data_from_request():
-    """尝试从 Cookie 中获取 token，并返回用户信息字典，失败则返回 None"""
-    token = request.cookies.get('token')
-    if not token:
-        # 尝试从 Authorization Header 中获取 token（以防前端是 AJAX 请求）
-        auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-        if not token:
-            return None # Token 缺失
+def _is_temporary_user(user_row) -> bool:
+    if not user_row:
+        return False
+    password_hash = user_row["password_hash"] if "password_hash" in user_row.keys() else None
+    return password_hash is None or password_hash == ""
 
-    try:
-        data = jwt.decode(token, get_config('secret_key'), algorithms=["HS256"])
-        user_db = get_user_db()
-        current_user = user_db.execute("SELECT * FROM user_info WHERE id=?", (data['user_id'],)).fetchone()
-        
-        # 更新 lastLogin 字段
-        user_db.execute("UPDATE user_info SET lastLogin=? WHERE id=?", (datetime.datetime.utcnow(), data['user_id']))
-        user_db.commit()
-        user_db.close()
-        
-        if not current_user:
-             return None # 用户 ID 无效
-             
-        # 将用户数据转换为字典，便于 Jinja2 使用
-        user_dict = dict(current_user)
-        # 移除敏感字段
-        user_dict.pop('password_hash', None)
-        user_dict['authenticated'] = True # 标记为已认证
-        
-        return user_dict
-        
-    except Exception as e:
-        # Token 无效或过期
-        print(f"Token error: {e}") # 调试用
-        return None
-
-# --- 新装饰器：用于渲染模板的视图函数 ---
-def login_required_template(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        user_info = get_user_data_from_request()
-
-        if user_info is None:
-            # Token 无效或缺失，重定向到登录页
-            # 注意：使用 url_for('users.user_login') 确保路径正确
-            response = make_response(redirect(url_for('users.user_login')))
-            # 清除可能存在的无效 token cookie
-            # response.delete_cookie('token')
-            return response
-        
-        # 将 user_info 传递给视图函数
-        return f(user_info, *args, **kwargs)
-    return decorated
-    
-# ---------------- JWT 装饰器 ----------------
-# --- 现有 JWT 装饰器（用于 AJAX 接口，无需修改） ---
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        current_user = get_user_data_from_request()
-        if current_user is None:
-            return jsonify({"status": "failed", "reason": "Authentication failed"}), 401
-        
-        # 传递原始的 user dict (或您需要的其他格式)
-        return f(current_user, *args, **kwargs)
-    return decorated
 
 # ---------------- 路由 ----------------
 @users_bp.route("/")
@@ -112,19 +69,72 @@ def register():
     if not username or not password:
         return jsonify({"status": "failed", "reason": "Missing username or password"})
 
+    ensure_user_permission_schema()
     user_db = get_user_db()
     existing_user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
 
-    if existing_user:
+    if existing_user and not _is_temporary_user(existing_user):
         return jsonify({"status": "failed", "reason": "Username already exists"})
 
     hashed_pw = hash_password(password)
-    new_user = (username, hashed_pw, '', '', False, False, False, False, False, False, datetime.datetime.utcnow())
-    user_db.execute("""INSERT INTO user_info 
-    (name, password_hash, icon, title, 
-    permission_manage_accounts, permission_manage_own_editions, permission_manage_all_editions, permission_manage_create_editions, permission_storyteller, permission_storyteller_vocal, 
-    lastLogin) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", new_user)
+    if existing_user and _is_temporary_user(existing_user):
+        # 覆盖临时用户，但保留其活动统计数据。
+        user_db.execute(
+            f"""
+            UPDATE user_info
+            SET
+                password_hash = ?,
+                icon = ?,
+                title = ?,
+                {MANAGE_ACCOUNT_PERMISSION} = 0,
+                {SCRIPT_BITMAP_COLUMN} = 0,
+                {LIGHTBOARD_BITMAP_COLUMN} = 0,
+                {ASSOCIATION_ROLE_COLUMN} = '普通玩家',
+                {SOCIAL_ROLE_COLUMN} = '保密',
+                {CONTACT_INFO_COLUMN} = '保密',
+                lastLogin = ?
+            WHERE name = ?
+            """,
+            (hashed_pw, "", "", datetime.datetime.utcnow(), username),
+        )
+    else:
+        new_user = (
+            username,
+            hashed_pw,
+            "",
+            "",
+            False,
+            0,
+            0,
+            "普通玩家",
+            "保密",
+            "保密",
+            0,
+            0,
+            0,
+            datetime.datetime.utcnow(),
+        )
+        user_db.execute(
+            f"""INSERT INTO user_info
+            (
+                name,
+                password_hash,
+                icon,
+                title,
+                {MANAGE_ACCOUNT_PERMISSION},
+                {SCRIPT_BITMAP_COLUMN},
+                {LIGHTBOARD_BITMAP_COLUMN},
+                {ASSOCIATION_ROLE_COLUMN},
+                {SOCIAL_ROLE_COLUMN},
+                {CONTACT_INFO_COLUMN},
+                {ACTIVITY_ORGANIZED_COUNT_COLUMN},
+                {ACTIVITY_JOINED_COUNT_COLUMN},
+                {ACTIVITY_ABSENT_COUNT_COLUMN},
+                lastLogin
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            new_user,
+        )
     user_db.commit()
     user_db.close()
 
@@ -143,7 +153,9 @@ def login():
     user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
     user_db.close()
 
-    if not user or not verify_password(user['password_hash'], password):
+    if not user or _is_temporary_user(user):
+        return jsonify({"status": "failed", "reason": "用户不存在请注册"})
+    if not verify_password(user['password_hash'], password):
         return jsonify({"status": "failed", "reason": "Invalid username or password"})
 
     token = jwt.encode(
@@ -175,12 +187,21 @@ def me(current_user):
         "status": "success", 
         "username": current_user['name'],
         "id": current_user['id'],
+        "permission_manage_account": current_user[MANAGE_ACCOUNT_PERMISSION],
         "permission_manage_accounts": current_user['permission_manage_accounts'],
         "permission_manage_own_editions": current_user['permission_manage_own_editions'],
         "permission_manage_all_editions": current_user['permission_manage_all_editions'],
         "permission_manage_create_editions": current_user['permission_manage_create_editions'],
         "permission_storyteller": current_user['permission_storyteller'],
         "permission_storyteller_vocal": current_user['permission_storyteller_vocal'],
+        SCRIPT_BITMAP_COLUMN: current_user[SCRIPT_BITMAP_COLUMN],
+        LIGHTBOARD_BITMAP_COLUMN: current_user[LIGHTBOARD_BITMAP_COLUMN],
+        ASSOCIATION_ROLE_COLUMN: current_user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
+        SOCIAL_ROLE_COLUMN: current_user.get(SOCIAL_ROLE_COLUMN, "保密"),
+        CONTACT_INFO_COLUMN: current_user.get(CONTACT_INFO_COLUMN, "保密"),
+        ACTIVITY_ORGANIZED_COUNT_COLUMN: current_user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
+        ACTIVITY_JOINED_COUNT_COLUMN: current_user.get(ACTIVITY_JOINED_COUNT_COLUMN, 0),
+        ACTIVITY_ABSENT_COUNT_COLUMN: current_user.get(ACTIVITY_ABSENT_COUNT_COLUMN, 0),
         "lastLogin": current_user['lastLogin']
     }
 
@@ -232,24 +253,34 @@ def view_user(user_id):
     user_db.close()
     if not user:
         return jsonify({"status": "failed", "reason": "User not found"})
+    user = enrich_user_permissions(dict(user))
     return jsonify(
         {
             "status": "success", 
             "username": user['name'],
             "id": user['id'],
+            "permission_manage_account": user[MANAGE_ACCOUNT_PERMISSION],
             "permission_manage_accounts": user['permission_manage_accounts'],
             "permission_manage_own_editions": user['permission_manage_own_editions'],
             "permission_manage_all_editions": user['permission_manage_all_editions'],
             "permission_manage_create_editions": user['permission_manage_create_editions'],
             "permission_storyteller": user['permission_storyteller'],
             "permission_storyteller_vocal": user['permission_storyteller_vocal'],
+            SCRIPT_BITMAP_COLUMN: user[SCRIPT_BITMAP_COLUMN],
+            LIGHTBOARD_BITMAP_COLUMN: user[LIGHTBOARD_BITMAP_COLUMN],
+            ASSOCIATION_ROLE_COLUMN: user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
+            SOCIAL_ROLE_COLUMN: user.get(SOCIAL_ROLE_COLUMN, "保密"),
+            CONTACT_INFO_COLUMN: user.get(CONTACT_INFO_COLUMN, "保密"),
+            ACTIVITY_ORGANIZED_COUNT_COLUMN: user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
+            ACTIVITY_JOINED_COUNT_COLUMN: user.get(ACTIVITY_JOINED_COUNT_COLUMN, 0),
+            ACTIVITY_ABSENT_COUNT_COLUMN: user.get(ACTIVITY_ABSENT_COUNT_COLUMN, 0),
             "lastLogin": user['lastLogin']
         }
     )
 
 @users_bp.route("/edit_user", methods=["GET"])
 def edit_user():
-    user = user_me()
+    user = get_current_user(update_last_login=False)
     if not user:
         return redirect(url_for('users.user_page'))
     if not user['permission_manage_accounts']:
@@ -258,7 +289,8 @@ def edit_user():
 
 @users_bp.route("/permission_update", methods=["POST"])
 def permission_update():
-    user = user_me()
+    ensure_user_permission_schema()
+    user = get_current_user(update_last_login=False)
     if not user:
         return redirect(url_for('users.user_page'))
     if not user['permission_manage_accounts']:
@@ -266,36 +298,114 @@ def permission_update():
     
     username = request.form.get("username") or (request.json.get("username") if request.is_json else None)
 
-    permission_manage_accounts = request.form.get("permission_manage_accounts") or (request.json.get("permission_manage_accounts") if request.is_json else None)
-    permission_manage_own_editions = request.form.get("permission_manage_own_editions") or (request.json.get("permission_manage_own_editions") if request.is_json else None)
-    permission_manage_all_editions = request.form.get("permission_manage_all_editions") or (request.json.get("permission_manage_all_editions") if request.is_json else None)
-    permission_manage_create_editions = request.form.get("permission_manage_create_editions") or (request.json.get("permission_manage_create_editions") if request.is_json else None)
-    permission_storyteller = request.form.get("permission_storyteller") or (request.json.get("permission_storyteller") if request.is_json else None)
-    permission_storyteller_vocal = request.form.get("permission_storyteller_vocal") or (request.json.get("permission_storyteller_vocal") if request.is_json else None)
+    payload = request.get_json(silent=True) if request.is_json else {}
+    if payload is None:
+        payload = {}
+    form_payload = request.form.to_dict() if request.form else {}
+    merged_payload = {}
+    merged_payload.update(form_payload)
+    merged_payload.update(payload)
 
     user_db = get_user_db()
     user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
     if not user:
+        user_db.close()
         return jsonify({"status": "failed", "reason": "目标用户不存在"})
-
-    user_db.execute("""UPDATE user_info SET 
-    permission_manage_accounts=?,
-    permission_manage_own_editions=?, 
-    permission_manage_all_editions=?, 
-    permission_manage_create_editions=?, 
-    permission_storyteller=?, 
-    permission_storyteller_vocal=? 
-    WHERE name=?""", 
-        (
-        permission_manage_accounts,
-        permission_manage_own_editions, 
-        permission_manage_all_editions, 
-        permission_manage_create_editions, 
-        permission_storyteller, 
-        permission_storyteller_vocal, 
-        username)
-    )
+    update_fields = build_permission_update_fields(merged_payload, dict(user))
+    set_clause = ", ".join(f"{key}=?" for key in update_fields)
+    update_values = list(update_fields.values())
+    update_values.append(username)
+    user_db.execute(f"UPDATE user_info SET {set_clause} WHERE name=?", update_values)
     user_db.commit()
     user_db.close()
 
     return jsonify({"status": "success"})
+
+
+@users_bp.route("/association_role_update", methods=["POST"])
+def association_role_update():
+    ensure_user_permission_schema()
+    user = get_current_user(update_last_login=False)
+    if not user:
+        return redirect(url_for('users.user_page'))
+    if not user['permission_manage_accounts']:
+        return jsonify({"status": "failed", "reason": "您没有权限编辑其他用户"})
+
+    payload = request.get_json(silent=True) if request.is_json else {}
+    if payload is None:
+        payload = {}
+    username = request.form.get("username") or payload.get("username")
+    association_role = request.form.get(ASSOCIATION_ROLE_COLUMN) or payload.get(ASSOCIATION_ROLE_COLUMN)
+
+    if not username:
+        return jsonify({"status": "failed", "reason": "缺少目标用户名"})
+    if association_role not in ASSOCIATION_ROLE_VALUES:
+        return jsonify({"status": "failed", "reason": "无效的协会身份"})
+
+    user_db = get_user_db()
+    target = user_db.execute("SELECT id FROM user_info WHERE name=?", (username,)).fetchone()
+    if not target:
+        user_db.close()
+        return jsonify({"status": "failed", "reason": "目标用户不存在"})
+    user_db.execute(
+        f"UPDATE user_info SET {ASSOCIATION_ROLE_COLUMN}=? WHERE name=?",
+        (association_role, username),
+    )
+    user_db.commit()
+    user_db.close()
+    return jsonify({"status": "success", ASSOCIATION_ROLE_COLUMN: association_role})
+
+
+@users_bp.route("/social_role_update", methods=["POST"])
+@users_bp.route("/profile_update", methods=["POST"])
+@token_required
+def social_role_update(current_user):
+    ensure_user_permission_schema()
+    payload = request.get_json(silent=True) if request.is_json else {}
+    if payload is None:
+        payload = {}
+    social_role = request.form.get(SOCIAL_ROLE_COLUMN) or payload.get(SOCIAL_ROLE_COLUMN)
+    contact_info = request.form.get(CONTACT_INFO_COLUMN) or payload.get(CONTACT_INFO_COLUMN)
+
+    update_parts = []
+    update_values = []
+    if social_role is not None:
+        if social_role not in SOCIAL_ROLE_VALUES:
+            return jsonify({"status": "failed", "reason": "无效的社会身份"})
+        update_parts.append(f"{SOCIAL_ROLE_COLUMN}=?")
+        update_values.append(social_role)
+
+    if contact_info is not None:
+        contact_info = str(contact_info).strip()
+        if len(contact_info) > 128:
+            return jsonify({"status": "failed", "reason": "联系方式过长（最多128字符）"})
+        if not contact_info:
+            contact_info = "保密"
+        update_parts.append(f"{CONTACT_INFO_COLUMN}=?")
+        update_values.append(contact_info)
+
+    if not update_parts:
+        return jsonify({"status": "failed", "reason": "未提供可更新字段"})
+
+    user_db = get_user_db()
+    update_values.append(current_user["id"])
+    user_db.execute(f"UPDATE user_info SET {', '.join(update_parts)} WHERE id=?", update_values)
+    user_db.commit()
+    latest = user_db.execute(
+        f"SELECT {SOCIAL_ROLE_COLUMN}, {CONTACT_INFO_COLUMN} FROM user_info WHERE id=?",
+        (current_user["id"],),
+    ).fetchone()
+    user_db.close()
+    return jsonify(
+        {
+            "status": "success",
+            SOCIAL_ROLE_COLUMN: latest[SOCIAL_ROLE_COLUMN] if latest else (social_role or "保密"),
+            CONTACT_INFO_COLUMN: latest[CONTACT_INFO_COLUMN] if latest else (contact_info or "保密"),
+        }
+    )
+
+
+@users_bp.route("/permission_bitmap_definition", methods=["GET"])
+@token_required
+def permission_bitmap_definition(_current_user):
+    return jsonify({"status": "success", "bitmap_definition": permission_bitmap_descriptions()})
