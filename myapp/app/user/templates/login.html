@@ -78,7 +78,7 @@
             return true;
           }
         }
-        alert("登录失败：请检查用户名或密码。");
+        alert("登录失败：" + (data.reason || "未知错误"));
         return false;
       } catch (e) {
         alert("登录请求失败");

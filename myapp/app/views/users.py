@@ -178,9 +178,9 @@ def login():
     user_db.close()
 
     if not user or _is_temporary_user(user):
-        return jsonify({"status": "failed", "reason": "用户不存在请注册"})
+        return jsonify({"status": "failed", "reason": "用户不存在，请先注册"})
     if not verify_password(user['password_hash'], password):
-        return jsonify({"status": "failed", "reason": "Invalid username or password"})
+        return jsonify({"status": "failed", "reason": "密码有误"})
 
     token = jwt.encode(
         {"user_id": user['id'], "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365)},
