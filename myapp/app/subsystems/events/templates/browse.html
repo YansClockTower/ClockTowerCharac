@@ -38,7 +38,7 @@
 
             <div class="event-item {{ status_class }}">
                 <div class="event-details">
-                    <div class="event-info">
+                    <div class="event-main">
                         <h3>{{ event.name }}
                             {% if status_text %}
                                 <span class="status-tag {{ status_class }}">{{ status_text }}</span>
@@ -50,76 +50,79 @@
                         {% if event.description %}
                             {{ event.description }}
                         {% endif %}
-                        <br>
-                        <p>
-                            <strong>活动类型:</strong> {{ event.event_type or '其他' }}<br>
-                            <strong>组织者:</strong> {{ event.inviter }}<br>
-                            <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
-                            <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
-                            <strong>活动地点:</strong> {{ event.location }}
-                        </p>
                     </div>
+                    <div class="event-meta-row">
+                        <div class="event-info">
+                            <p>
+                                <strong>活动类型:</strong> {{ event.event_type or '其他' }}<br>
+                                <strong>组织者:</strong> {{ event.inviter }}<br>
+                                <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
+                                <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
+                                <strong>活动地点:</strong> {{ event.location }}
+                            </p>
+                        </div>
 
-                    <div class="action-buttons">
-                        {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
-                        {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
-                        {% set is_full = (status_class == "status-full") %}
-                            {% if event.is_attending %}
-                                {% if event.locktime_obj < now() %}
-                                <button type="button" class="base-btn set-note-btn">
-                                    无法取消
-                                </button>
-                                {% else %}
-                                    <form method="POST" action="{{ url_for('events.leave_event_route', event_id=event.id) }}">
-                                        <button type="submit" class="base-btn leave-btn">取消报名</button>
+                        <div class="action-buttons">
+                            {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
+                            {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
+                            {% set is_full = (status_class == "status-full") %}
+                                {% if event.is_attending %}
+                                    {% if event.locktime_obj < now() %}
+                                    <button type="button" class="base-btn set-note-btn">
+                                        无法取消
+                                    </button>
+                                    {% else %}
+                                        <form method="POST" action="{{ url_for('events.leave_event_route', event_id=event.id) }}">
+                                            <button type="submit" class="base-btn leave-btn">取消报名</button>
+                                        </form>
+                                        {% if event.attendee_count < event.maxplayer %}
+                                        <button type="button" class="base-btn set-note-btn" onclick="editFriend({{ event.id }},'+')">
+                                            +随行人
+                                        </button>
+                                        {% endif %}
+                                        {% if event.user_friends != '0' %}
+                                        <button type="button" class="base-btn set-note-btn" onclick="editFriend({{ event.id }},'-')">
+                                            -随行人
+                                        </button>
+                                        {% endif %}
+                                    {% endif %}
+                                    <button type="button" class="base-btn set-note-btn" onclick="promptForNote({{ event.id }})">
+                                        设置备注
+                                    </button>
+                                {% elif is_full %}
+                                    <button type="button" class="base-btn leave-btn" disabled>
+                                        名额已满
+                                    </button>
+                                {% elif event.inviter != current_user %}
+                                    {% if event.locktime_obj < now() %}
+                                    <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}"
+                                        onsubmit="return confirm('确定空降吗？报名后无法取消！')">
+                                        <button type="submit" class="base-btn join-btn">
+                                            空降报名
+                                        </button>
                                     </form>
-                                    {% if event.attendee_count < event.maxplayer %}
-                                    <button type="button" class="base-btn set-note-btn" onclick="editFriend({{ event.id }},'+')">
-                                        +随行人
-                                    </button>
-                                    {% endif %}
-                                    {% if event.user_friends != '0' %}
-                                    <button type="button" class="base-btn set-note-btn" onclick="editFriend({{ event.id }},'-')">
-                                        -随行人
-                                    </button>
+                                    {% else %}
+                                    <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}">
+                                        <button type="submit" class="base-btn join-btn">
+                                            报名参加
+                                        </button>
+                                    </form>
                                     {% endif %}
                                 {% endif %}
-                                <button type="button" class="base-btn set-note-btn" onclick="promptForNote({{ event.id }})">
-                                    设置备注
-                                </button>
-                            {% elif is_full %}
-                                <button type="button" class="base-btn leave-btn" disabled>
-                                    名额已满
-                                </button>
-                            {% elif event.inviter != current_user %}
-                                {% if event.locktime_obj < now() %}
-                                <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}"
-                                    onsubmit="return confirm('确定空降吗？报名后无法取消！')">
-                                    <button type="submit" class="base-btn join-btn">
-                                        空降报名
-                                    </button>
-                                </form>
-                                {% else %}
-                                <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}">
-                                    <button type="submit" class="base-btn join-btn">
-                                        报名参加
-                                    </button>
-                                </form>
-                                {% endif %}
-                            {% endif %}
 
-                        {% if event_owner_or_admin %}
-                            <button onclick="refToEdit({{event.id}})" class="base-btn edit-btn">
-                                编辑活动
-                            </button>
-                            <form method="POST"
-                                  action="{{ url_for('events.delete_event_route', event_id=event.id) }}"
-                                  onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除活动及所有报名记录吗？{% endif %}')">
-                                <button type="submit" class="base-btn leave-btn">
-                                    {% if can_end_event %}结束活动{% else %}删除活动{% endif %}
+                            {% if event_owner_or_admin %}
+                                <button onclick="refToEdit({{event.id}})" class="base-btn edit-btn">
+                                    编辑活动
                                 </button>
-                            </form>
-                        {% endif %}
+                                <form method="POST"
+                                      action="{{ url_for('events.delete_event_route', event_id=event.id) }}"
+                                      onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除活动及所有报名记录吗？{% endif %}')">
+                                    <button type="submit" class="base-btn leave-btn">
+                                        {% if can_end_event %}结束活动{% else %}删除活动{% endif %}
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 

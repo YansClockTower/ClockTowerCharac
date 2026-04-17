@@ -17,22 +17,32 @@
     box-sizing: border-box;
 }
 .event-details {
-    width: 95%;
+    width: 100%;
+    display: block;
+}
+.event-main {
+    width: 100%;
+}
+.event-main h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+.event-main p,
+.event-main br {
+    display: none;
+}
+.event-meta-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 0;
 }
 .event-info {
     width: 85%;
     margin-right: 15px;
 }
-.action-buttons {
-    min-width: 100px;
-    width: 15%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex-shrink: 0;
+.event-info p {
+    margin: 0;
 }
 .event-summary {
     padding-top: 10px;
@@ -124,7 +134,19 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    margin-left: 15px;
+    margin-left: 0;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 0;
+    min-width: 70px;
+}
+.action-buttons .base-btn {
+    white-space: nowrap;
+}
+.action-buttons form {
+    display: flex;
+    justify-content: center;
+    width: 100%;
 }
 .join-btn {
     background: #28a745;
