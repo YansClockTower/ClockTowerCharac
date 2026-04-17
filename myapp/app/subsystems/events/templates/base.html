@@ -7,7 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('events.static', filename='style.css') }}">
     {% block extra_css %}{% endblock %}
     <style>
-        body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+        body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 0; background: #fff; }
+        .page-shell {
+            max-width: 800px;
+            min-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
+            transform-origin: top center;
+        }
         h1 { border-bottom: 2px solid #ccc; padding-bottom: 10px; }
         .event-form, .event-list { margin-bottom: 30px; padding: 15px; border: 1px solid #eee; border-radius: 5px; }
         .event-item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 3px; display: flex; justify-content: space-between; align-items: center; }
@@ -17,25 +25,44 @@
     </style>
 </head>
 <body>
-    <div class="header-status">
-        <span class="welcome-msg">欢迎, {{ current_user if current_user else '用户' }}</span>
-        <a href="{{ url_for('users.user_page') }}" class="user-center-link">用户中心</a>
-        <a href="#" class="logout-btn" onclick="logoutUser(event)">登出</a>
+    <div class="page-shell" id="pageShell">
+        <div class="header-status">
+            <span class="welcome-msg">欢迎, {{ current_user if current_user else '用户' }}</span>
+            <a href="{{ url_for('users.user_page') }}" class="user-center-link">用户中心</a>
+            <a href="#" class="logout-btn" onclick="logoutUser(event)">登出</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flashes">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <ul class="flashes">
-        {% for category, message in messages %}
-          <li class="{{ category }}">{{ message }}</li>
-        {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
-
-    {% block content %}{% endblock %}
-
     <script>
+      function applyShellScale() {
+        const shell = document.getElementById("pageShell");
+        if (!shell) return;
+        const minWidth = 600;
+        const viewportWidth = window.innerWidth;
+        const scale = viewportWidth < minWidth ? viewportWidth / minWidth : 1;
+        shell.style.transform = `scale(${scale})`;
+        shell.style.marginLeft = scale < 1 ? "0" : "auto";
+        shell.style.marginRight = scale < 1 ? "0" : "auto";
+        // 保证缩放后页面可滚动到底部
+        const scaledHeight = shell.offsetHeight * scale;
+        document.body.style.minHeight = `${scaledHeight + 12}px`;
+      }
+
+      window.addEventListener("resize", applyShellScale);
+      window.addEventListener("load", applyShellScale);
+
       async function logoutUser(event) {
         event.preventDefault();
         try {

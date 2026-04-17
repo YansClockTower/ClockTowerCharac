@@ -109,7 +109,9 @@
                             {% endif %}
 
                         {% if event_owner_or_admin %}
-                            <button onclick="refToEdit({{event.id}})" class="base-btn edit-btn">编辑</button>
+                            <button onclick="refToEdit({{event.id}})" class="base-btn edit-btn">
+                                编辑活动
+                            </button>
                             <form method="POST"
                                   action="{{ url_for('events.delete_event_route', event_id=event.id) }}"
                                   onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除活动及所有报名记录吗？{% endif %}')">
