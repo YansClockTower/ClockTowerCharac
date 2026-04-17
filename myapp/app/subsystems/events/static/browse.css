@@ -1,5 +1,8 @@
 .event-list {
     position: relative;
+    width: 100%;
+    min-width: min(400px, 100%);
+    box-sizing: border-box;
 }
 .event-item {
     display: flex;
@@ -9,6 +12,9 @@
     padding: 15px;
     margin-bottom: 10px;
     border-radius: 6px;
+    width: 100%;
+    min-width: min(400px, 100%);
+    box-sizing: border-box;
 }
 .event-details {
     width: 95%;
