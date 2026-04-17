@@ -2,28 +2,39 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>索引页</title>
     <style>
         body {
             margin: 0;
-            padding: 0;
+            padding: 24px;
             font-family: sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             background-color: #f7f7f7;
+            box-sizing: border-box;
         }
         h1 {
             font-size: 2.5em;
-            margin-bottom: 40px;
+            margin: 16px 0 28px;
+            text-align: center;
+        }
+        #user-avatar {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 10px auto;
+            border: 2px solid #ddd;
         }
         .primary-nav {
             display: flex;
             flex-direction: column;
             gap: 12px;
-            width: 280px;
+            width: min(360px, 100%);
         }
         .primary-nav button {
             width: 100%;
@@ -67,6 +78,50 @@
         }
         .secondary-nav a:hover {
             background-color: #2980b9;
+        }
+        p {
+            margin-top: 18px;
+            text-align: center;
+            color: #555;
+        }
+
+        @media (orientation: portrait), (max-width: 768px) {
+            body {
+                padding: 20px 16px 28px;
+                justify-content: flex-start;
+            }
+            #user-avatar {
+                width: 120px !important;
+                height: 120px !important;
+                margin-top: 6px !important;
+            }
+            h1 {
+                font-size: 1.6rem;
+                line-height: 1.4;
+                margin: 12px 0 18px;
+            }
+            .primary-nav {
+                width: 100%;
+                max-width: 460px;
+                gap: 10px;
+            }
+            .primary-nav button {
+                font-size: 1.05rem;
+                padding: 14px 12px;
+                border-radius: 10px;
+            }
+            .secondary-nav {
+                padding: 10px;
+                border-radius: 10px;
+            }
+            .secondary-nav a {
+                font-size: 1rem;
+                padding: 13px 10px;
+                border-radius: 10px;
+            }
+            p {
+                font-size: 0.95rem;
+            }
         }
     </style>
 </head>
