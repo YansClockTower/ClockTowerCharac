@@ -214,7 +214,8 @@
             const urlTemplate = "{{ url_for('events.signin_event_route', event_id=7777) }}";
             fetch(urlTemplate.replace("7777", eventId), {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                headers: ClockTowerAuth.authHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ signcode: signcode })
             })
             .then(response => response.json())
@@ -233,7 +234,8 @@
                 const urlTemplate = "{{ url_for('events.set_joininfo_route', event_id=7777) }}";
                 fetch(urlTemplate.replace("7777", eventId), {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    headers: ClockTowerAuth.authHeaders({ "Content-Type": "application/json" }),
                     body: JSON.stringify({ note: note })
                 })
                 .then(response => response.json())
@@ -252,7 +254,8 @@
             const urlTemplate = "{{ url_for('events.set_joininfo_route', event_id=7777) }}";
             fetch(urlTemplate.replace("7777", eventId), {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                headers: ClockTowerAuth.authHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ friend: isMore })
             })
             .then(response => response.json())

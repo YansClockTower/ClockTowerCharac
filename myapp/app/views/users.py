@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 import json
+from urllib.parse import unquote
+
 from flask import Blueprint, redirect, render_template, request, jsonify, make_response, send_file, url_for
 import jwt
 import datetime
@@ -9,6 +11,7 @@ from app.models.database import get_user_db
 from app.models.crypt import hash_password, verify_password
 from app.models.config import get_config
 from app.identity import get_current_user, login_required_template, token_required
+from app.identity.auth import extract_auth_token, safe_redirect_target
 from app.identity.permissions import (
     ACTIVITY_ABSENT_COUNT_COLUMN,
     ACTIVITY_JOINED_COUNT_COLUMN,
@@ -81,9 +84,11 @@ def user_page(user_info):
 
 @users_bp.route("/login")
 def user_login():
-    return render_template(
-            'login.html'
-    )
+    raw_next = request.args.get("next")
+    next_url = ""
+    if raw_next:
+        next_url = safe_redirect_target(unquote(raw_next)) or ""
+    return render_template("login.html", next_url=next_url)
 
 @users_bp.route("/register_submit", methods=["POST"])
 def register():
@@ -185,8 +190,10 @@ def login():
     token = jwt.encode(
         {"user_id": user['id'], "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365)},
         get_config('secret_key'),
-        algorithm="HS256"
+        algorithm="HS256",
     )
+    if isinstance(token, bytes):
+        token = token.decode("ascii")
 
     resp = make_response(jsonify({"status": "success", "id": user['id'], "token": token}))
 
@@ -202,9 +209,23 @@ def logout():
     return resp
 
 
+@users_bp.route("/establish_session", methods=["POST"])
+def establish_session():
+    """用 Cookie 或 Bearer 中的 JWT 校验后（再）下发 HttpOnly Cookie，便于整页导航与 WebView 补全会话。"""
+    token = extract_auth_token()
+    if not token:
+        return jsonify({"status": "failed", "reason": "缺少 token"}), 401
+    user = get_current_user(update_last_login=False)
+    if not user:
+        return jsonify({"status": "failed", "reason": "无效或过期 token"}), 401
+    resp = make_response(jsonify({"status": "success"}))
+    resp.set_cookie("token", token, httponly=True, samesite="Lax")
+    return resp
+
+
 @users_bp.route("/me", methods=["GET"])
 @token_required
-def me(current_user):
+def me(current_user):  # 须 Cookie 或 Authorization: Bearer；前端请用 ClockTowerAuth.authFetch
     secret_key = get_config('secret_key')
     # 用户信息数据（不含签名）
     user_data = {
@@ -249,7 +270,7 @@ def read_icon(id):
 # --- 新增上传头像路由 ---
 @users_bp.route("/upload_icon", methods=["POST"])
 @token_required
-def upload_icon(current_user): # current_user 由 token_required 装饰器提供
+def upload_icon(current_user):  # current_user 由 token_required；fetch 须带 Cookie 或 Authorization: Bearer
     # 确保上传目录存在
     # 1. 检查请求中是否有文件部分
     if 'image' not in request.files:
@@ -283,6 +304,7 @@ def view_user(user_id):
 
 @users_bp.route("/view_user_by_name", methods=["POST"])
 def view_user_by_name():
+    # 须 Cookie 或 Authorization: Bearer；前端请用 ClockTowerAuth.authFetch（与 token_required 一致）
     operator = get_current_user(update_last_login=False)
     if not operator:
         return jsonify({"status": "failed", "reason": "请先登录"}), 401
@@ -315,6 +337,7 @@ def edit_user():
 
 @users_bp.route("/permission_update", methods=["POST"])
 def permission_update():
+    # 须 Cookie 或 Authorization: Bearer；前端请用 ClockTowerAuth.authFetch
     ensure_user_permission_schema()
     user = get_current_user(update_last_login=False)
     if not user:
@@ -350,6 +373,7 @@ def permission_update():
 
 @users_bp.route("/association_role_update", methods=["POST"])
 def association_role_update():
+    # 须 Cookie 或 Authorization: Bearer；前端请用 ClockTowerAuth.authFetch
     ensure_user_permission_schema()
     user = get_current_user(update_last_login=False)
     if not user:
@@ -385,7 +409,7 @@ def association_role_update():
 @users_bp.route("/social_role_update", methods=["POST"])
 @users_bp.route("/profile_update", methods=["POST"])
 @token_required
-def social_role_update(current_user):
+def social_role_update(current_user):  # 须 Cookie 或 Authorization: Bearer
     ensure_user_permission_schema()
     payload = request.get_json(silent=True) if request.is_json else {}
     if payload is None:
@@ -433,5 +457,5 @@ def social_role_update(current_user):
 
 @users_bp.route("/permission_bitmap_definition", methods=["GET"])
 @token_required
-def permission_bitmap_definition(_current_user):
+def permission_bitmap_definition(_current_user):  # 须 Cookie 或 Authorization: Bearer
     return jsonify({"status": "success", "bitmap_definition": permission_bitmap_descriptions()})

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>编辑用户权限</title>
+  <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
   <style>
     body { font-family: system-ui, Arial, sans-serif; margin: 40px; }
     .card { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
@@ -124,7 +125,7 @@
       };
 
       try {
-        const res = await fetch("/user/permission_update", {
+        const res = await ClockTowerAuth.authFetch("/user/permission_update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -154,7 +155,7 @@
       };
 
       try {
-        const res = await fetch("/user/association_role_update", {
+        const res = await ClockTowerAuth.authFetch("/user/association_role_update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -177,7 +178,7 @@
         return;
       }
       try {
-        const res = await fetch("/user/view_user_by_name", {
+        const res = await ClockTowerAuth.authFetch("/user/view_user_by_name", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username }),

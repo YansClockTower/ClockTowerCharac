@@ -5,6 +5,7 @@
   <title>用户登录</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
   <style>
     body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
     .card { max-width: 420px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
@@ -44,14 +45,13 @@
 
   <script>
     const INFO_PAGE_URL = "/user";
-    const getAuthHeaders = () => ({ "Content-Type": "application/json" });
+    const LOGIN_NEXT = {{ next_url|tojson }};
 
     async function fetchMe() {
       try {
-        const res = await fetch("/user/me", {
+        const res = await ClockTowerAuth.authFetch("/user/me", {
           method: "GET",
-          credentials: "include",
-          headers: getAuthHeaders(),
+          headers: { "Content-Type": "application/json" },
         });
         if (!res.ok) return null;
         return await res.json();
@@ -70,13 +70,15 @@
         });
         const data = await res.json().catch(() => ({}));
 
-        if (data && data.token) {
+        if (data && data.status === "success" && data.token) {
+          ClockTowerAuth.setStoredAuthToken(data.token);
+          await ClockTowerAuth.establishSessionFromStoredToken();
           const me = await fetchMe();
-          if (me && (me.username || me.user || me.authenticated)) {
-            return true;
-          } else if (data && data.token) {
+          if (me && me.username) {
             return true;
           }
+          alert("登录失败：无法获取用户信息");
+          return false;
         }
         alert("登录失败：" + (data.reason || "未知错误"));
         return false;
@@ -93,7 +95,7 @@
 
       const success = await handleLogin(username, password);
       if (success) {
-        location.href = INFO_PAGE_URL;
+        location.href = LOGIN_NEXT || INFO_PAGE_URL;
       }
     };
 
@@ -117,7 +119,7 @@
           alert("注册成功。正在尝试自动登录...");
           const success = await handleLogin(username, password);
           if (success) {
-            location.href = INFO_PAGE_URL;
+            location.href = LOGIN_NEXT || INFO_PAGE_URL;
           }
         } else {
           alert("注册失败，请检查用户名是否已存在。");
@@ -130,11 +132,12 @@
     document.addEventListener("DOMContentLoaded", async () => {
       const authForms = document.getElementById("auth-forms");
       const loadingMsg = document.getElementById("loading-msg");
+      await ClockTowerAuth.establishSessionFromStoredToken();
       const me = await fetchMe();
 
-      if (me && (me.username || me.user)) {
+      if (me && me.username) {
         loadingMsg.textContent = "已登录，正在跳转...";
-        location.href = INFO_PAGE_URL;
+        location.href = LOGIN_NEXT || INFO_PAGE_URL;
       } else {
         loadingMsg.style.display = "none";
         authForms.style.display = "block";

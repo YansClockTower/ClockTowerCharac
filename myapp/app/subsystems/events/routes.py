@@ -128,7 +128,7 @@ def join_event_route(user_info, event_id):
 
 @events_bp.route("/signin/<int:event_id>", methods=["POST"])
 @token_required
-def signin_event_route(current_user, event_id):
+def signin_event_route(current_user, event_id):  # fetch 须带 Cookie 或 Authorization: Bearer（见 browse.html）
     data = request.get_json()
     signcode = data.get("signcode")
     success, error = signin_event(event_id, current_user["name"], signcode)
@@ -150,7 +150,7 @@ def leave_event_route(user_info, event_id):
 
 @events_bp.route("/set_joininfo/<int:event_id>", methods=["POST"])
 @token_required
-def set_joininfo_route(current_user, event_id):
+def set_joininfo_route(current_user, event_id):  # fetch 须带 Cookie 或 Authorization: Bearer（见 browse.html）
     if not request.is_json:
         return jsonify({"success": False, "message": "Missing JSON in request"}), 400
 

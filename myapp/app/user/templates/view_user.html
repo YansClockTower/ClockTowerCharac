@@ -5,6 +5,7 @@
   <title>用户中心</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
   <style>
     body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
     .card { max-width: 420px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
@@ -94,12 +95,12 @@
   <script>
     async function handleLogout() {
       try {
-        await fetch("/user/logout", {
+        await ClockTowerAuth.authFetch("/user/logout", {
           method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
         });
       } catch (e) {}
+      ClockTowerAuth.clearStoredAuthToken();
       location.href = "/user/login";
     }
 
@@ -170,10 +171,9 @@
         formData.append("image", file);
 
         try {
-          const res = await fetch("/user/upload_icon", {
+          const res = await ClockTowerAuth.authFetch("/user/upload_icon", {
             method: "POST",
-            credentials: "include",
-            body: formData
+            body: formData,
           });
 
           if (res.status === 413) {
@@ -197,9 +197,8 @@
     if (saveProfileBtn && socialRoleSelect && contactInfoInput) {
       saveProfileBtn.addEventListener("click", async () => {
         try {
-          const res = await fetch("/user/profile_update", {
+          const res = await ClockTowerAuth.authFetch("/user/profile_update", {
             method: "POST",
-            credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               social_role: socialRoleSelect.value,
