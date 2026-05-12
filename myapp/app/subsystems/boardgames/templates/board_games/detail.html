@@ -1,0 +1,36 @@
+{% extends "board_games/base.html" %}
+{% block title %}{{ game.board_game_name }}{% endblock %}
+{% block content %}
+<h1>{{ game.board_game_name }}</h1>
+<p class="toolbar">
+  <a href="{{ url_for('boardgames.browse') }}">返回浏览</a>
+</p>
+<div class="game-detail-layout">
+  <div class="game-detail-image">
+    {% if game.image_path %}
+      {% if game.image_path.startswith('http://') or game.image_path.startswith('https://') %}
+        <img src="{{ game.image_path }}" alt="">
+      {% elif game.image_path.startswith('/') %}
+        <img src="{{ game.image_path }}" alt="">
+      {% else %}
+        <img src="{{ url_for('static', filename=game.image_path) }}" alt="">
+      {% endif %}
+    {% else %}
+      <div class="no-image large">无图片</div>
+    {% endif %}
+  </div>
+  <dl class="game-detail-fields">
+    <dt>桌游类型</dt><dd>{{ game.game_type or '—' }}</dd>
+    <dt>人数(最少/推荐/最多)</dt><dd>{{ game.min_players if game.min_players is not none else '—' }} / {{ game.recommended_players if game.recommended_players is not none else '—' }} / {{ game.max_players if game.max_players is not none else '—' }}</dd>
+    <dt>游戏时长（分钟）</dt><dd>{{ game.playing_time if game.playing_time is not none else '—' }}</dd>
+    <dt>所有者</dt><dd>{{ game.owner }}</dd>
+    <dt>目前使用者</dt><dd>{{ game.current_holder or '—' }}</dd>
+    <dt>目前存放地点</dt><dd>{{ game.current_storage_location or '—' }}</dd>
+  </dl>
+</div>
+<br/>
+<dd class="multiline">{{ game.description or '—' }}</dd>
+<p class="borrow-actions">
+  <button type="button" class="btn btn-secondary" onclick="alert('借用功能暂未开放。')">申请借用</button>
+</p>
+{% endblock %}

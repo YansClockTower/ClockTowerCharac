@@ -1,0 +1,265 @@
+body {
+  font-family: sans-serif;
+  line-height: 1.6;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 10px;
+}
+
+h1 {
+  border-bottom: 2px solid #ccc;
+  padding-bottom: 10px;
+}
+
+.header-status {
+  text-align: right;
+  margin-bottom: 10px;
+  font-size: 0.9em;
+}
+
+.welcome-msg {
+  margin-right: 10px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+.user-center-link {
+  margin-right: 10px;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.logout-btn {
+  color: #dc3545;
+  text-decoration: none;
+}
+
+.flashes {
+  list-style: none;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 5px;
+}
+
+.flashes li.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.flashes li.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.toolbar {
+  margin-bottom: 1rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 4px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: #fff;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.empty-hint {
+  color: #666;
+}
+
+.game-browse-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.game-card {
+  display: block;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  background: #fafafa;
+}
+
+.game-card:hover {
+  border-color: #007bff;
+}
+
+.game-card-image-wrap {
+  aspect-ratio: 1;
+  background: #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-card-image-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.game-card .no-image {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.game-card-name {
+  display: block;
+  padding: 8px;
+  font-weight: 600;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.game-form label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.game-form input[type="text"],
+.game-form input[type="number"],
+.game-form textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+}
+
+.req {
+  color: #c00;
+}
+
+.game-detail-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.game-detail-image {
+  flex: 0 0 220px;
+}
+
+.game-detail-image img {
+  max-width: 220px;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.no-image.large {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eee;
+  color: #888;
+  border-radius: 6px;
+}
+
+.game-detail-fields {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+}
+
+.game-detail-fields dt {
+  margin: 0;
+  font-weight: 600;
+  color: #444;
+}
+
+.game-detail-fields dd {
+  margin: 0;
+}
+
+.game-detail-fields .multiline {
+  white-space: pre-wrap;
+}
+
+.borrow-actions {
+  margin-top: 24px;
+}
+
+.card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 22px;
+  background: #fafcff;
+}
+
+.smart-json-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.smart-json-hint {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.smart-json-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.smart-json-textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.smart-json-actions {
+  margin-top: 10px;
+}
+
+.smart-json-msg {
+  margin: 10px 0 0;
+  min-height: 1.2em;
+  font-size: 0.9rem;
+  color: #198754;
+}
+
+.smart-json-msg.is-error {
+  color: #b02a37;
+}

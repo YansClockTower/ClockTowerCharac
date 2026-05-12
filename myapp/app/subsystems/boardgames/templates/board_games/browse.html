@@ -1,0 +1,35 @@
+{% extends "board_games/base.html" %}
+{# 图片：http(s) 用完整 URL；以 / 开头用站点内路径；否则视为 app 根 static 下的相对路径（url_for('static', ...)） #}
+{% block title %}浏览桌游{% endblock %}
+{% block content %}
+<h1>桌游一览</h1>
+<p class="toolbar">
+  <a class="btn btn-primary" href="{{ url_for('boardgames.register') }}">登记新桌游</a>
+</p>
+{% if not games %}
+  <p class="empty-hint">暂无登记的桌游。</p>
+{% else %}
+  <ul class="game-browse-grid">
+    {% for game in games %}
+    <li>
+      <a class="game-card" href="{{ url_for('boardgames.game_detail', game_id=game.id) }}">
+        <div class="game-card-image-wrap">
+          {% if game.image_path %}
+            {% if game.image_path.startswith('http://') or game.image_path.startswith('https://') %}
+              <img src="{{ game.image_path }}" alt="" loading="lazy">
+            {% elif game.image_path.startswith('/') %}
+              <img src="{{ game.image_path }}" alt="" loading="lazy">
+            {% else %}
+              <img src="{{ url_for('static', filename=game.image_path) }}" alt="" loading="lazy">
+            {% endif %}
+          {% else %}
+            <span class="no-image">无图片</span>
+          {% endif %}
+        </div>
+        <span class="game-card-name">{{ game.board_game_name }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

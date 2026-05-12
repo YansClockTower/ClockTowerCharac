@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}桌游登记{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('boardgames.static', filename='style.css') }}">
+    <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="header-status">
+        <span class="welcome-msg">欢迎, {{ current_user if current_user else '用户' }}</span>
+        <a href="{{ url_for('users.user_page') }}" class="user-center-link">用户中心</a>
+        <a href="#" class="logout-btn" onclick="logoutUser(event)">登出</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        if (window.ClockTowerAuth) {
+          ClockTowerAuth.establishSessionFromStoredToken();
+        }
+      });
+
+      async function logoutUser(event) {
+        event.preventDefault();
+        try {
+          await (window.ClockTowerAuth
+            ? ClockTowerAuth.authFetch("/user/logout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+              })
+            : fetch("/user/logout", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+              }));
+        } catch (e) {}
+        if (window.ClockTowerAuth) {
+          ClockTowerAuth.clearStoredAuthToken();
+        }
+        window.location.href = "/user/login";
+      }
+    </script>
+</body>
+</html>

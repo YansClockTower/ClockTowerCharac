@@ -30,6 +30,8 @@ def create_app():
     from .portal.routes import portal_bp
     from .subsystems.events.routes import events_bp
     from .subsystems.events.dbutil import close_db as close_events_db
+    from .subsystems.boardgames.routes import boardgames_bp
+    from .subsystems.boardgames.dbutil import close_db as close_boardgames_db
 
     app.register_blueprint(api_bp)
     app.register_blueprint(character_bp)
@@ -37,8 +39,10 @@ def create_app():
     app.register_blueprint(viewedition_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(events_bp)
+    app.register_blueprint(boardgames_bp)
     app.register_blueprint(portal_bp)
 
     app.teardown_appcontext(close_events_db)
+    app.teardown_appcontext(close_boardgames_db)
 
     return app

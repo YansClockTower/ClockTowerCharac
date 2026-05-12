@@ -1,0 +1,144 @@
+{% extends "board_games/base.html" %}
+{% block title %}登记桌游{% endblock %}
+{% block content %}
+<h1>登记新桌游</h1>
+<p class="toolbar"><a href="{{ url_for('boardgames.browse') }}">返回浏览</a></p>
+
+<div class="smart-json card">
+  <h2 class="smart-json-title">智能识别</h2>
+  <p class="smart-json-hint">将集石脚本输出的 JSON 粘贴到下方，点击「识别」即可自动填入表单（所有者等需自行核对）。</p>
+  <label class="smart-json-label" for="smartJsonInput">JSON</label>
+  <textarea id="smartJsonInput" class="smart-json-textarea" rows="10" spellcheck="false" placeholder='{"name":"…","game_type_line":"…",…}'></textarea>
+  <div class="smart-json-actions">
+    <button type="button" id="smartJsonRecognizeBtn" class="btn btn-secondary">识别</button>
+  </div>
+  <p id="smartJsonMsg" class="smart-json-msg" aria-live="polite"></p>
+</div>
+
+<form method="post" class="game-form" id="boardGameRegisterForm">
+  <label>桌游名称 <span class="req">*</span>
+    <input type="text" name="board_game_name" required value="{{ form_data.get('board_game_name', '') }}">
+  </label>
+  <label>桌游类型
+    <input type="text" name="game_type" value="{{ form_data.get('game_type', '') }}">
+  </label>
+  <label>最少人数
+    <input type="number" name="min_players" min="0" value="{{ form_data.get('min_players', '') }}">
+  </label>
+  <label>最多人数
+    <input type="number" name="max_players" min="0" value="{{ form_data.get('max_players', '') }}">
+  </label>
+  <label>推荐人数
+    <input type="number" name="recommended_players" min="0" placeholder="集石等来源的推荐人数" value="{{ form_data.get('recommended_players', '') }}">
+  </label>
+  <label>游戏时长
+    <input type="number" name="playing_time" min="0" value="{{ form_data.get('playing_time', '') }}">
+  </label>
+  <label>描述
+    <textarea name="description" rows="4">{{ form_data.get('description', '') }}</textarea>
+  </label>
+  <label>图片路径或 URL
+    <input type="text" name="image_path" placeholder="https://... 或 static 下相对路径" value="{{ form_data.get('image_path', '') }}">
+  </label>
+  <label>所有者 <span class="req">*</span>
+    <input type="text" name="owner" required value="{{ form_data.get('owner', '') }}">
+  </label>
+  <label>目前使用者
+    <input type="text" name="current_holder" value="{{ form_data.get('current_holder', '') }}">
+  </label>
+  <label>目前存放地点
+    <input type="text" name="current_storage_location" value="{{ form_data.get('current_storage_location', '') }}">
+  </label>
+  <p><button type="submit" class="btn btn-primary">确认登记</button></p>
+</form>
+
+<script>
+(function () {
+  const btn = document.getElementById("smartJsonRecognizeBtn");
+  const jsonInput = document.getElementById("smartJsonInput");
+  const msg = document.getElementById("smartJsonMsg");
+  const form = document.getElementById("boardGameRegisterForm");
+  if (!btn || !jsonInput || !form) return;
+
+  function setMsg(text, isError) {
+    msg.textContent = text || "";
+    msg.classList.toggle("is-error", !!isError);
+  }
+
+  function fillField(name, value) {
+    if (value === undefined || value === null) return;
+    const el = form.querySelector("[name=\"" + name + "\"]");
+    if (!el) return;
+    el.value = value;
+  }
+
+  function parseMinutes(duration) {
+    if (!duration || typeof duration !== "string") return "";
+    var m = duration.match(/(\d+)\s*分钟/);
+    return m ? m[1] : "";
+  }
+
+  function parseMinMax(supportText) {
+    if (!supportText || typeof supportText !== "string") return { min: "", max: "" };
+    var first = supportText.split("、")[0].trim();
+    var m = first.match(/^(\d+)\s*[\u2013\-]\s*(\d+)$/);
+    if (m) return { min: m[1], max: m[2] };
+    var m2 = first.match(/^(\d+)\+$/);
+    if (m2) return { min: m2[1], max: "" };
+    var m3 = first.match(/^(\d+)$/);
+    if (m3) return { min: m3[1], max: m3[1] };
+    return { min: "", max: "" };
+  }
+
+  function parseRecommendedPlayers(text) {
+    if (text == null || text === "") return "";
+    var nums = String(text).match(/\d+/g);
+    if (!nums || !nums.length) return "";
+    var n = nums.map(Number);
+    return String(Math.max.apply(null, n));
+  }
+
+  function buildDescription(o) {
+    var d = o.description != null ? String(o.description) : "";
+    d = d.trim();
+    if (o.duration_per_player && !parseMinutes(o.duration_per_player)) {
+      d += "\n\n（集石人均时长：" + String(o.duration_per_player) + "）";
+    }
+    return d.trim();
+  }
+
+  btn.addEventListener("click", function () {
+    var raw = (jsonInput.value || "").trim();
+    if (!raw) {
+      setMsg("请先粘贴 JSON。", true);
+      return;
+    }
+    var o;
+    try {
+      o = JSON.parse(raw);
+    } catch (e) {
+      setMsg("JSON 格式无效，请检查括号与引号。", true);
+      return;
+    }
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      setMsg("根节点必须是 JSON 对象。", true);
+      return;
+    }
+    if (!o.name && !o.image_url) {
+      setMsg("未找到 name 或 image_url 字段，无法识别。", true);
+      return;
+    }
+    fillField("board_game_name", o.name != null ? String(o.name) : "");
+    fillField("game_type", o.game_type_line != null ? String(o.game_type_line) : "");
+    var mm = parseMinMax(o.player_support_text);
+    fillField("min_players", mm.min);
+    fillField("max_players", mm.max);
+    fillField("recommended_players", parseRecommendedPlayers(o.player_recommend_text));
+    fillField("playing_time", parseMinutes(o.duration_per_player || ""));
+    fillField("description", buildDescription(o));
+    fillField("image_path", o.image_url != null ? String(o.image_url) : "");
+    setMsg("已根据 JSON 填入字段，请核对所有者等信息后提交。", false);
+  });
+})();
+</script>
+{% endblock %}
