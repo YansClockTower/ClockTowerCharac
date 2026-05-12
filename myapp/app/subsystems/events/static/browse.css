@@ -188,6 +188,16 @@
     color: #155724;
     font-weight: bold;
 }
+a.player-tag,
+a.player-tag:visited {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+a.player-tag:hover {
+    text-decoration: underline;
+    filter: brightness(0.97);
+}
 .corner-button {
     position: absolute;
     top: 15px;

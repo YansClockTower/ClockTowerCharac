@@ -3,7 +3,7 @@ import hmac
 import json
 from urllib.parse import unquote
 
-from flask import Blueprint, redirect, render_template, request, jsonify, make_response, send_file, url_for
+from flask import Blueprint, flash, redirect, render_template, request, jsonify, make_response, send_file, url_for
 import jwt
 import datetime
 
@@ -81,6 +81,27 @@ def user_page(user_info):
     return render_template(
             'view_user.html',user_info=user_info # 将从数据库获取的字典传递给前端模板
     )
+
+
+@users_bp.route("/profile/<int:user_id>", methods=["GET"])
+@login_required_template
+def view_user_profile(user_info, user_id):
+    """查看其他用户公开资料（只读）；与本人中心区分。"""
+    if int(user_id) == int(user_info["id"]):
+        return redirect(url_for("users.user_page"))
+
+    ensure_user_permission_schema()
+    user_db = get_user_db()
+    row = user_db.execute("SELECT * FROM user_info WHERE id=?", (user_id,)).fetchone()
+    user_db.close()
+    if not row:
+        flash("未找到该用户。", "error")
+        return redirect(url_for("events.browse_events"))
+
+    profile = enrich_user_permissions(dict(row))
+    profile.pop("password_hash", None)
+    return render_template("view_user_public.html", profile=profile)
+
 
 @users_bp.route("/login")
 def user_login():

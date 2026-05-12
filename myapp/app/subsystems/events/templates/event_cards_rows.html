@@ -1,4 +1,18 @@
 {# 仅活动卡片行（无空列表 else），供首屏 include 与 /browse_more JSON 片段复用 #}
+{% macro player_tag_link(attendance, current_user, extra_class="") %}
+  {% set pid = attendance.player %}
+  {% set uid = attendance.user_id %}
+  {% if uid %}
+  <a href="{{ url_for('users.view_user_profile', user_id=uid) }}" class="player-tag{% if extra_class %} {{ extra_class }}{% endif %}{% if pid == current_user %} current-player-tag{% endif %}">
+  {% else %}
+  <span class="player-tag{% if extra_class %} {{ extra_class }}{% endif %}{% if pid == current_user %} current-player-tag{% endif %}">
+  {% endif %}
+      {{ pid }}
+      {% if attendance.note %}({{ attendance.note }}){% endif %}
+      {% set nf = attendance.friends|default(0)|int %}
+      {% if nf > 0 %}+{{ attendance.friends }}人{% endif %}
+  {% if uid %}</a>{% else %}</span>{% endif %}
+{% endmacro %}
 {% for event in events %}
     {% set archived = ((event.signcode|string)|trim == '0') %}
     {% set status_class = "" %}
@@ -105,9 +119,9 @@
                         </button>
                         <form method="POST"
                               action="{{ url_for('events.archive_event_route', event_id=event.id) }}"
-                              onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定提前归档该活动吗？（未到结束条件时不会计入组织/参与统计）{% endif %}')">
+                              onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除该活动吗？{% endif %}')">
                             <button type="submit" class="base-btn leave-btn">
-                                {% if can_end_event %}结束并归档{% else %}归档活动{% endif %}
+                                {% if can_end_event %}结束活动{% else %}删除活动{% endif %}
                             </button>
                         </form>
                     {% endif %}
@@ -132,40 +146,19 @@
                     <span class="player-list">
                     {% for attendance in event.attendee_notes %}
                     {% if attendance.signed > 0 %}
-                        {% set player_id = attendance.player %}
-                        {% set player_note = attendance.note %}
-                        {% set player_friends = attendance.friends %}
-                        <span class="player-tag {% if player_id == current_user %}current-player-tag{% endif %}">
-                            {{ player_id }}
-                            {% if player_note %}({{player_note}}){% endif %}
-                            {% if player_friends and player_friends != 0 %}+{{player_friends}}人{% endif %}
-                        </span>
+                        {{ player_tag_link(attendance, current_user, "") }}
                     {% endif %}
                     {% endfor %}
                     {% for attendance in event.attendee_notes %}
                     {% if attendance.signed == 0 %}
-                        {% set player_id = attendance.player %}
-                        {% set player_note = attendance.note %}
-                        {% set player_friends = attendance.friends %}
-                        <span class="player-tag unsigned-player-tag {% if player_id == current_user %}current-player-tag{% endif %}">
-                            {{ player_id }}
-                            {% if player_note %}({{player_note}}){% endif %}
-                            {% if player_friends and player_friends != 0 %}+{{player_friends}}人{% endif %}
-                        </span>
+                        {{ player_tag_link(attendance, current_user, "unsigned-player-tag") }}
                     {% endif %}
                     {% endfor %}
                     </span>
                 {% else %}
                     <span class="player-list">
                         {% for attendance in event.attendee_notes %}
-                        {% set player_id = attendance.player %}
-                        {% set player_note = attendance.note %}
-                        {% set player_friends = attendance.friends %}
-                        <span class="player-tag {% if player_id == current_user %}current-player-tag{% endif %}">
-                            {{ player_id }}
-                            {% if player_note %}({{player_note}}){% endif %}
-                            {% if player_friends and player_friends != '0' %}+{{player_friends}}人{% endif %}
-                        </span>
+                        {{ player_tag_link(attendance, current_user, "") }}
                         {% endfor %}
                     </span>
                 {% endif %}

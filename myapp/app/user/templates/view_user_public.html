@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>用户资料 — {{ profile.name or '用户' }}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 420px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    h2 { margin: 0 0 12px; }
+    .center { text-align: center; }
+    .permissions-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .permissions-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+    .permissions-table tr:last-child td { border-bottom: none; }
+    details { margin-top: 12px; border: 1px solid #eee; border-radius: 8px; padding: 8px 10px; }
+    summary { cursor: pointer; font-weight: 600; }
+    #avatar-container { display: flex; flex-direction: column; align-items: center; }
+    .nav-row { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .nav-row a, .nav-row button {
+      display: block; width: 100%; padding: 10px; text-align: center; text-decoration: none;
+      border-radius: 8px; box-sizing: border-box; font-size: 1rem; border: 1px solid #ccc; background: #f8f9fa; color: #333;
+    }
+    .nav-row a:hover { background: #e9ecef; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>用户资料</h2>
+    <p class="center">用户 <b>{{ profile.name or '用户' }}</b></p>
+    <div id="avatar-container" class="center">
+      <img src="{{ url_for('users.read_icon', id=profile.id) }}" alt="头像"
+           style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin: 10px auto; border: 2px solid #ddd;">
+    </div>
+    <table class="permissions-table">
+      <tr><td>协会身份</td><td>{{ profile.association_role or '普通玩家' }}</td></tr>
+      <tr><td>社会身份</td><td>{{ profile.social_role or '保密' }}</td></tr>
+      <tr><td>联系方式</td><td>{{ profile.contact_info or '保密' }}</td></tr>
+      <tr><td>组织活动次数</td><td>{{ profile.activity_organized_count or 0 }}</td></tr>
+      <tr><td>参与活动次数</td><td>{{ profile.activity_joined_count or 0 }}</td></tr>
+      <tr><td>缺席活动次数</td><td>{{ profile.activity_absent_count or 0 }}</td></tr>
+    </table>
+    <details>
+      <summary>权限概览</summary>
+      <table class="permissions-table">
+        <tr><td>用户权限管理</td><td>{{ '✅ 是' if profile.permission_manage_accounts else '❌ 否' }}</td></tr>
+        <tr><td>个人剧本管理</td><td>{{ '✅ 是' if profile.permission_manage_own_editions else '❌ 否' }}</td></tr>
+        <tr><td>全部剧本管理</td><td>{{ '✅ 是' if profile.permission_manage_all_editions else '❌ 否' }}</td></tr>
+        <tr><td>剧本导入与创建</td><td>{{ '✅ 是' if profile.permission_manage_create_editions else '❌ 否' }}</td></tr>
+        <tr><td>魔典说书人</td><td>{{ '✅ 是' if profile.permission_storyteller else '❌ 否' }}</td></tr>
+        <tr><td>语音说书人</td><td>{{ '✅ 是' if profile.permission_storyteller_vocal else '❌ 否' }}</td></tr>
+      </table>
+    </details>
+    <div class="nav-row">
+      <a href="{{ url_for('events.browse_events') }}">返回活动板</a>
+      <a href="{{ url_for('users.user_page') }}">我的用户中心</a>
+      <a href="/">返回首页</a>
+    </div>
+  </div>
+</body>
+</html>

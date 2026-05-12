@@ -16,6 +16,7 @@ from app.identity.permissions import (
     ensure_user_permission_schema,
 )
 from app.models.database import get_user_db
+from app.subsystems.events.attendee_ids import enrich_events_attendees_user_ids
 from app.subsystems.events.dbutil import (
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
     EVENT_TYPE_VALUES,
@@ -132,6 +133,7 @@ def browse_events(user_info):
     browse_tab, browse_filters = _browse_filters_from_request()
     events_total = count_browse_events(current_user, browse_filters)
     events = get_browse_events_page(current_user, browse_filters, BROWSE_PAGE_SIZE, 0)
+    enrich_events_attendees_user_ids(events)
     events_loaded = len(events)
     has_more_browse = events_loaded < events_total
     browse_next_offset = events_loaded
@@ -170,6 +172,7 @@ def browse_events_more(user_info):
 
     total = count_browse_events(current_user, browse_filters)
     events = get_browse_events_page(current_user, browse_filters, limit, offset)
+    enrich_events_attendees_user_ids(events)
     loaded_total = offset + len(events)
     html = render_template(
         "event_cards_rows.html",
