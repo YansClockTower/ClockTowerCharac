@@ -1,8 +1,8 @@
 {
     "development": true,
-    "database_path": "/home/ubuntu/ClockTower_database",
+    "database_path": "/root/ClockTower_database",
     "database_path_dev": "./database",
-    "usericon_path": "/home/ubuntu/shares/usericon",
+    "usericon_path": "/root/shares/usericon",
     "usericon_path_dev": "/Users/yanice/shares/usericon",
     "secret_key": "yanicesno1",
     "permission_bitmap": {
