@@ -35,10 +35,12 @@
                 <label for="location_select">活动地点 (必填):</label>
                 <select id="location_select" name="location_select" required onchange="checkLocation(this)">
                     <option value="">-- 请选择地点 --</option>
-                    <option value="交大紫矜街(博雅厅)" {% if event.location == "交大紫矜街(博雅厅)" %}selected{% endif %}>交大紫矜街(博雅厅)</option>
-                    <option value="交大玉兰苑" {% if event.location == "交大玉兰苑" %}selected{% endif %}>交大玉兰苑</option>
-                    <option value="华师秋实" {% if event.location == "华师秋实" %}selected{% endif %}>华师秋实</option>
-                    <option value="华师冬日" {% if event.location == "华师冬日" %}selected{% endif %}>华师冬日</option>
+                    <option value="交大紫矜街(博雅厅)">交大紫矜街(博雅厅)</option>
+                    <option value="交大玉兰苑">交大玉兰苑</option>
+                    <option value="交大北博士公寓">交大北博士公寓</option>
+                    <option value="华师秋实">华师秋实</option>
+                    <option value="华师冬日">华师冬日</option>
+                    <option value="华师研寓">华师研寓</option>
                     <option value="其他（自己填写）">其他（自己填写）</option>
                 </select>
             </p>
@@ -59,6 +61,8 @@
                     <option value="1" {% if event.locktime_select == "1" %}selected{% endif %}>提前1小时</option>
                     <option value="4" {% if event.locktime_select == "4" %}selected{% endif %}>提前4小时</option>
                     <option value="12" {% if event.locktime_select == "12" %}selected{% endif %}>提前12小时</option>
+                    <option value="24" {% if event.locktime_select == "24" %}selected{% endif %}>提前24小时</option>
+                    <option value="48" {% if event.locktime_select == "48" %}selected{% endif %}>提前48小时</option>
                 </select>
             </p>
             <div style="display: flex; gap: 20px; margin-bottom: 15px;">
@@ -79,8 +83,9 @@
                 <button type="submit">保存更改</button>
             </p>
         </form>
-        <form method="POST" action="{{ url_for('events.delete_event_route', event_id=event.id) }}" class="delete-form">
-            <button type="submit" class="base-btn delete-btn">删除活动</button>
+        <form method="POST" action="{{ url_for('events.archive_event_route', event_id=event.id) }}" class="delete-form"
+              onsubmit="return confirm('确定归档该活动吗？归档后不可再编辑或操作。');">
+            <button type="submit" class="base-btn delete-btn">归档活动</button>
         </form>
     </div>
     <script>
@@ -120,7 +125,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         const locationSelect = document.getElementById("location_select");
         const eventLocation = "{{ event.location }}";
-        const presetLocations = ["交大紫矜街(博雅厅)", "交大玉兰苑", "华师秋实", "华师冬日"];
+        const presetLocations = ["交大紫矜街(博雅厅)", "交大玉兰苑", "交大北博士公寓", "华师秋实", "华师冬日", "华师研寓"];
         if (!presetLocations.includes(eventLocation) && eventLocation) {
             locationSelect.value = "其他（自己填写）";
             const customContainer = document.getElementById("custom_location_container");

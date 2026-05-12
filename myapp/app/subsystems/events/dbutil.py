@@ -9,6 +9,29 @@ from app.models.config import get_config
 
 EVENT_TYPE_VALUES = ("轻桌游聚会", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "其他")
 
+# 活动板「轻桌游聚会」书签对应的类型，须与 EVENT_TYPE_VALUES 中该项一致
+BROWSE_BOOKMARK_LIGHT_EVENT_TYPE = "轻桌游聚会"
+
+# signcode 置为该值表示活动已归档（结束），不再允许报名/编辑等操作
+ARCHIVED_SIGNCODE = "0"
+
+
+def is_event_archived(event) -> bool:
+    """根据 events 行 dict 判断是否为已归档活动。"""
+    if not event:
+        return False
+    sc = event.get("signcode")
+    if sc is None:
+        return False
+    return str(sc).strip() == ARCHIVED_SIGNCODE
+
+
+def archive_event(event_id):
+    """将活动标记为已归档（不删除记录与报名）。"""
+    db = get_db()
+    db.execute("UPDATE events SET signcode = ? WHERE id = ?", (ARCHIVED_SIGNCODE, event_id))
+    db.commit()
+
 
 def _events_db_path():
     if get_config("development"):
@@ -118,6 +141,28 @@ def get_all_events(current_user):
     return events_list
 
 
+def apply_event_list_filters(events, *, current_user, now, filters):
+    """
+    按条件筛选已展开的活动列表（get_all_events 的返回值）。
+
+    filters 为 dict，键均可缺省；空 dict 表示不过滤。
+      event_type: str，须与 EVENT_TYPE_VALUES 中某项一致
+      my_activities_only: bool，仅保留「我组织的」或「我已报名的」活动
+    """
+    if not filters:
+        return list(events)
+    out = []
+    for e in events:
+        et = filters.get("event_type")
+        if et and (e.get("event_type") or "其他") != et:
+            continue
+        if filters.get("my_activities_only"):
+            if e.get("inviter") != current_user and not e.get("is_attending"):
+                continue
+        out.append(e)
+    return out
+
+
 def get_event_by_id(event_id):
     db = get_db()
     row = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
@@ -201,6 +246,11 @@ def delete_event(event_id):
 
 def join_event(event_id, player):
     db = get_db()
+    row = db.execute("SELECT signcode FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row is None:
+        return False, "活动不存在。"
+    if is_event_archived(dict(row)):
+        return False, "活动已归档，无法报名。"
     try:
         db.execute("INSERT INTO attendinfo (eventid, player) VALUES (?, ?)", (event_id, player))
         db.commit()
@@ -211,7 +261,13 @@ def join_event(event_id, player):
 
 def signin_event(event_id, player, code):
     db = get_db()
-    expected_code = dict(db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone())["signcode"]
+    row = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row is None:
+        return False, "活动不存在。"
+    ev = dict(row)
+    if is_event_archived(ev):
+        return False, "活动已归档，无法签到。"
+    expected_code = ev["signcode"]
     if expected_code != code:
         return False, "签到码错误！"
 
@@ -232,6 +288,9 @@ def signin_event(event_id, player, code):
 
 def note_event(event_id, player, note):
     db = get_db()
+    row = db.execute("SELECT signcode FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row is None or is_event_archived(dict(row)):
+        return False, "活动已归档或不存在。"
     try:
         db.execute(
             """
@@ -249,6 +308,9 @@ def note_event(event_id, player, note):
 
 def friend_event(event_id, player, friend):
     db = get_db()
+    row = db.execute("SELECT signcode FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row is None or is_event_archived(dict(row)):
+        return False, "活动已归档或不存在。"
     try:
         db.execute(
             """
@@ -266,6 +328,9 @@ def friend_event(event_id, player, friend):
 
 def leave_event(event_id, player):
     db = get_db()
+    row = db.execute("SELECT signcode FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row is None or is_event_archived(dict(row)):
+        return False
     cursor = db.execute("DELETE FROM attendinfo WHERE eventid = ? AND player = ?", (event_id, player))
     db.commit()
     return cursor.rowcount > 0

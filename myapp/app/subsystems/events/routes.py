@@ -17,13 +17,17 @@ from app.identity.permissions import (
 )
 from app.models.database import get_user_db
 from app.subsystems.events.dbutil import (
+    BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
     EVENT_TYPE_VALUES,
+    apply_event_list_filters,
+    archive_event,
     create_event,
     delete_event,
     friend_event,
     get_all_events,
     get_event_attendance_records,
     get_event_by_id,
+    is_event_archived,
     join_event,
     leave_event,
     note_event,
@@ -99,15 +103,38 @@ def _ensure_temporary_user(user_db, username):
     )
 
 
+def _browse_tab_and_filters():
+    """活动板书签：tab=all | light | my。"""
+    tab = (request.args.get("tab") or "all").strip()
+    if tab not in ("all", "light", "my"):
+        tab = "all"
+    filters = {}
+    if tab == "light":
+        filters["event_type"] = BROWSE_BOOKMARK_LIGHT_EVENT_TYPE
+    elif tab == "my":
+        filters["my_activities_only"] = True
+    return tab, filters
+
+
 @events_bp.route("/")
 @login_required_template
 def browse_events(user_info):
     current_user = user_info["name"]
     current_user_is_admin = user_info.get("association_role") == "管理员"
-    events = get_all_events(current_user)
+    all_events = get_all_events(current_user)
+    browse_tab, browse_filters = _browse_tab_and_filters()
+    now_ts = datetime.now()
+    events = apply_event_list_filters(
+        all_events,
+        current_user=current_user,
+        now=now_ts,
+        filters=browse_filters,
+    )
     return render_template(
         "browse.html",
         events=events,
+        events_total=len(all_events),
+        browse_tab=browse_tab,
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
         now=datetime.now,
@@ -118,6 +145,13 @@ def browse_events(user_info):
 @login_required_template
 def join_event_route(user_info, event_id):
     current_user = user_info["name"]
+    ev = get_event_by_id(event_id)
+    if ev is None:
+        flash("活动不存在。", "error")
+        return redirect(url_for("events.browse_events"))
+    if is_event_archived(ev):
+        flash("活动已归档，无法报名。", "warning")
+        return redirect(url_for("events.browse_events"))
     success, error = join_event(event_id, current_user)
     if success:
         flash("报名成功！期待您的参与。", "success")
@@ -141,6 +175,10 @@ def signin_event_route(current_user, event_id):  # fetch 须带 Cookie 或 Autho
 @login_required_template
 def leave_event_route(user_info, event_id):
     current_user = user_info["name"]
+    ev = get_event_by_id(event_id)
+    if ev and is_event_archived(ev):
+        flash("活动已归档，无法取消报名。", "warning")
+        return redirect(url_for("events.browse_events"))
     if leave_event(event_id, current_user):
         flash("已取消报名。", "info")
     else:
@@ -156,6 +194,12 @@ def set_joininfo_route(current_user, event_id):  # fetch 须带 Cookie 或 Autho
 
     data = request.get_json()
     current_username = current_user["name"]
+    ev = get_event_by_id(event_id)
+    if ev is None:
+        return jsonify({"success": False, "message": "活动不存在"}), 200
+    if is_event_archived(ev):
+        return jsonify({"success": False, "message": "活动已归档"}), 200
+
     note = data.get("note")
     if note:
         success, error = note_event(event_id, current_username, note)
@@ -234,6 +278,10 @@ def edit_event_route(user_info, event_id):
         flash("您无权编辑此活动或活动不存在。", "error")
         return redirect(url_for("events.browse_events"))
 
+    if is_event_archived(event):
+        flash("该活动已归档，无法编辑。", "warning")
+        return redirect(url_for("events.browse_events"))
+
     if request.method == "POST":
         try:
             minplayer_str = request.form.get("minplayer")
@@ -270,14 +318,19 @@ def edit_event_route(user_info, event_id):
 
 
 @events_bp.route("/delete/<int:event_id>", methods=["POST"])
+@events_bp.route("/archive/<int:event_id>", methods=["POST"])
 @login_required_template
-def delete_event_route(user_info, event_id):
+def archive_event_route(user_info, event_id):
     ensure_user_permission_schema()
     event = get_event_by_id(event_id)
     current_user = user_info["name"]
     current_user_is_admin = user_info.get("association_role") == "管理员"
     if event is None or (not current_user_is_admin and event["inviter"] != current_user):
-        flash("您无权删除此活动或活动不存在。", "error")
+        flash("您无权归档此活动或活动不存在。", "error")
+        return redirect(url_for("events.browse_events"))
+
+    if is_event_archived(event):
+        flash("该活动已经归档。", "info")
         return redirect(url_for("events.browse_events"))
 
     attendee_count = 0
@@ -322,11 +375,10 @@ def delete_event_route(user_info, event_id):
                 )
         user_db.commit()
         user_db.close()
-        delete_event(event_id)
-        flash("活动已结束，参与档案已归档并删除活动。", "success")
+        archive_event(event_id)
+        flash("活动已结束，参与记录已归档。", "success")
     else:
         delete_event(event_id)
         flash("活动和所有相关报名记录已成功删除！", "success")
 
     return redirect(url_for("events.browse_events"))
-
