@@ -19,14 +19,15 @@ from app.models.database import get_user_db
 from app.subsystems.events.dbutil import (
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
     EVENT_TYPE_VALUES,
-    apply_event_list_filters,
     archive_event,
+    count_browse_events,
     create_event,
     delete_event,
-    friend_event,
-    get_all_events,
+    get_browse_events_page,
     get_event_attendance_records,
     get_event_by_id,
+    get_event_listing_by_id,
+    friend_event,
     is_event_archived,
     join_event,
     leave_event,
@@ -43,6 +44,9 @@ events_bp = Blueprint(
     static_folder="static",
     static_url_path="/static",
 )
+
+BROWSE_PAGE_SIZE = 5
+BROWSE_MORE_MAX_LIMIT = 20
 
 
 def _event_can_be_ended(event, attendee_count):
@@ -103,9 +107,9 @@ def _ensure_temporary_user(user_db, username):
     )
 
 
-def _browse_tab_and_filters():
+def _browse_tab_and_filters_for_tab(tab_raw):
     """活动板书签：tab=all | light | my。"""
-    tab = (request.args.get("tab") or "all").strip()
+    tab = (tab_raw or "all").strip()
     if tab not in ("all", "light", "my"):
         tab = "all"
     filters = {}
@@ -116,28 +120,73 @@ def _browse_tab_and_filters():
     return tab, filters
 
 
+def _browse_filters_from_request():
+    return _browse_tab_and_filters_for_tab(request.args.get("tab"))
+
+
 @events_bp.route("/")
 @login_required_template
 def browse_events(user_info):
     current_user = user_info["name"]
     current_user_is_admin = user_info.get("association_role") == "管理员"
-    all_events = get_all_events(current_user)
-    browse_tab, browse_filters = _browse_tab_and_filters()
-    now_ts = datetime.now()
-    events = apply_event_list_filters(
-        all_events,
-        current_user=current_user,
-        now=now_ts,
-        filters=browse_filters,
-    )
+    browse_tab, browse_filters = _browse_filters_from_request()
+    events_total = count_browse_events(current_user, browse_filters)
+    events = get_browse_events_page(current_user, browse_filters, BROWSE_PAGE_SIZE, 0)
+    events_loaded = len(events)
+    has_more_browse = events_loaded < events_total
+    browse_next_offset = events_loaded
     return render_template(
         "browse.html",
         events=events,
-        events_total=len(all_events),
+        events_total=events_total,
+        events_loaded=events_loaded,
         browse_tab=browse_tab,
+        browse_page_size=BROWSE_PAGE_SIZE,
+        browse_next_offset=browse_next_offset,
+        browse_has_more=has_more_browse,
+        has_more_browse=has_more_browse,
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
         now=datetime.now,
+    )
+
+
+@events_bp.route("/browse_more")
+@login_required_template
+def browse_events_more(user_info):
+    """分页追加活动卡片 HTML 片段（JSON）。"""
+    current_user = user_info["name"]
+    current_user_is_admin = user_info.get("association_role") == "管理员"
+    browse_tab, browse_filters = _browse_tab_and_filters_for_tab(request.args.get("tab"))
+    try:
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        offset = 0
+    try:
+        limit = int(request.args.get("limit", BROWSE_PAGE_SIZE))
+    except ValueError:
+        limit = BROWSE_PAGE_SIZE
+    limit = max(1, min(BROWSE_MORE_MAX_LIMIT, limit))
+
+    total = count_browse_events(current_user, browse_filters)
+    events = get_browse_events_page(current_user, browse_filters, limit, offset)
+    loaded_total = offset + len(events)
+    html = render_template(
+        "event_cards_rows.html",
+        events=events,
+        current_user=current_user,
+        current_user_is_admin=current_user_is_admin,
+        now=datetime.now,
+    )
+    return jsonify(
+        {
+            "status": "success",
+            "html": html,
+            "next_offset": loaded_total,
+            "has_more": loaded_total < total,
+            "loaded_total": loaded_total,
+            "total": total,
+        }
     )
 
 
@@ -208,23 +257,25 @@ def set_joininfo_route(current_user, event_id):  # fetch 须带 Cookie 或 Autho
         return jsonify({"success": False, "message": f"备注失败：{error}"}), 200
 
     friend = data.get("friend")
+    listing = get_event_listing_by_id(event_id, current_username)
+    if listing is None:
+        return jsonify({"success": False, "message": "活动不存在"}), 200
     try:
-        for event in get_all_events(current_username):
-            if int(event["id"]) == int(event_id):
-                if friend == "+":
-                    if event["maxplayer"] > event["attendee_count"]:
-                        success, error = friend_event(event_id, current_username, int(event["user_friends"]) + 1)
-                        if success:
-                            return jsonify({"success": True, "message": "随行人已成功保存"}), 200
-                        return jsonify({"success": False, "message": f"随行人设置失败：{error}"}), 200
-                    return jsonify({"success": False, "message": "随行人设置失败：已达人数上限。"}), 200
-                if friend == "-":
-                    if int(event["user_friends"]) > 0:
-                        success, error = friend_event(event_id, current_username, int(event["user_friends"]) - 1)
-                        if success:
-                            return jsonify({"success": True, "message": "随行人已成功保存"}), 200
-                        return jsonify({"success": False, "message": f"随行人设置失败：{error}"}), 200
-                    return jsonify({"success": False, "message": "随行人设置失败：你没有随行人。"}), 200
+        if friend == "+":
+            maxp = listing.get("maxplayer")
+            if maxp is not None and int(maxp) > int(listing.get("attendee_count", 0)):
+                success, error = friend_event(event_id, current_username, int(listing["user_friends"]) + 1)
+                if success:
+                    return jsonify({"success": True, "message": "随行人已成功保存"}), 200
+                return jsonify({"success": False, "message": f"随行人设置失败：{error}"}), 200
+            return jsonify({"success": False, "message": "随行人设置失败：已达人数上限。"}), 200
+        if friend == "-":
+            if int(listing["user_friends"]) > 0:
+                success, error = friend_event(event_id, current_username, int(listing["user_friends"]) - 1)
+                if success:
+                    return jsonify({"success": True, "message": "随行人已成功保存"}), 200
+                return jsonify({"success": False, "message": f"随行人设置失败：{error}"}), 200
+            return jsonify({"success": False, "message": "随行人设置失败：你没有随行人。"}), 200
     except Exception:
         return jsonify({"success": False, "message": "服务器内部错误"}), 500
 
@@ -333,11 +384,8 @@ def archive_event_route(user_info, event_id):
         flash("该活动已经归档。", "info")
         return redirect(url_for("events.browse_events"))
 
-    attendee_count = 0
-    for listed_event in get_all_events(current_user):
-        if int(listed_event["id"]) == int(event_id):
-            attendee_count = int(listed_event.get("attendee_count", 0))
-            break
+    listing = get_event_listing_by_id(event_id, current_user)
+    attendee_count = int(listing.get("attendee_count", 0)) if listing else 0
 
     if _event_can_be_ended(event, attendee_count):
         attendance_records = get_event_attendance_records(event_id)
@@ -378,6 +426,7 @@ def archive_event_route(user_info, event_id):
         archive_event(event_id)
         flash("活动已结束，参与记录已归档。", "success")
     else:
+        # 如果活动无法结束（可能根本没组起来），就直接删除即可，不需要归档。
         delete_event(event_id)
         flash("活动和所有相关报名记录已成功删除！", "success")
 

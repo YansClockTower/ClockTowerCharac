@@ -76,10 +76,7 @@ def close_db(e=None):
         g._events_db = None
 
 
-def get_all_events(current_user):
-    db = get_db()
-    events_with_attendees = db.execute(
-        """
+_EVENT_LISTING_SELECT = """
         SELECT
             e.*,
             GROUP_CONCAT(a.player) AS attendee_list,
@@ -88,14 +85,32 @@ def get_all_events(current_user):
             (SELECT IFNULL(note, '') || '::' || IFNULL(friend, '0') || '::' || IFNULL(signed, '0') FROM attendinfo WHERE eventid = e.id AND player = ?) AS user_info_raw
         FROM events e
         LEFT JOIN attendinfo a ON e.id = a.eventid
-        GROUP BY e.id
-        ORDER BY e.id DESC
-        """,
-        (current_user, current_user),
-    ).fetchall()
+"""
 
+
+def _browse_sql_filter_clause(filters, current_user):
+    """与 apply_event_list_filters 语义一致，在 SQL 层筛选 events 行。"""
+    if not filters:
+        return "", []
+    parts = []
+    params = []
+    et = filters.get("event_type")
+    if et:
+        parts.append("COALESCE(NULLIF(TRIM(e.event_type), ''), '其他') = ?")
+        params.append(et)
+    if filters.get("my_activities_only"):
+        parts.append(
+            "(e.inviter = ? OR EXISTS(SELECT 1 FROM attendinfo ai WHERE ai.eventid = e.id AND ai.player = ?))"
+        )
+        params.extend([current_user, current_user])
+    if not parts:
+        return "", []
+    return " AND " + " AND ".join(parts), params
+
+
+def _materialize_event_rows(rows):
     events_list = []
-    for event in events_with_attendees:
+    for event in rows:
         event_dict = dict(event)
         attend_count = 0
         if event_dict["attendee_list"]:
@@ -139,6 +154,49 @@ def get_all_events(current_user):
         event_dict["locktime_select"] = str(int((starttime - locktime).seconds / 3600))
         events_list.append(event_dict)
     return events_list
+
+
+def count_browse_events(current_user, filters):
+    """当前书签筛选下的活动总数（不按页截断）。"""
+    where_extra, wp = _browse_sql_filter_clause(filters, current_user)
+    db = get_db()
+    row = db.execute(f"SELECT COUNT(*) AS c FROM events e WHERE 1=1 {where_extra}", wp).fetchone()
+    return int(row["c"]) if row else 0
+
+
+def get_browse_events_page(current_user, filters, limit, offset):
+    """
+    分页读取活动列表（与活动板书签筛选一致）。
+    limit 为 None 时表示不限制条数（仅用于少量管理路径）。
+    """
+    db = get_db()
+    where_extra, wp = _browse_sql_filter_clause(filters, current_user)
+    sql = (
+        _EVENT_LISTING_SELECT
+        + f" WHERE 1=1 {where_extra} GROUP BY e.id ORDER BY e.id DESC"
+    )
+    params = [current_user, current_user] + wp
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params.extend([int(limit), int(offset)])
+    rows = db.execute(sql, tuple(params)).fetchall()
+    return _materialize_event_rows(rows)
+
+
+def get_event_listing_by_id(event_id, current_user):
+    """单条活动的列表视图数据（含报名人数等），供 joininfo / 归档等使用。"""
+    db = get_db()
+    sql = _EVENT_LISTING_SELECT + " WHERE e.id = ? GROUP BY e.id"
+    params = (current_user, current_user, int(event_id))
+    row = db.execute(sql, params).fetchone()
+    if row is None:
+        return None
+    return _materialize_event_rows([row])[0]
+
+
+def get_all_events(current_user, browse_filters=None):
+    """全部活动（无条数限制）；browse_filters 与活动板书签筛选语义一致。"""
+    return get_browse_events_page(current_user, browse_filters or {}, limit=None, offset=0)
 
 
 def apply_event_list_filters(events, *, current_user, now, filters):

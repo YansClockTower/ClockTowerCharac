@@ -10,7 +10,7 @@
 
     <div class="event-list">
         <div class="browse-header-row">
-            <h2>活动列表 <span class="browse-count">（显示 {{ events|length }} / 共 {{ events_total }} 个）</span></h2>
+            <h2>活动列表 <span class="browse-count">（共 {{ events_total }} 个）</span></h2>
             <a href="{{ url_for('events.add_event_route') }}" class="base-btn corner-button">
                 + 新活动
             </a>
@@ -25,7 +25,25 @@
                href="{{ url_for('events.browse_events', tab='my') }}">我的活动</a>
         </nav>
 
-        {% include "event_cards_list.html" %}
+        {# 活动列表容器：events_total、browse_tab、has_more_browse；行模板见 event_cards_rows.html #}
+        {% if events_total == 0 %}
+            {% if browse_tab == 'light' %}
+                <p>当前没有「轻桌游聚会」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
+            {% elif browse_tab == 'my' %}
+                <p>暂无您组织或已报名的活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
+            {% else %}
+                <p>目前还没有活动信息。去 <a href="{{ url_for('events.add_event_route') }}">添加一个</a> 吧！</p>
+            {% endif %}
+        {% else %}
+        <div id="browse-events-list" class="browse-events-list">
+        {% include "event_cards_rows.html" %}
+        </div>
+        <p id="browse-load-status" class="browse-load-status" role="status" aria-live="polite" hidden>加载中…</p>
+        {% if has_more_browse %}
+        <div id="browse-scroll-sentinel" class="browse-scroll-sentinel" aria-hidden="true"></div>
+        {% endif %}
+        {% endif %}
+        
 
     </div>
 
@@ -92,5 +110,67 @@
             })
             .catch(() => alert("提交请求出错，请稍后再试。"));
         }
+
+        (function () {
+            const PAGE = {{ browse_page_size|tojson }};
+            const TAB = {{ browse_tab|tojson }};
+            const moreUrl = {{ url_for('events.browse_events_more')|tojson }};
+            let nextOffset = {{ browse_next_offset|tojson }};
+            let hasMore = {{ browse_has_more|tojson }};
+            const list = document.getElementById("browse-events-list");
+            const sentinel = document.getElementById("browse-scroll-sentinel");
+            const statusEl = document.getElementById("browse-load-status");
+            const loadedEl = document.getElementById("browse-loaded-count");
+            if (!list || !sentinel || !hasMore) return;
+
+            let loading = false;
+            let obs = null;
+
+            async function loadMore() {
+                if (loading || !hasMore) return;
+                loading = true;
+                if (statusEl) {
+                    statusEl.hidden = false;
+                    statusEl.textContent = "加载中…";
+                }
+                try {
+                    const u = new URL(moreUrl, window.location.origin);
+                    u.searchParams.set("tab", TAB);
+                    u.searchParams.set("offset", String(nextOffset));
+                    u.searchParams.set("limit", String(PAGE));
+                    const res = await ClockTowerAuth.authFetch(u.toString(), { method: "GET" });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data || data.status !== "success") {
+                        if (statusEl) statusEl.textContent = "加载失败，请稍后重试";
+                        return;
+                    }
+                    list.insertAdjacentHTML("beforeend", data.html || "");
+                    nextOffset = data.next_offset != null ? data.next_offset : nextOffset;
+                    hasMore = !!data.has_more;
+                    if (loadedEl && data.loaded_total != null) {
+                        loadedEl.textContent = String(data.loaded_total);
+                    }
+                    if (!hasMore) {
+                        sentinel.remove();
+                        if (obs) obs.disconnect();
+                    }
+                } catch (e) {
+                    if (statusEl) statusEl.textContent = "加载失败，请检查网络";
+                } finally {
+                    loading = false;
+                    if (statusEl) statusEl.hidden = true;
+                }
+            }
+
+            obs = new IntersectionObserver(
+                (entries) => {
+                    for (const e of entries) {
+                        if (e.isIntersecting) loadMore();
+                    }
+                },
+                { root: null, rootMargin: "120px", threshold: 0 }
+            );
+            obs.observe(sentinel);
+        })();
     </script>
 {% endblock %}

@@ -1,4 +1,4 @@
-{# 活动卡片列表：依赖上下文 events, current_user, current_user_is_admin, now, browse_tab #}
+{# 仅活动卡片行（无空列表 else），供首屏 include 与 /browse_more JSON 片段复用 #}
 {% for event in events %}
     {% set archived = ((event.signcode|string)|trim == '0') %}
     {% set status_class = "" %}
@@ -105,9 +105,9 @@
                         </button>
                         <form method="POST"
                               action="{{ url_for('events.archive_event_route', event_id=event.id) }}"
-                              onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除该活动吗？{% endif %}')">
+                              onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定提前归档该活动吗？（未到结束条件时不会计入组织/参与统计）{% endif %}')">
                             <button type="submit" class="base-btn leave-btn">
-                                {% if can_end_event %}结束活动{% else %}删除活动{% endif %}
+                                {% if can_end_event %}结束并归档{% else %}归档活动{% endif %}
                             </button>
                         </form>
                     {% endif %}
@@ -190,12 +190,4 @@
         </div>
         {% endif %}
     </div>
-{% else %}
-    {% if browse_tab == 'light' %}
-        <p>当前没有「轻桌游聚会」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
-    {% elif browse_tab == 'my' %}
-        <p>暂无您组织或已报名的活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
-    {% else %}
-        <p>目前还没有活动信息。去 <a href="{{ url_for('events.add_event_route') }}">添加一个</a> 吧！</p>
-    {% endif %}
 {% endfor %}

@@ -59,6 +59,20 @@
     color: #495057;
     background-color: #c8c8c8;
 }
+.browse-events-list {
+    min-height: 40px;
+}
+.browse-load-status {
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+    margin: 10px 0;
+}
+.browse-scroll-sentinel {
+    height: 2px;
+    width: 100%;
+    pointer-events: none;
+}
 .event-item {
     display: flex;
     flex-direction: column;
