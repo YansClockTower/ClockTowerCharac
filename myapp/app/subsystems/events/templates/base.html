@@ -6,6 +6,7 @@
     <title>{% block title %}活动信息板{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('events.static', filename='style.css') }}">
     <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+    <script src="{{ url_for('users.static', filename='js/email_bind_prompt.js') }}"></script>
     {% block extra_css %}{% endblock %}
     <style>
         body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 10px; }

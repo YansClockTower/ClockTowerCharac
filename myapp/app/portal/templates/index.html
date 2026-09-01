@@ -79,6 +79,20 @@
         .secondary-nav a:hover {
             background-color: #2980b9;
         }
+        .secondary-nav .disabled-item {
+            display: block;
+            text-align: center;
+            padding: 10px;
+            background-color: #bdc3c7;
+            color: #fff;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 8px;
+            cursor: default;
+        }
+        .secondary-nav .disabled-item:last-child {
+            margin-bottom: 0;
+        }
         p {
             margin-top: 18px;
             text-align: center;
@@ -119,6 +133,11 @@
                 padding: 13px 10px;
                 border-radius: 10px;
             }
+            .secondary-nav .disabled-item {
+                font-size: 1rem;
+                padding: 13px 10px;
+                border-radius: 10px;
+            }
             p {
                 font-size: 0.95rem;
             }
@@ -149,11 +168,19 @@
             <a href="{{ url_for('edition.select_characters') }}">自制剧本</a>
             <a href="{{ url_for('edition.import_json') }}">收录新剧本</a>
         </div>
+
+        <button type="button" onclick="toggleSection('trpg-tools-section')">TRPG(跑团)工具</button>
+        <div id="trpg-tools-section" class="secondary-nav">
+            <span class="disabled-item">电子跑团系统(开发中)</span>
+            <span class="disabled-item">TRPG模组编辑器(开发中)</span>
+        </div>
     </div>
     <p>
         桌游协会资料站 | 粤ICP备2025432638号
     </p>
 
+    <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+    <script src="{{ url_for('users.static', filename='js/email_bind_prompt.js') }}"></script>
     <script>
         function toggleSection(sectionId) {
             const target = document.getElementById(sectionId);
