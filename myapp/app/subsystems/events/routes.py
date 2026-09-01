@@ -18,12 +18,17 @@ from app.identity.permissions import (
 from app.models.database import get_user_db
 from app.subsystems.events.attendee_ids import enrich_events_attendees_user_ids
 from app.subsystems.events.dbutil import (
+    ADMIN_ONLY_LOCATION,
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
+    BROWSE_BOOKMARK_PIGEON_EVENT_TYPE,
     EVENT_TYPE_VALUES,
+    PRESET_LOCATIONS,
     archive_event,
     count_browse_events,
     create_event,
     delete_event,
+    event_requires_admin,
+    event_requires_membership,
     get_browse_events_page,
     get_event_attendance_records,
     get_event_by_id,
@@ -36,6 +41,7 @@ from app.subsystems.events.dbutil import (
     signin_event,
     update_event,
 )
+from app.user.membership import user_is_member
 
 events_bp = Blueprint(
     "events",
@@ -57,13 +63,43 @@ def _event_can_be_ended(event, attendee_count):
     return is_started and enough_people
 
 
-def _render_add_event(current_user, selected_event_type="其他"):
+def _is_admin(user_info) -> bool:
+    return user_info.get("association_role") == "管理员"
+
+
+def _render_add_event(user_info, selected_event_type="其他"):
     return render_template(
         "add.html",
-        current_user=current_user,
+        current_user=user_info["name"],
+        current_user_is_admin=_is_admin(user_info),
         event_type_values=EVENT_TYPE_VALUES,
+        preset_locations=PRESET_LOCATIONS,
+        admin_only_location=ADMIN_ONLY_LOCATION,
+        pigeon_event_type=BROWSE_BOOKMARK_PIGEON_EVENT_TYPE,
         selected_event_type=selected_event_type if selected_event_type in EVENT_TYPE_VALUES else "其他",
     )
+
+
+def _render_edit_event(event, user_info):
+    return render_template(
+        "edit.html",
+        event=event,
+        current_user=user_info["name"],
+        current_user_is_admin=_is_admin(user_info),
+        event_type_values=EVENT_TYPE_VALUES,
+        preset_locations=PRESET_LOCATIONS,
+        admin_only_location=ADMIN_ONLY_LOCATION,
+        pigeon_event_type=BROWSE_BOOKMARK_PIGEON_EVENT_TYPE,
+    )
+
+
+def _reject_non_admin_restricted(user_info, event_type, location):
+    """非管理员选用布鸽类型或南体活动室时返回错误文案，否则 None。"""
+    if _is_admin(user_info):
+        return None
+    if event_requires_admin(event_type, location):
+        return "仅管理员可发布「布鸽桌游活动」或地点为「南体活动室(布鸽专用)」的活动。"
+    return None
 
 
 def _ensure_temporary_user(user_db, username):
@@ -109,13 +145,15 @@ def _ensure_temporary_user(user_db, username):
 
 
 def _browse_tab_and_filters_for_tab(tab_raw):
-    """活动板书签：tab=all | light | my。"""
+    """活动板书签：tab=all | light | pigeon | my。"""
     tab = (tab_raw or "all").strip()
-    if tab not in ("all", "light", "my"):
+    if tab not in ("all", "light", "pigeon", "my"):
         tab = "all"
     filters = {}
     if tab == "light":
         filters["event_type"] = BROWSE_BOOKMARK_LIGHT_EVENT_TYPE
+    elif tab == "pigeon":
+        filters["event_type"] = BROWSE_BOOKMARK_PIGEON_EVENT_TYPE
     elif tab == "my":
         filters["my_activities_only"] = True
     return tab, filters
@@ -130,6 +168,7 @@ def _browse_filters_from_request():
 def browse_events(user_info):
     current_user = user_info["name"]
     current_user_is_admin = user_info.get("association_role") == "管理员"
+    current_user_is_member = user_is_member(user_info)
     browse_tab, browse_filters = _browse_filters_from_request()
     events_total = count_browse_events(current_user, browse_filters)
     events = get_browse_events_page(current_user, browse_filters, BROWSE_PAGE_SIZE, 0)
@@ -149,6 +188,7 @@ def browse_events(user_info):
         has_more_browse=has_more_browse,
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
+        current_user_is_member=current_user_is_member,
         now=datetime.now,
     )
 
@@ -159,6 +199,7 @@ def browse_events_more(user_info):
     """分页追加活动卡片 HTML 片段（JSON）。"""
     current_user = user_info["name"]
     current_user_is_admin = user_info.get("association_role") == "管理员"
+    current_user_is_member = user_is_member(user_info)
     browse_tab, browse_filters = _browse_tab_and_filters_for_tab(request.args.get("tab"))
     try:
         offset = max(0, int(request.args.get("offset", 0)))
@@ -179,6 +220,7 @@ def browse_events_more(user_info):
         events=events,
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
+        current_user_is_member=current_user_is_member,
         now=datetime.now,
     )
     return jsonify(
@@ -204,6 +246,9 @@ def join_event_route(user_info, event_id):
     if is_event_archived(ev):
         flash("活动已归档，无法报名。", "warning")
         return redirect(url_for("events.browse_events"))
+    if event_requires_membership(ev.get("event_type")) and not user_is_member(user_info):
+        flash("「布鸽桌游活动」仅限会员报名，请先验证会员资质。", "warning")
+        return redirect(url_for("users.membership"))
     success, error = join_event(event_id, current_user)
     if success:
         flash("报名成功！期待您的参与。", "success")
@@ -288,7 +333,6 @@ def set_joininfo_route(current_user, event_id):  # fetch 须带 Cookie 或 Autho
 @events_bp.route("/add", methods=["GET", "POST"])
 @login_required_template
 def add_event_route(user_info):
-    current_user = user_info["name"]
     if request.method == "POST":
         try:
             minplayer_str = request.form.get("minplayer")
@@ -297,17 +341,23 @@ def add_event_route(user_info):
             maxplayer = int(maxplayer_str) if maxplayer_str else None
         except ValueError:
             flash("最小/最大玩家数必须是数字！", "error")
-            return _render_add_event(current_user, request.form.get("event_type", "其他"))
+            return _render_add_event(user_info, request.form.get("event_type", "其他"))
 
         event_type = request.form.get("event_type", "其他")
         if event_type not in EVENT_TYPE_VALUES:
             flash("活动类型无效，请重新选择。", "error")
-            return _render_add_event(current_user, event_type)
+            return _render_add_event(user_info, event_type)
+
+        location = (request.form.get("location") or "").strip()
+        deny = _reject_non_admin_restricted(user_info, event_type, location)
+        if deny:
+            flash(deny, "error")
+            return _render_add_event(user_info, event_type)
 
         data = {
             "name": request.form["name"],
-            "inviter": current_user,
-            "location": request.form["location"],
+            "inviter": user_info["name"],
+            "location": location,
             "starttime": request.form["starttime"],
             "locktime": request.form["locktime"],
             "description": request.form.get("description", ""),
@@ -319,7 +369,7 @@ def add_event_route(user_info):
             create_event(data)
             flash("活动添加成功！", "success")
             return redirect(url_for("events.browse_events"))
-    return _render_add_event(current_user)
+    return _render_add_event(user_info)
 
 
 @events_bp.route("/edit/<int:event_id>", methods=["GET", "POST"])
@@ -327,7 +377,7 @@ def add_event_route(user_info):
 def edit_event_route(user_info, event_id):
     event = get_event_by_id(event_id)
     current_user = user_info["name"]
-    current_user_is_admin = user_info.get("association_role") == "管理员"
+    current_user_is_admin = _is_admin(user_info)
     if event is None or (not current_user_is_admin and event["inviter"] != current_user):
         flash("您无权编辑此活动或活动不存在。", "error")
         return redirect(url_for("events.browse_events"))
@@ -344,16 +394,22 @@ def edit_event_route(user_info, event_id):
             maxplayer = int(maxplayer_str) if maxplayer_str else None
         except ValueError:
             flash("最小/最大玩家数必须是数字！", "error")
-            return render_template("edit.html", event=event, current_user=current_user, event_type_values=EVENT_TYPE_VALUES)
+            return _render_edit_event(event, user_info)
 
         event_type = request.form.get("event_type", "其他")
         if event_type not in EVENT_TYPE_VALUES:
             flash("活动类型无效，请重新选择。", "error")
-            return render_template("edit.html", event=event, current_user=current_user, event_type_values=EVENT_TYPE_VALUES)
+            return _render_edit_event(event, user_info)
+
+        location = (request.form.get("location") or "").strip()
+        deny = _reject_non_admin_restricted(user_info, event_type, location)
+        if deny:
+            flash(deny, "error")
+            return _render_edit_event(event, user_info)
 
         data = {
             "name": request.form["name"],
-            "location": request.form["location"],
+            "location": location,
             "starttime": request.form["starttime"],
             "locktime": request.form["locktime"],
             "description": request.form.get("description", ""),
@@ -367,8 +423,8 @@ def edit_event_route(user_info, event_id):
             return redirect(url_for("events.browse_events"))
         else:
             flash("活动信息不完整（名字/地点/开始时间）！", "error")
-            return render_template("edit.html", event=event, current_user=current_user, event_type_values=EVENT_TYPE_VALUES)
-    return render_template("edit.html", event=event, current_user=current_user, event_type_values=EVENT_TYPE_VALUES)
+            return _render_edit_event(event, user_info)
+    return _render_edit_event(event, user_info)
 
 
 @events_bp.route("/delete/<int:event_id>", methods=["POST"])

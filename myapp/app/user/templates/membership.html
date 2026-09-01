@@ -17,6 +17,9 @@
     .flashes li { padding: 8px 10px; margin: 6px 0; border-radius: 4px; }
     .flashes .success { background: #d4edda; color: #155724; }
     .flashes .error { background: #f8d7da; color: #721c24; }
+    .instructions { margin: 12px 0 16px; padding: 12px 14px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; font-size: 0.92rem; line-height: 1.55; }
+    .instructions ol { margin: 0; padding-left: 1.25rem; }
+    .instructions li + li { margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -32,24 +35,30 @@
       {% endif %}
     {% endwith %}
 
-    <p>请填写微信支付账单中的<strong>交易单号</strong>作为凭证。每个订单号只能核销一次。</p>
-    <p class="muted">账单导入可能有延迟。若提交后尚未出现在账单库中，状态为「审核中」，之后访问时会自动复核。</p>
+    <div class="instructions">
+      <p style="margin: 0 0 8px;"><strong>如何获取支付单号</strong></p>
+      <ol>
+        <li>向<strong>布鸽桌游社官号</strong>支付会费后，在「微信支付」的支付凭证中查看账单详情，将详情中的<strong>支付单号</strong>复制下来并填写到下方即可。</li>
+        <li>对于曾经就已支付过会费、已在桌游社的人（大概率找不到支付凭证），可以私聊<strong>旧桌游社官号</strong>手动补资质。</li>
+      </ol>
+    </div>
+    <p class="muted">每个支付单号只能核销一次。账单导入可能有延迟；若提交后尚未出现在账单库中，状态为「审核中」，之后访问时会自动复核。</p>
 
     {% if is_member and member_locked %}
       <p>资质：<strong>会员（{{ user.association_role }}）</strong></p>
-      <p>订单号凭证：<strong>{{ user.member_order_no }}</strong></p>
+      <p>支付单号凭证：<strong>{{ user.member_order_no }}</strong></p>
       <p class="muted">已核销并锁定，不能再修改。</p>
     {% elif user and user.member_order_no %}
       <p>资质：尚未成为会员（{{ user.association_role or '普通玩家' }}）</p>
-      <p>已提交订单号：<strong>{{ user.member_order_no }}</strong></p>
+      <p>已提交支付单号：<strong>{{ user.member_order_no }}</strong></p>
       {% if user.member_review_note %}
         <p class="review-warn">{{ user.member_review_note }}</p>
       {% else %}
         <p class="review-pending">状态：审核中。账单同步后将自动核销。</p>
       {% endif %}
       <form method="POST" action="{{ url_for('users.membership') }}">
-        <label for="order_no">更换订单号</label>
-        <input id="order_no" name="order_no" value="{{ user.member_order_no }}" autocomplete="off" placeholder="微信支付交易单号">
+        <label for="order_no">更换支付单号</label>
+        <input id="order_no" name="order_no" value="{{ user.member_order_no }}" autocomplete="off" placeholder="从微信支付账单详情复制支付单号">
         <button type="submit">重新提交</button>
       </form>
     {% else %}
@@ -58,8 +67,8 @@
         <p class="review-warn">{{ user.member_review_note }}</p>
       {% endif %}
       <form method="POST" action="{{ url_for('users.membership') }}">
-        <label for="order_no">订单号</label>
-        <input id="order_no" name="order_no" autocomplete="off" placeholder="微信支付交易单号">
+        <label for="order_no">支付单号</label>
+        <input id="order_no" name="order_no" autocomplete="off" placeholder="从微信支付账单详情复制支付单号">
         <button type="submit">提交验证</button>
       </form>
     {% endif %}

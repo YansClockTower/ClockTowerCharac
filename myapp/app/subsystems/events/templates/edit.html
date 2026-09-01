@@ -27,7 +27,10 @@
                 <select id="event_type" name="event_type" required>
                     {% set current_event_type = event.event_type or "其他" %}
                     {% for type_name in event_type_values %}
-                    <option value="{{ type_name }}" {% if type_name == current_event_type %}selected{% endif %}>{{ type_name }}</option>
+                    {% if type_name != pigeon_event_type or current_user_is_admin or type_name == current_event_type %}
+                    <option value="{{ type_name }}" {% if type_name == current_event_type %}selected{% endif %}
+                      {% if type_name == pigeon_event_type and not current_user_is_admin %}disabled{% endif %}>{{ type_name }}</option>
+                    {% endif %}
                     {% endfor %}
                 </select>
             </p>
@@ -35,12 +38,12 @@
                 <label for="location_select">活动地点 (必填):</label>
                 <select id="location_select" name="location_select" required onchange="checkLocation(this)">
                     <option value="">-- 请选择地点 --</option>
-                    <option value="交大紫矜街(博雅厅)">交大紫矜街(博雅厅)</option>
-                    <option value="交大玉兰苑">交大玉兰苑</option>
-                    <option value="交大北博士公寓">交大北博士公寓</option>
-                    <option value="华师秋实">华师秋实</option>
-                    <option value="华师冬日">华师冬日</option>
-                    <option value="华师研寓">华师研寓</option>
+                    {% for loc in preset_locations %}
+                    {% if loc != admin_only_location or current_user_is_admin or loc == event.location %}
+                    <option value="{{ loc }}"
+                      {% if loc == admin_only_location and not current_user_is_admin %}disabled{% endif %}>{{ loc }}</option>
+                    {% endif %}
+                    {% endfor %}
                     <option value="其他（自己填写）">其他（自己填写）</option>
                 </select>
             </p>
@@ -125,7 +128,7 @@
     document.addEventListener("DOMContentLoaded", function() {
         const locationSelect = document.getElementById("location_select");
         const eventLocation = "{{ event.location }}";
-        const presetLocations = ["交大紫矜街(博雅厅)", "交大玉兰苑", "交大北博士公寓", "华师秋实", "华师冬日", "华师研寓"];
+        const presetLocations = {{ preset_locations|list|tojson }};
         if (!presetLocations.includes(eventLocation) && eventLocation) {
             locationSelect.value = "其他（自己填写）";
             const customContainer = document.getElementById("custom_location_container");
@@ -136,6 +139,7 @@
             customInput.name = "location";
             document.getElementById("final_location").name = "location_temp";
         } else {
+            locationSelect.value = eventLocation || "";
             checkLocation(locationSelect);
         }
 

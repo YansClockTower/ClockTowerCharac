@@ -49,6 +49,19 @@ def user_member_locked(user) -> bool:
     return user_is_member(user) and bool(order_no)
 
 
+def membership_credential_status(user) -> str:
+    """会员凭证栏状态：未提交 / 待验证 / 已验证 / 无需验证。"""
+    if user_is_member(user):
+        order_no = (_row_get(user, MEMBER_ORDER_NO_COLUMN) or "").strip()
+        if order_no:
+            return "已验证"
+        return "无需验证"
+    order_no = (_row_get(user, MEMBER_ORDER_NO_COLUMN) or "").strip()
+    if order_no:
+        return "待验证"
+    return "未提交"
+
+
 def _grant_membership(username: str, order_no: str) -> None:
     ensure_user_permission_schema()
     db = get_user_db()

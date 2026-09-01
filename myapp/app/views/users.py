@@ -45,6 +45,7 @@ from app.user.email_codes import (
     user_email_verified,
 )
 from app.user.membership import (
+    membership_credential_status,
     silent_verify_membership,
     submit_member_order,
     user_is_member,
@@ -142,6 +143,7 @@ def _serialize_user_profile(user):
         "email_verified": bool(_row_get(user, EMAIL_VERIFIED_COLUMN, 0)),
         "member_order_no": member_order,
         "member_review_note": _row_get(user, MEMBER_REVIEW_NOTE_COLUMN, "") or "",
+        "member_credential_status": membership_credential_status(user),
         "is_member": user_is_member(user),
         "member_locked": user_member_locked(user),
         "member_pending": bool(member_order) and not user_is_member(user),
@@ -158,6 +160,9 @@ def user_page(user_info):
     row = user_db.execute("SELECT * FROM user_info WHERE id=?", (user_info["id"],)).fetchone()
     user_db.close()
     profile = enrich_user_permissions(dict(row)) if row else user_info
+    if profile is not None:
+        profile = dict(profile)
+        profile["member_credential_status"] = membership_credential_status(profile)
     return render_template("view_user.html", user_info=profile)
 
 
@@ -393,15 +398,13 @@ def bind_email_submit(current_user):
 
 @users_bp.route("/login_submit", methods=["POST"])
 def login():
-    username = _req_val("username")
+    account = _req_val("username")
     password = _req_val("password")
 
-    if not username or not password:
+    if not account or not password:
         return jsonify({"status": "failed", "reason": "Missing username or password"})
 
-    user_db = get_user_db()
-    user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
-    user_db.close()
+    user = find_user_by_account(account)
 
     if not user or _is_temporary_user(user):
         return jsonify({"status": "failed", "reason": "用户不存在，请先注册"})
@@ -450,6 +453,17 @@ def me(current_user):  # 须 Cookie 或 Authorization: Bearer；前端请用 Clo
         hashlib.sha256,
     ).hexdigest()
     return jsonify({**user_data, "signature": signature})
+
+
+@users_bp.route("/verify_email", methods=["GET"])
+@login_required_template
+def verify_email(user_info):
+    ensure_user_permission_schema()
+    user_db = get_user_db()
+    row = user_db.execute("SELECT * FROM user_info WHERE id=?", (user_info["id"],)).fetchone()
+    user_db.close()
+    profile = enrich_user_permissions(dict(row)) if row else user_info
+    return render_template("verify_email.html", user=profile, current_user=user_info["name"])
 
 
 @users_bp.route("/membership", methods=["GET", "POST"])

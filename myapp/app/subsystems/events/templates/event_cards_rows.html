@@ -40,6 +40,9 @@
     {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
     {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
     {% set is_full = (status_class == "status-full") %}
+    {% set member_only = (event.event_type or '其他') == '布鸽桌游活动' %}
+    {% set can_join = (not member_only) or current_user_is_member %}
+    {% set show_schedule = (not member_only) or can_join or event.is_attending or event_owner_or_admin %}
 
     <div class="event-item {{ status_class }}">
         <div class="event-details">
@@ -59,11 +62,15 @@
             <div class="event-meta-row">
                 <div class="event-info">
                     <p>
-                        <strong>活动类型:</strong> {{ event.event_type or '其他' }}<br>
+                        <strong>活动类型:</strong> {{ event.event_type or '其他' }}{% if member_only %} <span style="font-size:0.85em;color:#856404;">（会员专属）</span>{% endif %}<br>
                         <strong>组织者:</strong> {{ event.inviter }}<br>
+                        {% if show_schedule %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
                         <strong>活动地点:</strong> {{ event.location }}
+                        {% elif member_only %}
+                        <span style="font-size:0.9em;color:#666;">(布鸽协会会员活动)</span>
+                        {% endif %}
                     </p>
                 </div>
 
@@ -97,7 +104,11 @@
                                 名额已满
                             </button>
                         {% elif event.inviter != current_user %}
-                            {% if event.locktime_obj < now() %}
+                            {% if not can_join %}
+                            <a href="{{ url_for('users.membership') }}" class="base-btn join-btn" style="display:inline-block;text-align:center;text-decoration:none;line-height:normal;">
+                                验证会员资质
+                            </a>
+                            {% elif event.locktime_obj < now() %}
                             <form method="POST" action="{{ url_for('events.join_event_route', event_id=event.id) }}"
                                 onsubmit="return confirm('确定空降吗？报名后无法取消！')">
                                 <button type="submit" class="base-btn join-btn">

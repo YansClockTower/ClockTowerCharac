@@ -3,7 +3,7 @@ CREATE TABLE events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     signcode TEXT NOT NULL,
     name TEXT NOT NULL,
-    event_type TEXT NOT NULL DEFAULT '其他' CHECK(event_type IN ('轻桌游聚会','德州扑克','德式桌游','狼人杀','血染钟楼','其他')),
+    event_type TEXT NOT NULL DEFAULT '其他' CHECK(event_type IN ('轻桌游聚会','布鸽桌游活动','德州扑克','德式桌游','狼人杀','血染钟楼','其他')),
     inviter TEXT NOT NULL,
     location TEXT NOT NULL,
     starttime TEXT NOT NULL,

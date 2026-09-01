@@ -17,6 +17,10 @@ import sqlite3
 #     activity_organized_count INTEGER DEFAULT 0 CHECK(activity_organized_count >= 0),
 #     activity_joined_count INTEGER DEFAULT 0 CHECK(activity_joined_count >= 0),
 #     activity_absent_count INTEGER DEFAULT 0 CHECK(activity_absent_count >= 0),
+#     email TEXT UNIQUE,
+#     email_verified INTEGER DEFAULT 0,
+#     member_order_no TEXT,
+#     member_review_note TEXT,
 #     lastLogin INTEGER
 # );''')
 
@@ -104,8 +108,9 @@ import sqlite3
 # # 关闭连接
 # conn.close()
 
-# 登记桌游：新建数据库 board_games.sqlite，表 registered_board_games
 # 在 myapp/database 目录下执行：python3 build_table.py
+
+# 登记桌游：board_games.sqlite
 conn = sqlite3.connect("board_games.sqlite")
 conn.execute(
     """
@@ -127,3 +132,65 @@ conn.execute(
 )
 conn.commit()
 conn.close()
+print("ok: board_games.sqlite")
+
+# 微信二维码收款账单库：空表 wechat_qr_income（与 user / events 分离）
+conn = sqlite3.connect("wechat_qr_income.sqlite")
+conn.execute(
+    """
+    CREATE TABLE IF NOT EXISTS wechat_qr_income (
+        order_no TEXT PRIMARY KEY,
+        peer TEXT NOT NULL,
+        note TEXT,
+        source_file TEXT,
+        imported_at TEXT NOT NULL,
+        redeemed INTEGER DEFAULT 0,
+        redeemed_by TEXT,
+        redeemed_at TEXT
+    );
+    """
+)
+conn.commit()
+conn.close()
+print("ok: wechat_qr_income.sqlite")
+
+# 用户库：为已有 user_info 补邮箱 / 会员订单号列（幂等）
+conn = sqlite3.connect("user_latest.sqlite")
+user_cols = {row[1] for row in conn.execute("PRAGMA table_info(user_info)").fetchall()}
+if not user_cols:
+    raise SystemExit("user_latest.sqlite 中没有 user_info 表，请先创建用户库")
+
+_user_alters = [
+    ("email", "TEXT"),
+    ("email_verified", "INTEGER DEFAULT 0"),
+    ("member_order_no", "TEXT"),
+    ("member_review_note", "TEXT"),
+]
+for name, decl in _user_alters:
+    if name not in user_cols:
+        conn.execute(f"ALTER TABLE user_info ADD COLUMN {name} {decl}")
+        print(f"ok: user_info ADD COLUMN {name}")
+    else:
+        print(f"skip: user_info.{name} already exists")
+
+try:
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_info_email ON user_info(email)")
+except Exception as exc:
+    print(f"skip unique index on email: {exc}")
+
+conn.execute(
+    """
+    CREATE TABLE IF NOT EXISTS email_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        code TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+    );
+    """
+)
+conn.commit()
+conn.close()
+print("ok: user_latest.sqlite email / member_order columns")

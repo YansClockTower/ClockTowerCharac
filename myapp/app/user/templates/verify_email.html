@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>验证邮箱</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 520px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row input { flex: 1; margin: 6px 0; }
+    .row button { width: auto; white-space: nowrap; margin: 6px 0; }
+    .muted { color: #666; font-size: 0.9rem; }
+    .status { margin-top: 8px; min-height: 20px; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>验证邮箱</h2>
+    <p class="muted">绑定并验证邮箱后，可用于登录与找回密码。</p>
+
+    {% if user.email and user.email_verified %}
+      <p>当前邮箱：<strong>{{ user.email }}</strong>（已验证）</p>
+      <p class="muted">如需更换邮箱，请联系管理员。</p>
+    {% else %}
+      {% if user.email %}
+        <p>当前邮箱：<strong>{{ user.email }}</strong>（未验证）</p>
+      {% endif %}
+      <label for="bindEmailInput">邮箱</label>
+      <input type="email" id="bindEmailInput" value="{{ user.email or '' }}" placeholder="邮箱">
+      <p class="muted">验证码将发到上述邮箱；如未收到，请留意垃圾邮件。</p>
+      <div class="row">
+        <input type="text" id="bindCodeInput" placeholder="验证码">
+        <button type="button" id="sendBindCodeBtn">发送验证码</button>
+      </div>
+      <button type="button" id="bindEmailBtn">验证并绑定</button>
+      <div id="bindEmailStatus" class="status"></div>
+    {% endif %}
+
+    <p style="margin-top: 16px;">
+      <a href="{{ url_for('users.user_page') }}">返回用户中心</a>
+    </p>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.ClockTowerAuth) ClockTowerAuth.establishSessionFromStoredToken();
+
+      const sendBindCodeBtn = document.getElementById("sendBindCodeBtn");
+      const bindEmailBtn = document.getElementById("bindEmailBtn");
+      const bindEmailStatus = document.getElementById("bindEmailStatus");
+      if (!sendBindCodeBtn || !bindEmailBtn) return;
+
+      function setBindStatus(ok, text) {
+        bindEmailStatus.textContent = text;
+        bindEmailStatus.className = ok ? "status success" : "status error";
+      }
+
+      function startCooldown(btn, seconds) {
+        let left = seconds;
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = left + "s";
+        const t = setInterval(() => {
+          left -= 1;
+          if (left <= 0) {
+            clearInterval(t);
+            btn.disabled = false;
+            btn.textContent = original;
+          } else {
+            btn.textContent = left + "s";
+          }
+        }, 1000);
+      }
+
+      sendBindCodeBtn.addEventListener("click", async () => {
+        const email = document.getElementById("bindEmailInput").value.trim();
+        if (!email) return setBindStatus(false, "请填写邮箱");
+        try {
+          const res = await ClockTowerAuth.authFetch("/user/send_bind_code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.status !== "success") return setBindStatus(false, data.reason || "发送失败");
+          startCooldown(sendBindCodeBtn, 60);
+          setBindStatus(true, data.delivery === "dev-print" ? "验证码已打印到服务器控制台" : "验证码已发送，若未收到，请留意垃圾邮件");
+        } catch (e) {
+          setBindStatus(false, "网络错误");
+        }
+      });
+
+      bindEmailBtn.addEventListener("click", async () => {
+        const email = document.getElementById("bindEmailInput").value.trim();
+        const code = document.getElementById("bindCodeInput").value.trim();
+        if (!email || !code) return setBindStatus(false, "请填写邮箱与验证码");
+        try {
+          const res = await ClockTowerAuth.authFetch("/user/bind_email_submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, code }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.status !== "success") return setBindStatus(false, data.reason || "绑定失败");
+          location.href = "{{ url_for('users.user_page') }}";
+        } catch (e) {
+          setBindStatus(false, "网络错误");
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}轻桌游聚集地 - 活动板{% endblock %}
+{% block title %}桌游协会 - 活动板{% endblock %}
 
 {% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('events.static', filename='browse.css') }}">
@@ -21,6 +21,8 @@
                href="{{ url_for('events.browse_events') }}">全部</a>
             <a class="browse-tab {% if browse_tab == 'light' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events', tab='light') }}">轻桌游聚会</a>
+            <a class="browse-tab {% if browse_tab == 'pigeon' %}is-active{% endif %}"
+               href="{{ url_for('events.browse_events', tab='pigeon') }}">布鸽桌游活动</a>
             <a class="browse-tab {% if browse_tab == 'my' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events', tab='my') }}">我的活动</a>
         </nav>
@@ -29,6 +31,8 @@
         {% if events_total == 0 %}
             {% if browse_tab == 'light' %}
                 <p>当前没有「轻桌游聚会」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
+            {% elif browse_tab == 'pigeon' %}
+                <p>当前没有「布鸽桌游活动」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
             {% elif browse_tab == 'my' %}
                 <p>暂无您组织或已报名的活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
             {% else %}

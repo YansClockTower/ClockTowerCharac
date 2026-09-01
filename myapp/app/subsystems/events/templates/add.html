@@ -28,7 +28,9 @@
                 <label for="event_type">活动类型 (必填):</label>
                 <select id="event_type" name="event_type" required>
                     {% for type_name in event_type_values %}
+                    {% if type_name != pigeon_event_type or current_user_is_admin %}
                     <option value="{{ type_name }}" {% if type_name == selected_event_type %}selected{% endif %}>{{ type_name }}</option>
+                    {% endif %}
                     {% endfor %}
                 </select>
             </p>
@@ -36,12 +38,11 @@
                 <label for="location_select">活动地点 (必填):</label>
                 <select id="location_select" name="location_select" required onchange="checkAddLocation(this)">
                     <option value="">-- 请选择地点 --</option>
-                    <option value="交大紫矜街(博雅厅)">交大紫矜街(博雅厅)</option>
-                    <option value="交大玉兰苑">交大玉兰苑</option>
-                    <option value="交大北博士公寓">交大北博士公寓</option>
-                    <option value="华师秋实">华师秋实</option>
-                    <option value="华师冬日">华师冬日</option>
-                    <option value="华师研寓">华师研寓</option>
+                    {% for loc in preset_locations %}
+                    {% if loc != admin_only_location or current_user_is_admin %}
+                    <option value="{{ loc }}">{{ loc }}</option>
+                    {% endif %}
+                    {% endfor %}
                     <option value="其他（自己填写）">其他（自己填写）</option>
                 </select>
             </p>

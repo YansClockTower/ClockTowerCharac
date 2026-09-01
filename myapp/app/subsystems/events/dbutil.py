@@ -7,10 +7,37 @@ from flask import g
 
 from app.models.config import get_config
 
-EVENT_TYPE_VALUES = ("轻桌游聚会", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "其他")
+EVENT_TYPE_VALUES = ("轻桌游聚会", "布鸽桌游活动", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "其他")
 
-# 活动板「轻桌游聚会」书签对应的类型，须与 EVENT_TYPE_VALUES 中该项一致
+# 活动板书签对应的类型，须与 EVENT_TYPE_VALUES 中该项一致
 BROWSE_BOOKMARK_LIGHT_EVENT_TYPE = "轻桌游聚会"
+BROWSE_BOOKMARK_PIGEON_EVENT_TYPE = "布鸽桌游活动"
+
+MEMBER_ONLY_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
+
+# 仅管理员可选用的活动类型 / 地点
+ADMIN_ONLY_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
+ADMIN_ONLY_LOCATION = "南体活动室(布鸽专用)"
+PRESET_LOCATIONS = (
+    "交大紫矜街(博雅厅)",
+    "交大玉兰苑",
+    "交大北博士公寓",
+    "华师秋实",
+    "华师冬日",
+    "华师研寓",
+    ADMIN_ONLY_LOCATION,
+)
+
+
+def event_requires_membership(event_type: str) -> bool:
+    return (event_type or "其他") in MEMBER_ONLY_EVENT_TYPES
+
+
+def event_requires_admin(event_type: str, location: str) -> bool:
+    """布鸽桌游活动类型，或南体活动室(布鸽专用)地点，仅管理员可发布/编辑。"""
+    if (event_type or "其他") in ADMIN_ONLY_EVENT_TYPES:
+        return True
+    return (location or "").strip() == ADMIN_ONLY_LOCATION
 
 # signcode 置为该值表示活动已归档（结束），不再允许报名/编辑等操作
 ARCHIVED_SIGNCODE = "0"
