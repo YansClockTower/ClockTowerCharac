@@ -1,0 +1,141 @@
+/* 用户认证 / 个人中心页 — 莫兰迪 */
+body.user-page {
+  margin: 40px auto;
+  padding: 0 16px;
+}
+
+body.user-page .card button,
+body.user-page .card input[type="text"],
+body.user-page .card input[type="email"],
+body.user-page .card input[type="password"],
+body.user-page .card select {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+}
+
+body.user-page .card .row button {
+  width: auto;
+  white-space: nowrap;
+}
+
+body.user-page #avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+body.user-page #avatarInput {
+  padding: 0;
+  border: none;
+}
+
+body.user-page .card--wide {
+  max-width: 520px;
+}
+
+.review-pending {
+  color: var(--color-flash-warning-text);
+  background: var(--color-flash-warning-bg);
+  border: 1px solid var(--color-flash-warning-border);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.review-warn {
+  color: var(--color-flash-error-text);
+  background: var(--color-flash-error-bg);
+  border: 1px solid var(--color-flash-error-border);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.instructions {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.instructions ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.instructions li + li {
+  margin-top: 8px;
+}
+
+.nav-row {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-row a,
+.nav-row button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+  font-size: 1rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+}
+
+.nav-row a:hover {
+  background: var(--color-bg-muted);
+  text-decoration: none;
+}
+
+body.user-page.edit-user-page .card {
+  max-width: 600px;
+}
+
+.profile-view {
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-muted);
+  display: none;
+}
+
+.profile-view h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.profile-view table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.profile-view td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--color-border-light);
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+.profile-view tr:last-child td {
+  border-bottom: none;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-row button {
+  flex: 1;
+}

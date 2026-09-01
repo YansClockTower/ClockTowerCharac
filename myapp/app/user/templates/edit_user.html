@@ -3,27 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>编辑用户权限</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/user-pages.css') }}">
   <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
-  <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 40px; }
-    .card { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
-    h2 { margin-top: 0; }
-    label { display: block; margin: 8px 0; }
-    input[type="text"] { width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box; }
-    button { padding: 10px 16px; margin-top: 12px; }
-    .status { margin-top: 16px; color: #333; }
-    .success { color: green; }
-    .error { color: red; }
-    .profile-view { margin-top: 20px; padding: 14px; border: 1px solid #ddd; border-radius: 10px; background: #fafafa; display: none; }
-    .profile-view h3 { margin-top: 0; margin-bottom: 10px; }
-    .profile-view table { width: 100%; border-collapse: collapse; }
-    .profile-view td { padding: 6px 4px; border-bottom: 1px solid #eee; }
-    .profile-view tr:last-child td { border-bottom: none; }
-    .btn-row { display: flex; gap: 8px; }
-    .btn-row button { flex: 1; }
-  </style>
 </head>
-<body>
+<body class="user-page edit-user-page">
   <div class="card">
     <h2>编辑用户权限</h2>
     <label>用户名：

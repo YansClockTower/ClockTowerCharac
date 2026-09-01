@@ -6,61 +6,7 @@
   const VERIFY_URL = "/user/verify_email";
 
   function ensureStyles() {
-    if (document.getElementById("email-bind-prompt-styles")) return;
-    const style = document.createElement("style");
-    style.id = "email-bind-prompt-styles";
-    style.textContent = `
-      .email-bind-prompt-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 2000;
-        background: rgba(0, 0, 0, 0.45);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 16px;
-        box-sizing: border-box;
-      }
-      .email-bind-prompt-card {
-        width: 100%;
-        max-width: 360px;
-        background: #fff;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-      }
-      .email-bind-prompt-card h3 {
-        margin: 0 0 10px;
-        font-size: 1.15rem;
-      }
-      .email-bind-prompt-card p {
-        margin: 0 0 16px;
-        color: #555;
-        line-height: 1.5;
-        font-size: 0.95rem;
-      }
-      .email-bind-prompt-actions {
-        display: flex;
-        gap: 10px;
-        justify-content: flex-end;
-      }
-      .email-bind-prompt-actions button {
-        border: none;
-        border-radius: 8px;
-        padding: 10px 14px;
-        font-size: 0.95rem;
-        cursor: pointer;
-      }
-      .email-bind-prompt-primary {
-        background: #007bff;
-        color: #fff;
-      }
-      .email-bind-prompt-secondary {
-        background: #f1f3f5;
-        color: #333;
-      }
-    `;
-    document.head.appendChild(style);
+    /* styles live in app/static/css/site.css */
   }
 
   function showModal() {

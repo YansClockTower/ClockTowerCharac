@@ -202,12 +202,6 @@ a.player-tag:hover {
     position: absolute;
     top: 15px;
     right: 15px;
-    padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
-}
-.corner-button:hover {
-    background-color: #0056b3;
 }
 .action-buttons {
     display: flex;
@@ -226,25 +220,4 @@ a.player-tag:hover {
     display: flex;
     justify-content: center;
     width: 100%;
-}
-.join-btn {
-    background: #28a745;
-    color: white;
-}
-.join-btn:hover {
-    background: #1e7e34;
-}
-.leave-btn {
-    background: #17a2b8;
-    color: white;
-}
-.leave-btn:hover {
-    background: #138496;
-}
-.edit-btn {
-    background: #ffc107;
-    color: #343a40;
-}
-.edit-btn:hover {
-    background: #e0a800;
 }

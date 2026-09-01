@@ -4,11 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}桌游登记{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
     <link rel="stylesheet" href="{{ url_for('boardgames.static', filename='style.css') }}">
     <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="page-shell">
     <div class="header-status">
         <span class="welcome-msg">欢迎, {{ current_user if current_user else '用户' }}</span>
         <a href="{{ url_for('users.user_page') }}" class="user-center-link">用户中心</a>

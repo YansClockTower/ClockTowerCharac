@@ -1,90 +1,4 @@
-body {
-  font-family: sans-serif;
-  line-height: 1.6;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 10px;
-}
-
-h1 {
-  border-bottom: 2px solid #ccc;
-  padding-bottom: 10px;
-}
-
-.header-status {
-  text-align: right;
-  margin-bottom: 10px;
-  font-size: 0.9em;
-}
-
-.welcome-msg {
-  margin-right: 10px;
-  font-weight: bold;
-  color: #007bff;
-}
-
-.user-center-link {
-  margin-right: 10px;
-  color: #007bff;
-  text-decoration: none;
-}
-
-.logout-btn {
-  color: #dc3545;
-  text-decoration: none;
-}
-
-.flashes {
-  list-style: none;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 5px;
-}
-
-.flashes li.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.flashes li.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-.toolbar {
-  margin-bottom: 1rem;
-}
-
-.btn {
-  display: inline-block;
-  padding: 8px 14px;
-  border-radius: 4px;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: #fff;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: #fff;
-}
-
-.btn-secondary:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.empty-hint {
-  color: #666;
-}
+/* 桌游登记：仅保留桌游浏览/详情/登记表单特有样式 */
 
 .game-browse-grid {
   list-style: none;
@@ -97,7 +11,7 @@ h1 {
 
 .game-card {
   display: block;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   overflow: hidden;
   text-decoration: none;
@@ -106,7 +20,7 @@ h1 {
 }
 
 .game-card:hover {
-  border-color: #007bff;
+  border-color: var(--color-primary);
 }
 
 .game-card-image-wrap {
@@ -144,14 +58,7 @@ h1 {
 .game-form input[type="text"],
 .game-form input[type="number"],
 .game-form textarea {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
   margin-top: 4px;
-}
-
-.req {
-  color: #c00;
 }
 
 .game-detail-layout {
@@ -170,7 +77,7 @@ h1 {
   width: 100%;
   height: auto;
   border-radius: 6px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
 }
 
 .no-image.large {
@@ -211,14 +118,6 @@ h1 {
   margin-top: 24px;
 }
 
-.card {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin-bottom: 22px;
-  background: #fafcff;
-}
-
 .smart-json-title {
   margin: 0 0 8px;
   font-size: 1.1rem;
@@ -227,7 +126,7 @@ h1 {
 .smart-json-hint {
   margin: 0 0 12px;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--color-text-muted);
 }
 
 .smart-json-label {
@@ -237,16 +136,11 @@ h1 {
 }
 
 .smart-json-textarea {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.45;
   padding: 10px;
-  border: 1px solid #ccc;
   border-radius: 6px;
-  resize: vertical;
 }
 
 .smart-json-actions {
@@ -262,4 +156,10 @@ h1 {
 
 .smart-json-msg.is-error {
   color: #b02a37;
+}
+
+.card.smart-json-card {
+  max-width: none;
+  margin-bottom: 22px;
+  background: #fafcff;
 }

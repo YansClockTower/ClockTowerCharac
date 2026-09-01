@@ -1,0 +1,137 @@
+/* 首页门户导航 — 莫兰迪 */
+body.portal-home {
+  margin: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--color-bg-muted);
+}
+
+.portal-home h1 {
+  font-size: 2.5em;
+  margin: 16px 0 28px;
+  text-align: center;
+  border-bottom: none;
+  padding-bottom: 0;
+  color: var(--color-heading);
+}
+
+.portal-home #user-avatar {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 10px auto;
+  border: 2px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+.portal-home .primary-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(360px, 100%);
+}
+
+.portal-home .primary-nav > button {
+  width: 100%;
+  text-align: center;
+  padding: 10px;
+  background-color: #9a9590;
+  border-radius: var(--radius-md);
+}
+
+.portal-home .primary-nav > button:hover {
+  background-color: #8a8580;
+}
+
+.portal-home .secondary-nav {
+  display: none;
+  margin-top: -4px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-light);
+}
+
+.portal-home .secondary-nav.active {
+  display: block;
+}
+
+.portal-home .secondary-nav a {
+  display: block;
+  text-align: center;
+  padding: 10px;
+  background-color: var(--color-primary);
+  color: #fff;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.portal-home .secondary-nav a:last-child {
+  margin-bottom: 0;
+}
+
+.portal-home .secondary-nav a:hover {
+  background-color: var(--color-primary-hover);
+  text-decoration: none;
+}
+
+.portal-home .secondary-nav .disabled-item {
+  display: block;
+  text-align: center;
+  padding: 10px;
+  background-color: #c5c0ba;
+  color: #fdfbf8;
+  border-radius: var(--radius-md);
+  font-size: 1em;
+  margin-bottom: 8px;
+  cursor: default;
+}
+
+.portal-home .secondary-nav .disabled-item:last-child {
+  margin-bottom: 0;
+}
+
+.portal-home .footer-note {
+  margin-top: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+@media (orientation: portrait), (max-width: 768px) {
+  body.portal-home {
+    padding: 20px 16px 28px;
+    justify-content: flex-start;
+  }
+
+  .portal-home #user-avatar {
+    width: 120px;
+    height: 120px;
+    margin-top: 6px;
+  }
+
+  .portal-home h1 {
+    font-size: 1.6rem;
+    line-height: 1.4;
+    margin: 12px 0 18px;
+  }
+
+  .portal-home .primary-nav {
+    width: 100%;
+    max-width: 460px;
+    gap: 10px;
+  }
+
+  .portal-home .primary-nav > button,
+  .portal-home .secondary-nav a,
+  .portal-home .secondary-nav .disabled-item {
+    font-size: 1rem;
+    padding: 13px 10px;
+    border-radius: 10px;
+  }
+}
