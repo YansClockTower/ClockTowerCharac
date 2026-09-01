@@ -36,13 +36,52 @@
         <button id="setAvatarBtn" style="width: 50%; margin-top: 5px;">设置头像</button>
       </div>
       <table class="permissions-table">
-        <tr><td>协会身份</td><td>{{ user_info.association_role or '普通玩家' }}</td></tr>
+        <tr><td>协会身份</td><td>{{ user_info.association_role or '普通玩家' }}{% if (user_info.association_role or '普通玩家') != '普通玩家' %} · 会员{% endif %}</td></tr>
+        <tr><td>邮箱</td><td id="emailStatus">
+          {% if user_info.email and user_info.email_verified %}
+            {{ user_info.email }}（已验证）
+          {% elif user_info.email %}
+            {{ user_info.email }}（未验证）
+          {% else %}
+            未绑定
+          {% endif %}
+        </td></tr>
+        <tr><td>会员凭证</td><td>
+          {% if user_info.member_order_no and (user_info.association_role or '普通玩家') != '普通玩家' %}
+            已锁定：{{ user_info.member_order_no }}
+          {% elif user_info.member_order_no %}
+            审核中：{{ user_info.member_order_no }}
+          {% else %}
+            未提交 · <a href="{{ url_for('users.membership') }}">验证会员资质</a>
+          {% endif %}
+        </td></tr>
         <tr><td>社会身份</td><td id="currentSocialRole">{{ user_info.social_role or '保密' }}</td></tr>
         <tr><td>联系方式</td><td id="currentContactInfo">{{ user_info.contact_info or '保密' }}</td></tr>
         <tr><td>组织活动次数</td><td>{{ user_info.activity_organized_count or 0 }}</td></tr>
         <tr><td>参与活动次数</td><td>{{ user_info.activity_joined_count or 0 }}</td></tr>
         <tr><td>缺席活动次数</td><td>{{ user_info.activity_absent_count or 0 }}</td></tr>
       </table>
+
+      <div id="emailPrompt" style="display:none; margin-top:12px; padding:10px; border:1px solid #ffeeba; background:#fff3cd; border-radius:8px;">
+        <p style="margin:0 0 8px;">建议验证邮箱，便于找回密码。</p>
+        <button type="button" id="gotoBindEmailBtn" style="width:auto;">去绑定</button>
+        <button type="button" id="skipEmailPromptBtn" style="width:auto;">暂不验证</button>
+      </div>
+
+      {% if not user_info.email_verified %}
+      <details id="bindEmailBox" style="margin-top:12px;">
+        <summary>绑定 / 验证邮箱</summary>
+        <input type="email" id="bindEmailInput" placeholder="邮箱" style="width:100%; padding:8px; margin-top:8px; box-sizing:border-box;">
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <input type="text" id="bindCodeInput" placeholder="验证码" style="flex:1; padding:8px; box-sizing:border-box;">
+          <button type="button" id="sendBindCodeBtn" style="width:auto;">发送验证码</button>
+        </div>
+        <button type="button" id="bindEmailBtn">验证并绑定</button>
+        <div id="bindEmailStatus" class="status"></div>
+      </details>
+      {% endif %}
+
+      <p style="margin-top:12px;"><a href="{{ url_for('users.membership') }}">验证会员资质</a></p>
       <details>
         <summary>查看权限详情</summary>
         <table class="permissions-table">
@@ -215,6 +254,80 @@
           }
         } catch (e) {
           setProfileStatus(false, "❌ 网络错误或服务器异常");
+        }
+      });
+    }
+
+    const EMAIL_SKIP_KEY = "clocktower_skip_email_prompt";
+    const emailVerified = {{ 'true' if user_info.email_verified else 'false' }};
+    const emailPrompt = document.getElementById("emailPrompt");
+    if (emailPrompt && !emailVerified && !localStorage.getItem(EMAIL_SKIP_KEY)) {
+      emailPrompt.style.display = "block";
+    }
+    const skipEmailPromptBtn = document.getElementById("skipEmailPromptBtn");
+    if (skipEmailPromptBtn) {
+      skipEmailPromptBtn.addEventListener("click", async () => {
+        localStorage.setItem(EMAIL_SKIP_KEY, "1");
+        emailPrompt.style.display = "none";
+        try {
+          await ClockTowerAuth.authFetch("/user/skip_email_prompt", { method: "POST" });
+        } catch (e) {}
+      });
+    }
+    const gotoBindEmailBtn = document.getElementById("gotoBindEmailBtn");
+    if (gotoBindEmailBtn) {
+      gotoBindEmailBtn.addEventListener("click", () => {
+        const box = document.getElementById("bindEmailBox");
+        if (box) box.open = true;
+        emailPrompt.style.display = "none";
+      });
+    }
+
+    const sendBindCodeBtn = document.getElementById("sendBindCodeBtn");
+    const bindEmailBtn = document.getElementById("bindEmailBtn");
+    const bindEmailStatus = document.getElementById("bindEmailStatus");
+    function setBindStatus(ok, text) {
+      if (!bindEmailStatus) return;
+      bindEmailStatus.textContent = text;
+      bindEmailStatus.className = ok ? "status success" : "status error";
+    }
+    if (sendBindCodeBtn) {
+      sendBindCodeBtn.addEventListener("click", async () => {
+        const email = document.getElementById("bindEmailInput").value.trim();
+        if (!email) return setBindStatus(false, "请填写邮箱");
+        try {
+          const res = await ClockTowerAuth.authFetch("/user/send_bind_code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.status !== "success") return setBindStatus(false, data.reason || "发送失败");
+          sendBindCodeBtn.disabled = true;
+          setTimeout(() => { sendBindCodeBtn.disabled = false; }, 60000);
+          setBindStatus(true, data.delivery === "dev-print" ? "验证码已打印到服务器控制台" : "验证码已发送");
+        } catch (e) {
+          setBindStatus(false, "网络错误");
+        }
+      });
+    }
+    if (bindEmailBtn) {
+      bindEmailBtn.addEventListener("click", async () => {
+        const email = document.getElementById("bindEmailInput").value.trim();
+        const code = document.getElementById("bindCodeInput").value.trim();
+        if (!email || !code) return setBindStatus(false, "请填写邮箱与验证码");
+        try {
+          const res = await ClockTowerAuth.authFetch("/user/bind_email_submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, code }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.status !== "success") return setBindStatus(false, data.reason || "绑定失败");
+          localStorage.removeItem(EMAIL_SKIP_KEY);
+          location.reload();
+        } catch (e) {
+          setBindStatus(false, "网络错误");
         }
       });
     }

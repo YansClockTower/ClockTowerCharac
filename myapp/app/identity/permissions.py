@@ -40,9 +40,19 @@ ACTIVITY_ORGANIZED_COUNT_COLUMN = "activity_organized_count"
 ACTIVITY_JOINED_COUNT_COLUMN = "activity_joined_count"
 ACTIVITY_ABSENT_COUNT_COLUMN = "activity_absent_count"
 CONTACT_INFO_COLUMN = "contact_info"
+EMAIL_COLUMN = "email"
+EMAIL_VERIFIED_COLUMN = "email_verified"
+MEMBER_ORDER_NO_COLUMN = "member_order_no"
+MEMBER_REVIEW_NOTE_COLUMN = "member_review_note"
 
 ASSOCIATION_ROLE_VALUES = ("普通玩家", "协会玩家", "核心玩家", "管理员")
 SOCIAL_ROLE_VALUES = ("交大学生", "华师学生", "校外人员", "保密")
+ASSOCIATION_ROLE_RANK = {
+    "普通玩家": 0,
+    "协会玩家": 1,
+    "核心玩家": 2,
+    "管理员": 3,
+}
 
 
 def _bool_like(value) -> bool:
@@ -152,6 +162,34 @@ def ensure_user_permission_schema() -> None:
         conn.execute(f"ALTER TABLE user_info ADD COLUMN {ACTIVITY_ABSENT_COUNT_COLUMN} INTEGER DEFAULT 0")
     if CONTACT_INFO_COLUMN not in column_names:
         conn.execute(f"ALTER TABLE user_info ADD COLUMN {CONTACT_INFO_COLUMN} TEXT DEFAULT '保密'")
+    if EMAIL_COLUMN not in column_names:
+        conn.execute(f"ALTER TABLE user_info ADD COLUMN {EMAIL_COLUMN} TEXT")
+    if EMAIL_VERIFIED_COLUMN not in column_names:
+        conn.execute(f"ALTER TABLE user_info ADD COLUMN {EMAIL_VERIFIED_COLUMN} INTEGER DEFAULT 0")
+    if MEMBER_ORDER_NO_COLUMN not in column_names:
+        conn.execute(f"ALTER TABLE user_info ADD COLUMN {MEMBER_ORDER_NO_COLUMN} TEXT")
+    if MEMBER_REVIEW_NOTE_COLUMN not in column_names:
+        conn.execute(f"ALTER TABLE user_info ADD COLUMN {MEMBER_REVIEW_NOTE_COLUMN} TEXT")
+
+    try:
+        conn.execute(
+            f"CREATE UNIQUE INDEX IF NOT EXISTS idx_user_info_email ON user_info({EMAIL_COLUMN})"
+        )
+    except Exception:
+        pass
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS email_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            code TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
 
     column_names = _row_column_set(conn)
     if LEGACY_MANAGE_ACCOUNT_COLUMN in column_names:

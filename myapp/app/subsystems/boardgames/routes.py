@@ -73,7 +73,7 @@ def register(current_user):
                 description=_optional_str(request.form, "description"),
                 image_path=_optional_str(request.form, "image_path"),
                 owner=owner,
-                current_holder=owner,
+                current_holder=_optional_str(request.form, "current_holder"),
                 current_storage_location=_optional_str(request.form, "current_storage_location"),
             )
         except sqlite3.Error:

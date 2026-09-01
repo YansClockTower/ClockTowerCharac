@@ -7,4 +7,5 @@ Werkzeug==2.3.7
 MarkupSafe==2.1.5
 sqlite
 pillow
-flask_cor
+flask_cors
+resend

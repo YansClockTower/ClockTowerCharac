@@ -1,0 +1,43 @@
+---
+description: 从 LightBoardGame 误改版本移植：邮箱验证、找回密码、微信订单号核销会员
+alwaysApply: true
+---
+
+# 从 LightBoardGame 移植的账号能力
+
+用户曾在错误仓库 `~/develop/LightBoardGame` 实现下列能力，目标是在 **本仓库 ClockTowerCharac** 重做。不要照搬 Flask `session['username']`：这里用 JWT + Cookie（`app/identity/auth.py`、`/user/*`、`user_info`）。密码哈希用已有 `app.models.crypt`。会员对应已有 `association_role`（普通玩家 → 协会玩家），不要再造一套 `is_member` 权限体系。
+
+参考实现（只读对照，不要往 LightBoardGame 继续加功能）：`mailer.py`、`auth.py`、`dbutil.py`、`wechat_bills.py`、`scripts/extract_wechat_qr_income.py`、`templates/login.html`、`profile.html`、`membership.html`。
+
+## 1. 邮箱（只发不收）
+
+- Resend 官方 SDK：`RESEND_API_KEY`、`MAIL_FROM` 放 `.env`（gitignore）。未配 key 时打印到控制台便于本地测。
+- `users`/`user_info` 增加 `email`（唯一）、`email_verified`。注册：用户名 + 邮箱 + 密码 + 6 位码。
+- 表 `email_codes`：`email, code, purpose, expires_at, used, created_at`。`purpose`：`register` / `bind` / `reset`。码 10 分钟失效；同一邮箱+purpose 60 秒冷却；每小时最多 5 次。
+- 未验证用户访问时可提示「建议验证邮箱」，可跳过（session/本地标记即可）。个人页可补绑邮箱（`purpose=bind`）。
+- `/user/me` 返回 `email`、`email_verified`。
+
+## 2. 忘记密码
+
+- 登录页「忘记密码？」：填用户名**或**邮箱，码发到**已验证**邮箱。
+- 未绑定/未验证邮箱：拒绝并说明无法重设。
+- 提交：账号 + 码 + 新密码（≥6，两次一致）。`purpose=reset`。成功后按本项目方式登录（写 JWT / establish_session）。
+- 邮件主题按 purpose 区分（注册 / 绑定 / 重设）。
+
+## 3. 微信「二维码收款」订单号 = 会员凭证
+
+- **独立库** `database/wechat_qr_income.sqlite`，不要写入活动库或 `user_latest.sqlite`。
+- 导入工具读微信账单 CSV 正表（`微信支付账单明细列表` 之后）。编码试 `utf-8-sig` / `gb18030` / `gbk`。筛 `交易类型 == 二维码收款`（不要「扫二维码付款」）。取出交易单号、交易对方、备注（`/` 当空）。
+- `order_no` 主键。导入 **INSERT OR IGNORE**，相同订单号不覆盖。可同步一份 csv/json 到 `database/`（已 gitignore）。
+- 列：`redeemed` 默认 0（否）、`redeemed_by`、`redeemed_at`。核销用 `UPDATE ... WHERE order_no=? AND redeemed=0`，避免重复核销。
+- 用户侧：入口「验证会员资质」。提交交易单号（约 10–40 位字母数字）。
+  - 账单里有且未核销：立刻核销、锁定档案内订单号、把 `association_role` 从普通玩家升为协会玩家（已是更高角色则只核销+锁定，不降级）。
+  - 账单里还没有：写入用户档案（如 `member_order_no`），UI 显示「审核中」。
+  - 已被他人核销：提示更换凭证，订单号不锁定。
+- **每次已登录请求静默复核**待审订单号；账单稍后导入后自动通过。刚通过时可 flash 一次。
+- 成为会员后凭证只读。顶栏/个人页显示会员状态。
+
+## 不要做
+
+- 不要用非官方微信机器人抓账单。不要把 Resend API key 写进仓库或聊天。
+- LightBoardGame 的 `views/users.py` 是本仓库旧拷贝，不是新逻辑来源。

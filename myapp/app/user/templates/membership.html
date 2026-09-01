@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>验证会员资质</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('users.static', filename='css/common.css') }}">
+  <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
+    .card { max-width: 520px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
+    input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    .muted { color: #666; font-size: 0.9rem; }
+    .review-pending { color: #856404; background: #fff3cd; border: 1px solid #ffeeba; padding: 8px 10px; border-radius: 4px; }
+    .review-warn { color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; padding: 8px 10px; border-radius: 4px; }
+    .flashes { list-style: none; padding: 0; }
+    .flashes li { padding: 8px 10px; margin: 6px 0; border-radius: 4px; }
+    .flashes .success { background: #d4edda; color: #155724; }
+    .flashes .error { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>验证会员资质</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <p>请填写微信支付账单中的<strong>交易单号</strong>作为凭证。每个订单号只能核销一次。</p>
+    <p class="muted">账单导入可能有延迟。若提交后尚未出现在账单库中，状态为「审核中」，之后访问时会自动复核。</p>
+
+    {% if is_member and member_locked %}
+      <p>资质：<strong>会员（{{ user.association_role }}）</strong></p>
+      <p>订单号凭证：<strong>{{ user.member_order_no }}</strong></p>
+      <p class="muted">已核销并锁定，不能再修改。</p>
+    {% elif user and user.member_order_no %}
+      <p>资质：尚未成为会员（{{ user.association_role or '普通玩家' }}）</p>
+      <p>已提交订单号：<strong>{{ user.member_order_no }}</strong></p>
+      {% if user.member_review_note %}
+        <p class="review-warn">{{ user.member_review_note }}</p>
+      {% else %}
+        <p class="review-pending">状态：审核中。账单同步后将自动核销。</p>
+      {% endif %}
+      <form method="POST" action="{{ url_for('users.membership') }}">
+        <label for="order_no">更换订单号</label>
+        <input id="order_no" name="order_no" value="{{ user.member_order_no }}" autocomplete="off" placeholder="微信支付交易单号">
+        <button type="submit">重新提交</button>
+      </form>
+    {% else %}
+      <p>资质：尚未验证（{{ user.association_role or '普通玩家' }}）</p>
+      {% if user and user.member_review_note %}
+        <p class="review-warn">{{ user.member_review_note }}</p>
+      {% endif %}
+      <form method="POST" action="{{ url_for('users.membership') }}">
+        <label for="order_no">订单号</label>
+        <input id="order_no" name="order_no" autocomplete="off" placeholder="微信支付交易单号">
+        <button type="submit">提交验证</button>
+      </form>
+    {% endif %}
+
+    <p style="margin-top: 16px;">
+      <a href="{{ url_for('users.user_page') }}">返回用户中心</a>
+    </p>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.ClockTowerAuth) ClockTowerAuth.establishSessionFromStoredToken();
+    });
+  </script>
+</body>
+</html>

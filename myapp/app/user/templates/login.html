@@ -10,10 +10,17 @@
     body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 40px; }
     .card { max-width: 420px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 12px; }
     h2 { margin: 0 0 12px; }
+    h3 { margin: 16px 0 8px; }
     input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
-    .row { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row input { flex: 1; }
+    .row button { width: auto; white-space: nowrap; }
     .center { text-align: center; }
     .spacer { height: 10px; }
+    .linkish { background: none; border: none; color: #007bff; cursor: pointer; padding: 0; width: auto; text-decoration: underline; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .hint { font-size: 0.85rem; color: #666; }
   </style>
 </head>
 <body>
@@ -21,22 +28,40 @@
     <h2>用户认证</h2>
     <div id="view">
       <div id="auth-forms">
-        <div>
+        <div id="login-panel" class="panel active">
           <h3>登录</h3>
           <input id="login-username" placeholder="用户名" />
           <input id="login-password" type="password" placeholder="密码" />
           <button id="loginBtn">登录</button>
+          <p class="center"><button type="button" class="linkish" id="showResetBtn">忘记密码？</button></p>
         </div>
+
+        <div id="reset-panel" class="panel">
+          <h3>重设密码</h3>
+          <p class="hint">填写用户名或已验证邮箱，验证码将发到绑定邮箱。</p>
+          <input id="reset-account" placeholder="用户名或邮箱" />
+          <input id="reset-password" type="password" placeholder="新密码（至少 6 位）" />
+          <input id="reset-password2" type="password" placeholder="确认新密码" />
+          <div class="row">
+            <input id="reset-code" placeholder="邮箱验证码" />
+            <button type="button" id="sendResetCodeBtn">发送验证码</button>
+          </div>
+          <button id="resetBtn">确认重设并登录</button>
+          <p class="center"><button type="button" class="linkish" id="backToLoginBtn">返回登录</button></p>
+        </div>
+
         <div class="spacer"></div>
-        <div class="spacer"></div>
-        <div>
+        <div id="register-panel" class="panel active">
           <h3>注册</h3>
           <input id="reg-username" placeholder="用户名" />
-          <input id="reg-password" type="password" placeholder="密码" />
+          <input id="reg-email" type="email" placeholder="邮箱" />
+          <input id="reg-password" type="password" placeholder="密码（至少 6 位）" />
           <input id="reg-password2" type="password" placeholder="确认密码" />
           <div class="row">
-            <button id="registerBtn">注册</button>
+            <input id="reg-code" placeholder="邮箱验证码" />
+            <button type="button" id="sendRegCodeBtn">发送验证码</button>
           </div>
+          <button id="registerBtn">注册</button>
         </div>
       </div>
       <p id="loading-msg" class="center">正在检查登录状态...</p>
@@ -46,6 +71,23 @@
   <script>
     const INFO_PAGE_URL = "/user";
     const LOGIN_NEXT = {{ next_url|tojson }};
+
+    function startCooldown(btn, seconds) {
+      let left = seconds;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = left + "s";
+      const t = setInterval(() => {
+        left -= 1;
+        if (left <= 0) {
+          clearInterval(t);
+          btn.disabled = false;
+          btn.textContent = original;
+        } else {
+          btn.textContent = left + "s";
+        }
+      }, 1000);
+    }
 
     async function fetchMe() {
       try {
@@ -88,42 +130,44 @@
       }
     }
 
+    async function applyTokenResponse(data) {
+      if (data && data.status === "success" && data.token) {
+        ClockTowerAuth.setStoredAuthToken(data.token);
+        await ClockTowerAuth.establishSessionFromStoredToken();
+        location.href = LOGIN_NEXT || INFO_PAGE_URL;
+        return true;
+      }
+      return false;
+    }
+
     const loginsubmit = async () => {
       const username = document.getElementById("login-username").value.trim();
       const password = document.getElementById("login-password").value;
       if (!username || !password) return alert("请输入用户名和密码");
-
       const success = await handleLogin(username, password);
-      if (success) {
-        location.href = LOGIN_NEXT || INFO_PAGE_URL;
-      }
+      if (success) location.href = LOGIN_NEXT || INFO_PAGE_URL;
     };
 
     const registersubmit = async () => {
       const username = document.getElementById("reg-username").value.trim();
+      const email = document.getElementById("reg-email").value.trim();
       const password = document.getElementById("reg-password").value;
       const password2 = document.getElementById("reg-password2").value;
-      if (!username || !password || !password2) return alert("请输入完整的注册信息");
+      const code = document.getElementById("reg-code").value.trim();
+      if (!username || !email || !password || !password2 || !code) return alert("请输入完整的注册信息");
       if (password !== password2) return alert("两次输入的密码不一致");
+      if (password.length < 6) return alert("密码至少 6 位");
 
       try {
         const res = await fetch("/user/register_submit", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, email, password, code })
         });
         const data = await res.json().catch(() => ({}));
-
-        if (data && (data.status === "success" || data.success)) {
-          alert("注册成功。正在尝试自动登录...");
-          const success = await handleLogin(username, password);
-          if (success) {
-            location.href = LOGIN_NEXT || INFO_PAGE_URL;
-          }
-        } else {
-          alert("注册失败，请检查用户名是否已存在。");
-        }
+        if (await applyTokenResponse(data)) return;
+        alert("注册失败：" + (data.reason || "请检查信息"));
       } catch (e) {
         alert("注册请求失败");
       }
@@ -132,6 +176,82 @@
     document.addEventListener("DOMContentLoaded", async () => {
       const authForms = document.getElementById("auth-forms");
       const loadingMsg = document.getElementById("loading-msg");
+      const loginPanel = document.getElementById("login-panel");
+      const resetPanel = document.getElementById("reset-panel");
+      const registerPanel = document.getElementById("register-panel");
+
+      document.getElementById("showResetBtn").addEventListener("click", () => {
+        loginPanel.classList.remove("active");
+        registerPanel.classList.remove("active");
+        resetPanel.classList.add("active");
+      });
+      document.getElementById("backToLoginBtn").addEventListener("click", () => {
+        resetPanel.classList.remove("active");
+        loginPanel.classList.add("active");
+        registerPanel.classList.add("active");
+      });
+
+      document.getElementById("sendRegCodeBtn").addEventListener("click", async () => {
+        const email = document.getElementById("reg-email").value.trim();
+        if (!email) return alert("请先填写邮箱");
+        const btn = document.getElementById("sendRegCodeBtn");
+        try {
+          const res = await fetch("/user/send_code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.status !== "success") return alert(data.reason || "发送失败");
+          startCooldown(btn, 60);
+          alert(data.delivery === "dev-print" ? "验证码已打印到服务器控制台（本地调试）" : "验证码已发送");
+        } catch (e) {
+          alert("发送请求失败");
+        }
+      });
+
+      document.getElementById("sendResetCodeBtn").addEventListener("click", async () => {
+        const account = document.getElementById("reset-account").value.trim();
+        if (!account) return alert("请填写用户名或邮箱");
+        const btn = document.getElementById("sendResetCodeBtn");
+        try {
+          const res = await fetch("/user/send_reset_code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data.status !== "success") return alert(data.reason || "发送失败");
+          startCooldown(btn, 60);
+          alert(data.delivery === "dev-print" ? "验证码已打印到服务器控制台（本地调试）" : "验证码已发送");
+        } catch (e) {
+          alert("发送请求失败");
+        }
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", async () => {
+        const account = document.getElementById("reset-account").value.trim();
+        const password = document.getElementById("reset-password").value;
+        const password2 = document.getElementById("reset-password2").value;
+        const code = document.getElementById("reset-code").value.trim();
+        if (!account || !password || !password2 || !code) return alert("请填写完整信息");
+        if (password !== password2) return alert("两次密码不一致");
+        if (password.length < 6) return alert("密码至少 6 位");
+        try {
+          const res = await fetch("/user/reset_password_submit", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account, password, password2, code }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (await applyTokenResponse(data)) return;
+          alert("重设失败：" + (data.reason || "未知错误"));
+        } catch (e) {
+          alert("请求失败");
+        }
+      });
+
       await ClockTowerAuth.establishSessionFromStoredToken();
       const me = await fetchMe();
 

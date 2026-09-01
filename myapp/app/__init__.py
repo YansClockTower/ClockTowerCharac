@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, flash, g, request
 from flask_cors import CORS
 
 
@@ -6,6 +6,8 @@ def create_app():
     app = Flask(__name__, static_url_path='/static', static_folder='static')
     from .models.config import get_config
     from .identity.permissions import ensure_user_permission_schema
+    from .identity import get_current_user
+    from .user.membership import silent_verify_membership
     app.config["SECRET_KEY"] = get_config("secret_key")
     ensure_user_permission_schema()
 
@@ -41,6 +43,22 @@ def create_app():
     app.register_blueprint(events_bp)
     app.register_blueprint(boardgames_bp)
     app.register_blueprint(portal_bp)
+
+    @app.before_request
+    def _silent_membership_recheck():
+        if request.endpoint and (
+            request.endpoint.startswith("static")
+            or (request.endpoint or "").endswith(".static")
+            or request.path.startswith("/static")
+        ):
+            return
+        user = get_current_user(update_last_login=False)
+        if not user:
+            return
+        result = silent_verify_membership(user["name"])
+        if result == "granted" and not getattr(g, "_membership_flash_done", False):
+            flash("会员资质已通过验证。", "success")
+            g._membership_flash_done = True
 
     app.teardown_appcontext(close_events_db)
     app.teardown_appcontext(close_boardgames_db)

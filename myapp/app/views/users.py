@@ -10,6 +10,7 @@ import datetime
 from app.models.database import get_user_db
 from app.models.crypt import hash_password, verify_password
 from app.models.config import get_config
+from app.models.mailer import send_verification_code
 from app.identity import get_current_user, login_required_template, token_required
 from app.identity.auth import extract_auth_token, safe_redirect_target
 from app.identity.permissions import (
@@ -19,7 +20,11 @@ from app.identity.permissions import (
     ASSOCIATION_ROLE_COLUMN,
     ASSOCIATION_ROLE_VALUES,
     CONTACT_INFO_COLUMN,
+    EMAIL_COLUMN,
+    EMAIL_VERIFIED_COLUMN,
     MANAGE_ACCOUNT_PERMISSION,
+    MEMBER_ORDER_NO_COLUMN,
+    MEMBER_REVIEW_NOTE_COLUMN,
     SCRIPT_BITMAP_COLUMN,
     SOCIAL_ROLE_COLUMN,
     SOCIAL_ROLE_VALUES,
@@ -28,6 +33,22 @@ from app.identity.permissions import (
     enrich_user_permissions,
     ensure_user_permission_schema,
     permission_bitmap_descriptions,
+)
+from app.user.email_codes import (
+    bind_user_email,
+    consume_email_code,
+    create_email_code,
+    find_user_by_account,
+    find_user_by_email,
+    is_valid_email,
+    normalize_email,
+    user_email_verified,
+)
+from app.user.membership import (
+    silent_verify_membership,
+    submit_member_order,
+    user_is_member,
+    user_member_locked,
 )
 
 from app.models.usericon import save_user_icon, user_icon_url
@@ -50,18 +71,65 @@ def _is_temporary_user(user_row) -> bool:
     return password_hash is None or password_hash == ""
 
 
+def _row_get(user, key, default=None):
+    if not user:
+        return default
+    try:
+        if key in user.keys():
+            val = user[key]
+            return default if val is None else val
+    except Exception:
+        pass
+    return default
+
+
+def _issue_auth_response(user, extra=None):
+    token = jwt.encode(
+        {"user_id": user["id"], "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365)},
+        get_config("secret_key"),
+        algorithm="HS256",
+    )
+    if isinstance(token, bytes):
+        token = token.decode("ascii")
+    payload = {"status": "success", "id": user["id"], "token": token}
+    if extra:
+        payload.update(extra)
+    resp = make_response(jsonify(payload))
+    resp.set_cookie("token", token, httponly=True, samesite="Lax")
+    return resp
+
+
+def _json_body():
+    if request.is_json:
+        return request.get_json(silent=True) or {}
+    return {}
+
+
+def _req_val(*keys):
+    body = _json_body()
+    for key in keys:
+        v = request.form.get(key)
+        if v is None:
+            v = body.get(key)
+        if v is not None and str(v).strip() != "":
+            return v if not isinstance(v, str) else v.strip()
+    return None
+
+
 def _serialize_user_profile(user):
+    member_order = _row_get(user, MEMBER_ORDER_NO_COLUMN, "") or ""
+    email = _row_get(user, EMAIL_COLUMN, "") or ""
     return {
         "status": "success",
-        "username": user['name'],
-        "id": user['id'],
+        "username": user["name"],
+        "id": user["id"],
         "permission_manage_account": user[MANAGE_ACCOUNT_PERMISSION],
-        "permission_manage_accounts": user['permission_manage_accounts'],
-        "permission_manage_own_editions": user['permission_manage_own_editions'],
-        "permission_manage_all_editions": user['permission_manage_all_editions'],
-        "permission_manage_create_editions": user['permission_manage_create_editions'],
-        "permission_storyteller": user['permission_storyteller'],
-        "permission_storyteller_vocal": user['permission_storyteller_vocal'],
+        "permission_manage_accounts": user["permission_manage_accounts"],
+        "permission_manage_own_editions": user["permission_manage_own_editions"],
+        "permission_manage_all_editions": user["permission_manage_all_editions"],
+        "permission_manage_create_editions": user["permission_manage_create_editions"],
+        "permission_storyteller": user["permission_storyteller"],
+        "permission_storyteller_vocal": user["permission_storyteller_vocal"],
         SCRIPT_BITMAP_COLUMN: user[SCRIPT_BITMAP_COLUMN],
         LIGHTBOARD_BITMAP_COLUMN: user[LIGHTBOARD_BITMAP_COLUMN],
         ASSOCIATION_ROLE_COLUMN: user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
@@ -70,7 +138,14 @@ def _serialize_user_profile(user):
         ACTIVITY_ORGANIZED_COUNT_COLUMN: user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
         ACTIVITY_JOINED_COUNT_COLUMN: user.get(ACTIVITY_JOINED_COUNT_COLUMN, 0),
         ACTIVITY_ABSENT_COUNT_COLUMN: user.get(ACTIVITY_ABSENT_COUNT_COLUMN, 0),
-        "lastLogin": user['lastLogin'],
+        "email": email,
+        "email_verified": bool(_row_get(user, EMAIL_VERIFIED_COLUMN, 0)),
+        "member_order_no": member_order,
+        "member_review_note": _row_get(user, MEMBER_REVIEW_NOTE_COLUMN, "") or "",
+        "is_member": user_is_member(user),
+        "member_locked": user_member_locked(user),
+        "member_pending": bool(member_order) and not user_is_member(user),
+        "lastLogin": user["lastLogin"],
     }
 
 
@@ -78,9 +153,12 @@ def _serialize_user_profile(user):
 @users_bp.route("/")
 @login_required_template
 def user_page(user_info):
-    return render_template(
-            'view_user.html',user_info=user_info # 将从数据库获取的字典传递给前端模板
-    )
+    ensure_user_permission_schema()
+    user_db = get_user_db()
+    row = user_db.execute("SELECT * FROM user_info WHERE id=?", (user_info["id"],)).fetchone()
+    user_db.close()
+    profile = enrich_user_permissions(dict(row)) if row else user_info
+    return render_template("view_user.html", user_info=profile)
 
 
 @users_bp.route("/profile/<int:user_id>", methods=["GET"])
@@ -113,22 +191,36 @@ def user_login():
 
 @users_bp.route("/register_submit", methods=["POST"])
 def register():
-    username = request.form.get("username") or (request.json.get("username") if request.is_json else None)
-    password = request.form.get("password") or (request.json.get("password") if request.is_json else None)
+    username = _req_val("username")
+    password = _req_val("password")
+    email = normalize_email(_req_val("email") or "")
+    code = _req_val("code")
 
     if not username or not password:
         return jsonify({"status": "failed", "reason": "Missing username or password"})
+    if not email or not is_valid_email(email):
+        return jsonify({"status": "failed", "reason": "请填写有效邮箱"})
+    if not code:
+        return jsonify({"status": "failed", "reason": "请填写邮箱验证码"})
+    if len(password) < 6:
+        return jsonify({"status": "failed", "reason": "密码至少 6 位"})
 
     ensure_user_permission_schema()
+    if find_user_by_email(email):
+        return jsonify({"status": "failed", "reason": "该邮箱已被注册"})
+
+    if not consume_email_code(email, code, purpose="register"):
+        return jsonify({"status": "failed", "reason": "验证码无效或已过期"})
+
     user_db = get_user_db()
     existing_user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
 
     if existing_user and not _is_temporary_user(existing_user):
+        user_db.close()
         return jsonify({"status": "failed", "reason": "Username already exists"})
 
     hashed_pw = hash_password(password)
     if existing_user and _is_temporary_user(existing_user):
-        # 覆盖临时用户，但保留其活动统计数据。
         user_db.execute(
             f"""
             UPDATE user_info
@@ -142,28 +234,14 @@ def register():
                 {ASSOCIATION_ROLE_COLUMN} = '普通玩家',
                 {SOCIAL_ROLE_COLUMN} = '保密',
                 {CONTACT_INFO_COLUMN} = '保密',
+                {EMAIL_COLUMN} = ?,
+                {EMAIL_VERIFIED_COLUMN} = 1,
                 lastLogin = ?
             WHERE name = ?
             """,
-            (hashed_pw, "", "", datetime.datetime.utcnow(), username),
+            (hashed_pw, "", "", email, datetime.datetime.utcnow(), username),
         )
     else:
-        new_user = (
-            username,
-            hashed_pw,
-            "",
-            "",
-            False,
-            0,
-            0,
-            "普通玩家",
-            "保密",
-            "保密",
-            0,
-            0,
-            0,
-            datetime.datetime.utcnow(),
-        )
         user_db.execute(
             f"""INSERT INTO user_info
             (
@@ -180,21 +258,143 @@ def register():
                 {ACTIVITY_ORGANIZED_COUNT_COLUMN},
                 {ACTIVITY_JOINED_COUNT_COLUMN},
                 {ACTIVITY_ABSENT_COUNT_COLUMN},
+                {EMAIL_COLUMN},
+                {EMAIL_VERIFIED_COLUMN},
                 lastLogin
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            new_user,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                username,
+                hashed_pw,
+                "",
+                "",
+                False,
+                0,
+                0,
+                "普通玩家",
+                "保密",
+                "保密",
+                0,
+                0,
+                0,
+                email,
+                1,
+                datetime.datetime.utcnow(),
+            ),
         )
     user_db.commit()
+    user = user_db.execute("SELECT * FROM user_info WHERE name=?", (username,)).fetchone()
     user_db.close()
+    return _issue_auth_response(user)
 
-    return jsonify({"status": "success"})
+
+@users_bp.route("/send_code", methods=["POST"])
+def send_code():
+    email = normalize_email(_req_val("email") or "")
+    if not email or not is_valid_email(email):
+        return jsonify({"status": "failed", "reason": "请填写有效邮箱"})
+    if find_user_by_email(email):
+        return jsonify({"status": "failed", "reason": "该邮箱已被注册"})
+    code, err = create_email_code(email, purpose="register")
+    if err:
+        return jsonify({"status": "failed", "reason": err})
+    ok, detail = send_verification_code(email, code, purpose="register")
+    if not ok:
+        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
+    return jsonify({"status": "success", "delivery": detail})
+
+
+@users_bp.route("/send_reset_code", methods=["POST"])
+def send_reset_code():
+    account = _req_val("account", "username", "email") or ""
+    user = find_user_by_account(account)
+    if not user:
+        return jsonify({"status": "failed", "reason": "未找到该账号"})
+    if not user_email_verified(user):
+        return jsonify({"status": "failed", "reason": "尚未验证邮箱，无法重设密码"})
+    email = normalize_email(user["email"])
+    code, err = create_email_code(email, purpose="reset")
+    if err:
+        return jsonify({"status": "failed", "reason": err})
+    ok, detail = send_verification_code(email, code, purpose="reset")
+    if not ok:
+        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
+    return jsonify({"status": "success", "delivery": detail})
+
+
+@users_bp.route("/reset_password_submit", methods=["POST"])
+def reset_password_submit():
+    account = _req_val("account", "username", "email") or ""
+    code = _req_val("code") or ""
+    password = _req_val("password", "new_password") or ""
+    password2 = _req_val("password2", "new_password2")
+    if not account or not code or not password:
+        return jsonify({"status": "failed", "reason": "请填写完整信息"})
+    if len(password) < 6:
+        return jsonify({"status": "failed", "reason": "密码至少 6 位"})
+    if password2 is not None and password != password2:
+        return jsonify({"status": "failed", "reason": "两次密码不一致"})
+
+    user = find_user_by_account(account)
+    if not user:
+        return jsonify({"status": "failed", "reason": "未找到该账号"})
+    if not user_email_verified(user):
+        return jsonify({"status": "failed", "reason": "尚未验证邮箱，无法重设密码"})
+    email = normalize_email(user["email"])
+    if not consume_email_code(email, code, purpose="reset"):
+        return jsonify({"status": "failed", "reason": "验证码无效或已过期"})
+
+    ensure_user_permission_schema()
+    user_db = get_user_db()
+    user_db.execute(
+        "UPDATE user_info SET password_hash = ? WHERE id = ?",
+        (hash_password(password), user["id"]),
+    )
+    user_db.commit()
+    latest = user_db.execute("SELECT * FROM user_info WHERE id = ?", (user["id"],)).fetchone()
+    user_db.close()
+    return _issue_auth_response(latest)
+
+
+@users_bp.route("/send_bind_code", methods=["POST"])
+@token_required
+def send_bind_code(current_user):
+    email = normalize_email(_req_val("email") or "")
+    if not email or not is_valid_email(email):
+        return jsonify({"status": "failed", "reason": "请填写有效邮箱"})
+    other = find_user_by_email(email)
+    if other and other["id"] != current_user["id"]:
+        return jsonify({"status": "failed", "reason": "该邮箱已被其他账号使用"})
+    code, err = create_email_code(email, purpose="bind")
+    if err:
+        return jsonify({"status": "failed", "reason": err})
+    ok, detail = send_verification_code(email, code, purpose="bind")
+    if not ok:
+        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
+    return jsonify({"status": "success", "delivery": detail})
+
+
+@users_bp.route("/bind_email_submit", methods=["POST"])
+@token_required
+def bind_email_submit(current_user):
+    email = normalize_email(_req_val("email") or "")
+    code = _req_val("code") or ""
+    if not email or not is_valid_email(email):
+        return jsonify({"status": "failed", "reason": "请填写有效邮箱"})
+    if not code:
+        return jsonify({"status": "failed", "reason": "请填写验证码"})
+    if not consume_email_code(email, code, purpose="bind"):
+        return jsonify({"status": "failed", "reason": "验证码无效或已过期"})
+    ok, err = bind_user_email(current_user["name"], email)
+    if not ok:
+        return jsonify({"status": "failed", "reason": err or "绑定失败"})
+    return jsonify({"status": "success", "email": email, "email_verified": True})
 
 
 @users_bp.route("/login_submit", methods=["POST"])
 def login():
-    username = request.form.get("username") or (request.json.get("username") if request.is_json else None)
-    password = request.form.get("password") or (request.json.get("password") if request.is_json else None)
+    username = _req_val("username")
+    password = _req_val("password")
 
     if not username or not password:
         return jsonify({"status": "failed", "reason": "Missing username or password"})
@@ -205,24 +405,10 @@ def login():
 
     if not user or _is_temporary_user(user):
         return jsonify({"status": "failed", "reason": "用户不存在，请先注册"})
-    if not verify_password(user['password_hash'], password):
+    if not verify_password(user["password_hash"], password):
         return jsonify({"status": "failed", "reason": "密码有误"})
 
-    token = jwt.encode(
-        {"user_id": user['id'], "exp": datetime.datetime.utcnow() + datetime.timedelta(days=365)},
-        get_config('secret_key'),
-        algorithm="HS256",
-    )
-    if isinstance(token, bytes):
-        token = token.decode("ascii")
-
-    resp = make_response(jsonify({"status": "success", "id": user['id'], "token": token}))
-
-    # generate cookies
-    resp.set_cookie("token", token, httponly=True, samesite="Lax")
-
-    return resp
-
+    return _issue_auth_response(user)
 @users_bp.route("/logout", methods=["POST"])
 def logout():
     resp = make_response(jsonify({"status": "success"}))
@@ -247,41 +433,55 @@ def establish_session():
 @users_bp.route("/me", methods=["GET"])
 @token_required
 def me(current_user):  # 须 Cookie 或 Authorization: Bearer；前端请用 ClockTowerAuth.authFetch
-    secret_key = get_config('secret_key')
-    # 用户信息数据（不含签名）
-    user_data = {
-        "status": "success", 
-        "username": current_user['name'],
-        "id": current_user['id'],
-        "permission_manage_account": current_user[MANAGE_ACCOUNT_PERMISSION],
-        "permission_manage_accounts": current_user['permission_manage_accounts'],
-        "permission_manage_own_editions": current_user['permission_manage_own_editions'],
-        "permission_manage_all_editions": current_user['permission_manage_all_editions'],
-        "permission_manage_create_editions": current_user['permission_manage_create_editions'],
-        "permission_storyteller": current_user['permission_storyteller'],
-        "permission_storyteller_vocal": current_user['permission_storyteller_vocal'],
-        SCRIPT_BITMAP_COLUMN: current_user[SCRIPT_BITMAP_COLUMN],
-        LIGHTBOARD_BITMAP_COLUMN: current_user[LIGHTBOARD_BITMAP_COLUMN],
-        ASSOCIATION_ROLE_COLUMN: current_user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
-        SOCIAL_ROLE_COLUMN: current_user.get(SOCIAL_ROLE_COLUMN, "保密"),
-        CONTACT_INFO_COLUMN: current_user.get(CONTACT_INFO_COLUMN, "保密"),
-        ACTIVITY_ORGANIZED_COUNT_COLUMN: current_user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
-        ACTIVITY_JOINED_COUNT_COLUMN: current_user.get(ACTIVITY_JOINED_COUNT_COLUMN, 0),
-        ACTIVITY_ABSENT_COUNT_COLUMN: current_user.get(ACTIVITY_ABSENT_COUNT_COLUMN, 0),
-        "lastLogin": current_user['lastLogin']
-    }
+    ensure_user_permission_schema()
+    user_db = get_user_db()
+    row = user_db.execute("SELECT * FROM user_info WHERE id=?", (current_user["id"],)).fetchone()
+    user_db.close()
+    if not row:
+        return jsonify({"status": "failed", "reason": "User not found"}), 404
+    user = enrich_user_permissions(dict(row))
+    user_data = _serialize_user_profile(user)
 
-    # 序列化为字符串（确保顺序一致）
+    secret_key = get_config("secret_key")
     payload = json.dumps(user_data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    # 使用 HMAC-SHA256 生成签名
     signature = hmac.new(
-        secret_key.encode("utf-8"), 
-        payload.encode("utf-8"), 
-        hashlib.sha256
+        secret_key.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256,
     ).hexdigest()
-
-    # 返回带签名的数据
     return jsonify({**user_data, "signature": signature})
+
+
+@users_bp.route("/membership", methods=["GET", "POST"])
+@login_required_template
+def membership(user_info):
+    ensure_user_permission_schema()
+    if request.method == "POST":
+        order_no = request.form.get("order_no") or ""
+        ok, status, message = submit_member_order(user_info["name"], order_no)
+        flash(message, "success" if ok else "error")
+        if status == "granted":
+            flash("会员资质已通过验证。", "success")
+        return redirect(url_for("users.membership"))
+
+    user_db = get_user_db()
+    row = user_db.execute("SELECT * FROM user_info WHERE id=?", (user_info["id"],)).fetchone()
+    user_db.close()
+    profile = enrich_user_permissions(dict(row)) if row else user_info
+    return render_template(
+        "membership.html",
+        user=profile,
+        is_member=user_is_member(profile),
+        member_locked=user_member_locked(profile),
+        current_user=user_info["name"],
+    )
+
+
+@users_bp.route("/skip_email_prompt", methods=["POST"])
+@token_required
+def skip_email_prompt(_current_user):
+    """前端可用 localStorage；此接口返回成功以便兼容。"""
+    return jsonify({"status": "success"})
 
 
 @users_bp.route("/read_icon/<int:id>", methods=["GET"])

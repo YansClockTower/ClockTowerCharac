@@ -4,7 +4,7 @@
     "database_path_dev": "./database",
     "usericon_path": "/root/shares/usericon",
     "usericon_path_dev": "/Users/yanice/shares/usericon",
-    "secret_key": "yanicesno1",
+    "mail_from": "sjtu-bga@yanice.online",
     "permission_bitmap": {
         "script_subsystem": {
             "permission_manage_own_editions": 0,
@@ -21,4 +21,3 @@
         }
     }
 }
-

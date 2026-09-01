@@ -2,3 +2,8 @@ myapp/database/*
 jsons/
 *__pycache__
 __pycache__*
+.env
+myapp/.env
+myapp/secrets.txt
+**/wechat_qr_income.csv
+**/wechat_qr_income.json

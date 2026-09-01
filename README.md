@@ -28,3 +28,7 @@ sudo systemctl enable edition_app
 To Server:
 git push and pull.
 run makefile in your server.
+
+Secrets:
+Copy `myapp/secrets.example.txt` to `myapp/secrets.txt` and fill `secret_key` / `resend_api_key`.
+`secrets.txt` is gitignored; do not commit it.
