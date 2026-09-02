@@ -27,9 +27,9 @@
                 <select id="event_type" name="event_type" required>
                     {% set current_event_type = event.event_type or "其他" %}
                     {% for type_name in event_type_values %}
-                    {% if type_name != pigeon_event_type or current_user_is_admin or type_name == current_event_type %}
+                    {% if type_name != pigeon_event_type or current_user_is_staff or type_name == current_event_type %}
                     <option value="{{ type_name }}" {% if type_name == current_event_type %}selected{% endif %}
-                      {% if type_name == pigeon_event_type and not current_user_is_admin %}disabled{% endif %}>{{ type_name }}</option>
+                      {% if type_name == pigeon_event_type and not current_user_is_staff %}disabled{% endif %}>{{ type_name }}</option>
                     {% endif %}
                     {% endfor %}
                 </select>
@@ -39,9 +39,9 @@
                 <select id="location_select" name="location_select" required onchange="checkLocation(this)">
                     <option value="">-- 请选择地点 --</option>
                     {% for loc in preset_locations %}
-                    {% if loc != admin_only_location or current_user_is_admin or loc == event.location %}
+                    {% if loc != admin_only_location or current_user_is_staff or loc == event.location %}
                     <option value="{{ loc }}"
-                      {% if loc == admin_only_location and not current_user_is_admin %}disabled{% endif %}>{{ loc }}</option>
+                      {% if loc == admin_only_location and not current_user_is_staff %}disabled{% endif %}>{{ loc }}</option>
                     {% endif %}
                     {% endfor %}
                     <option value="其他（自己填写）">其他（自己填写）</option>

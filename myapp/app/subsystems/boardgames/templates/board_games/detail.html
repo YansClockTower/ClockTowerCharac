@@ -4,6 +4,9 @@
 <h1>{{ game.board_game_name }}</h1>
 <p class="toolbar">
   <a href="{{ url_for('boardgames.browse') }}">返回浏览</a>
+  {% if can_edit %}
+  · <a href="{{ url_for('boardgames.game_edit', game_id=game.id) }}">编辑信息</a>
+  {% endif %}
 </p>
 <div class="game-detail-layout">
   <div class="game-detail-image">

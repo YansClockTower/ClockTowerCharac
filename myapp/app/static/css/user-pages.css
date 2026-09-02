@@ -5,6 +5,7 @@ body.user-page {
 }
 
 body.user-page .card button,
+body.user-page .card input:not([type]),
 body.user-page .card input[type="text"],
 body.user-page .card input[type="email"],
 body.user-page .card input[type="password"],
@@ -94,6 +95,19 @@ body.user-page .card--wide {
 .nav-row a:hover {
   background: var(--color-bg-muted);
   text-decoration: none;
+}
+
+.auth-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35em;
+  flex-wrap: wrap;
+}
+
+.auth-links-sep {
+  color: var(--color-text-muted);
+  user-select: none;
 }
 
 body.user-page.edit-user-page .card {

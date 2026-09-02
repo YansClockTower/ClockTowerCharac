@@ -1,8 +1,7 @@
 /**
- * 已登录且邮箱未验证时，弹窗建议绑定邮箱（可跳过，localStorage 标记）。
+ * 已登录且邮箱未绑定/未验证时，在主页与活动列表弹窗建议绑定邮箱（每次进入均提示）。
  */
 (function (global) {
-  const SKIP_KEY = "clocktower_skip_email_prompt";
   const VERIFY_URL = "/user/verify_email";
 
   function ensureStyles() {
@@ -18,7 +17,7 @@
         <h3 id="email-bind-prompt-title">建议绑定邮箱</h3>
         <p>绑定并验证邮箱后，可用于登录与找回密码。</p>
         <div class="email-bind-prompt-actions">
-          <button type="button" class="email-bind-prompt-secondary" data-action="skip">暂时忽略</button>
+          <button type="button" class="email-bind-prompt-secondary" data-action="dismiss">稍后再说</button>
           <button type="button" class="email-bind-prompt-primary" data-action="go">前往绑定</button>
         </div>
       </div>
@@ -36,15 +35,7 @@
       global.location.href = VERIFY_URL;
     });
 
-    backdrop.querySelector('[data-action="skip"]').addEventListener("click", async () => {
-      try {
-        localStorage.setItem(SKIP_KEY, "1");
-      } catch (e) {}
-      if (global.ClockTowerAuth) {
-        try {
-          await global.ClockTowerAuth.authFetch("/user/skip_email_prompt", { method: "POST" });
-        } catch (e) {}
-      }
+    backdrop.querySelector('[data-action="dismiss"]').addEventListener("click", () => {
       close();
     });
 
@@ -66,19 +57,24 @@
     }
   }
 
+  function needsEmailBind(me) {
+    if (!me || !me.username) return false;
+    if (!me.email) return true;
+    return !me.email_verified;
+  }
+
   async function maybePromptBindEmail() {
     try {
-      if (localStorage.getItem(SKIP_KEY)) return;
+      localStorage.removeItem("clocktower_skip_email_prompt");
     } catch (e) {}
     const me = await fetchMe();
-    if (!me || !me.username) return;
-    if (me.email_verified) return;
+    if (!needsEmailBind(me)) return;
     showModal();
   }
 
   global.ClockTowerEmailPrompt = {
-    SKIP_KEY,
     maybePromptBindEmail,
+    needsEmailBind,
   };
 
   document.addEventListener("DOMContentLoaded", maybePromptBindEmail);

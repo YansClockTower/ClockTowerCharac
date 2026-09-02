@@ -87,6 +87,7 @@ ASSOCIATION_ROLE_RANK = {
     "管理员": 4,
 }
 MEMBER_RANK = ASSOCIATION_ROLE_RANK["协会玩家"]
+STAFF_RANK = ASSOCIATION_ROLE_RANK["干事"]
 ADMIN_RANK = ASSOCIATION_ROLE_RANK["管理员"]
 
 
@@ -106,6 +107,11 @@ def association_role_rank(user) -> int:
 def user_is_admin(user) -> bool:
     """管理员：association_rank == 4。"""
     return association_role_rank(user) == ADMIN_RANK
+
+
+def user_is_staff(user) -> bool:
+    """干事及以上（association_rank >= 3），含布鸽活动发布/活动室权限。"""
+    return association_role_rank(user) >= STAFF_RANK
 
 
 def _legacy_storyteller_from_row(row: Mapping[str, object], bitmap: int) -> bool:

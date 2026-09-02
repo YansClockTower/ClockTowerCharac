@@ -15,9 +15,12 @@ BROWSE_BOOKMARK_PIGEON_EVENT_TYPE = "布鸽桌游活动"
 
 MEMBER_ONLY_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
 
-# 仅管理员可选用的活动类型 / 地点
-ADMIN_ONLY_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
-ADMIN_ONLY_LOCATION = "南体活动室(布鸽专用)"
+# 仅干事及以上可选用的活动类型 / 地点（association_rank >= 3）
+STAFF_PRIVILEGE_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
+STAFF_ONLY_LOCATION = "南体活动室(布鸽专用)"
+# 兼容旧名
+ADMIN_ONLY_EVENT_TYPES = STAFF_PRIVILEGE_EVENT_TYPES
+ADMIN_ONLY_LOCATION = STAFF_ONLY_LOCATION
 PRESET_LOCATIONS = (
     "交大紫矜街(博雅厅)",
     "交大玉兰苑",
@@ -33,11 +36,12 @@ def event_requires_membership(event_type: str) -> bool:
     return (event_type or "其他") in MEMBER_ONLY_EVENT_TYPES
 
 
-def event_requires_admin(event_type: str, location: str) -> bool:
-    """布鸽桌游活动类型，或南体活动室(布鸽专用)地点，仅管理员可发布/编辑。"""
-    if (event_type or "其他") in ADMIN_ONLY_EVENT_TYPES:
+def event_requires_staff_privilege(event_type: str, location: str) -> bool:
+    """布鸽桌游活动类型，或南体活动室(布鸽专用)地点，需干事及以上身份。"""
+    if (event_type or "其他") in STAFF_PRIVILEGE_EVENT_TYPES:
         return True
-    return (location or "").strip() == ADMIN_ONLY_LOCATION
+    return (location or "").strip() == STAFF_ONLY_LOCATION
+
 
 # signcode 置为该值表示活动已归档（结束），不再允许报名/编辑等操作
 ARCHIVED_SIGNCODE = "0"

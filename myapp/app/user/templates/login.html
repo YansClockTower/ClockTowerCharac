@@ -15,39 +15,43 @@
       <div id="auth-forms">
         <div id="login-panel" class="panel active">
           <h3>登录</h3>
-          <input id="login-username" placeholder="用户名或邮箱" />
+          <input id="login-username" type="text" placeholder="用户名或邮箱" />
           <input id="login-password" type="password" placeholder="密码" />
           <button id="loginBtn">登录</button>
-          <p class="center"><button type="button" class="linkish" id="showResetBtn">忘记密码？</button></p>
+          <p class="center auth-links">
+            <button type="button" class="linkish" id="showRegisterBtn">前往注册</button>
+            <span class="auth-links-sep" aria-hidden="true">·</span>
+            <button type="button" class="linkish" id="showResetBtn">忘记密码？</button>
+          </p>
         </div>
 
         <div id="reset-panel" class="panel">
           <h3>重设密码</h3>
           <p class="hint">填写用户名或已验证邮箱，验证码将发到绑定邮箱。</p>
-          <input id="reset-account" placeholder="用户名或邮箱" />
+          <input id="reset-account" type="text" placeholder="用户名或邮箱" />
           <input id="reset-password" type="password" placeholder="新密码（至少 6 位）" />
           <input id="reset-password2" type="password" placeholder="确认新密码" />
           <div class="row">
-            <input id="reset-code" placeholder="邮箱验证码" />
+            <input id="reset-code" type="text" placeholder="邮箱验证码" autocomplete="one-time-code" />
             <button type="button" id="sendResetCodeBtn">发送验证码</button>
           </div>
           <button id="resetBtn">确认重设并登录</button>
           <p class="center"><button type="button" class="linkish" id="backToLoginBtn">返回登录</button></p>
         </div>
 
-        <div class="spacer"></div>
-        <div id="register-panel" class="panel active">
+        <div id="register-panel" class="panel">
           <h3>注册</h3>
-          <input id="reg-username" placeholder="用户名" />
+          <input id="reg-username" type="text" placeholder="用户名" autocomplete="username" />
           <input id="reg-email" type="email" placeholder="邮箱" />
           <p class="hint">验证码将发到上述邮箱；如未收到，请留意垃圾邮件。</p>
           <input id="reg-password" type="password" placeholder="密码（至少 6 位）" />
           <input id="reg-password2" type="password" placeholder="确认密码" />
           <div class="row">
-            <input id="reg-code" placeholder="邮箱验证码" />
+            <input id="reg-code" type="text" placeholder="邮箱验证码" autocomplete="one-time-code" />
             <button type="button" id="sendRegCodeBtn">发送验证码</button>
           </div>
           <button id="registerBtn">注册</button>
+          <p class="center"><button type="button" class="linkish" id="showLoginFromRegisterBtn">已有账号？点击登录</button></p>
         </div>
       </div>
       <p id="loading-msg" class="center">正在检查登录状态...</p>
@@ -166,16 +170,16 @@
       const resetPanel = document.getElementById("reset-panel");
       const registerPanel = document.getElementById("register-panel");
 
-      document.getElementById("showResetBtn").addEventListener("click", () => {
-        loginPanel.classList.remove("active");
-        registerPanel.classList.remove("active");
-        resetPanel.classList.add("active");
-      });
-      document.getElementById("backToLoginBtn").addEventListener("click", () => {
-        resetPanel.classList.remove("active");
-        loginPanel.classList.add("active");
-        registerPanel.classList.add("active");
-      });
+      function showAuthPanel(name) {
+        loginPanel.classList.toggle("active", name === "login");
+        resetPanel.classList.toggle("active", name === "reset");
+        registerPanel.classList.toggle("active", name === "register");
+      }
+
+      document.getElementById("showRegisterBtn").addEventListener("click", () => showAuthPanel("register"));
+      document.getElementById("showResetBtn").addEventListener("click", () => showAuthPanel("reset"));
+      document.getElementById("backToLoginBtn").addEventListener("click", () => showAuthPanel("login"));
+      document.getElementById("showLoginFromRegisterBtn").addEventListener("click", () => showAuthPanel("login"));
 
       document.getElementById("sendRegCodeBtn").addEventListener("click", async () => {
         const email = document.getElementById("reg-email").value.trim();

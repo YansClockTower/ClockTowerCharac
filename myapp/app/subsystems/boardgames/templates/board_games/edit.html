@@ -1,0 +1,50 @@
+{% extends "board_games/base.html" %}
+{% block title %}编辑：{{ game.board_game_name }}{% endblock %}
+{% block content %}
+<h1>编辑桌游信息</h1>
+<p class="toolbar">
+  <a href="{{ url_for('boardgames.game_detail', game_id=game.id) }}">返回详情</a>
+  ·
+  <a href="{{ url_for('boardgames.browse') }}">返回浏览</a>
+</p>
+
+<form method="post" class="game-form" id="boardGameEditForm">
+  <label>桌游名称 <span class="req">*</span>
+    <input type="text" name="board_game_name" required value="{{ form_data.get('board_game_name', '') }}">
+  </label>
+  <label>桌游类型
+    <input type="text" name="game_type" value="{{ form_data.get('game_type', '') }}">
+  </label>
+  <label>最少人数
+    <input type="number" name="min_players" min="0" value="{{ form_data.get('min_players', '') }}">
+  </label>
+  <label>最多人数
+    <input type="number" name="max_players" min="0" value="{{ form_data.get('max_players', '') }}">
+  </label>
+  <label>推荐人数
+    <input type="number" name="recommended_players" min="0" value="{{ form_data.get('recommended_players', '') }}">
+  </label>
+  <label>游戏时长（分钟）
+    <input type="number" name="playing_time" min="0" value="{{ form_data.get('playing_time', '') }}">
+  </label>
+  <label>描述
+    <textarea name="description" rows="4">{{ form_data.get('description', '') }}</textarea>
+  </label>
+  <label>图片路径或 URL
+    <input type="text" name="image_path" placeholder="https://... 或 static 下相对路径" value="{{ form_data.get('image_path', '') }}">
+  </label>
+  <label>所有者 <span class="req">*</span>
+    <input type="text" name="owner" required value="{{ form_data.get('owner', '') }}">
+  </label>
+  <label>目前使用者
+    <input type="text" name="current_holder" value="{{ form_data.get('current_holder', '') }}">
+  </label>
+  <label>目前存放地点
+    <input type="text" name="current_storage_location" value="{{ form_data.get('current_storage_location', '') }}">
+  </label>
+  <p>
+    <button type="submit" class="btn btn-primary">保存修改</button>
+    <a class="btn btn-secondary" href="{{ url_for('boardgames.game_detail', game_id=game.id) }}">取消</a>
+  </p>
+</form>
+{% endblock %}

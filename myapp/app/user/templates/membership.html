@@ -44,7 +44,7 @@
       {% endif %}
       <form method="POST" action="{{ url_for('users.membership') }}">
         <label for="order_no">更换支付单号</label>
-        <input id="order_no" name="order_no" value="{{ user.member_order_no }}" autocomplete="off" placeholder="从微信支付账单详情复制支付单号">
+        <input type="text" id="order_no" name="order_no" value="{{ user.member_order_no }}" autocomplete="off" placeholder="从微信支付账单详情复制支付单号">
         <button type="submit">重新提交</button>
       </form>
     {% else %}
@@ -54,7 +54,7 @@
       {% endif %}
       <form method="POST" action="{{ url_for('users.membership') }}">
         <label for="order_no">支付单号</label>
-        <input id="order_no" name="order_no" autocomplete="off" placeholder="从微信支付账单详情复制支付单号">
+        <input type="text" id="order_no" name="order_no" autocomplete="off" placeholder="从微信支付账单详情复制支付单号">
         <button type="submit">提交验证</button>
       </form>
     {% endif %}

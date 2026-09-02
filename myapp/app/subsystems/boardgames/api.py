@@ -75,3 +75,55 @@ def create_registered_game(
     )
     db.commit()
     return int(cur.lastrowid)
+
+
+def update_registered_game(
+    game_id: int,
+    *,
+    board_game_name: str,
+    game_type: Optional[str],
+    min_players: Optional[int],
+    max_players: Optional[int],
+    recommended_players: Optional[int],
+    playing_time: Optional[int],
+    description: Optional[str],
+    image_path: Optional[str],
+    owner: str,
+    current_holder: Optional[str],
+    current_storage_location: Optional[str],
+) -> bool:
+    db = get_db()
+    playing_val = str(playing_time) if playing_time is not None else None
+    cur = db.execute(
+        """
+        UPDATE registered_board_games
+        SET board_game_name = ?,
+            game_type = ?,
+            min_players = ?,
+            max_players = ?,
+            recommended_players = ?,
+            playing_time = ?,
+            description = ?,
+            image_path = ?,
+            owner = ?,
+            current_holder = ?,
+            current_storage_location = ?
+        WHERE id = ?
+        """,
+        (
+            board_game_name,
+            game_type,
+            min_players,
+            max_players,
+            recommended_players,
+            playing_val,
+            description,
+            image_path,
+            owner,
+            current_holder,
+            current_storage_location,
+            game_id,
+        ),
+    )
+    db.commit()
+    return cur.rowcount > 0

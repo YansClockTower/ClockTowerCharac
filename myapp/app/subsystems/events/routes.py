@@ -13,6 +13,8 @@ from app.identity.permissions import (
     SCRIPT_BITMAP_COLUMN,
     SOCIAL_ROLE_COLUMN,
     ensure_user_permission_schema,
+    user_is_admin,
+    user_is_staff,
 )
 from app.models.database import get_user_db
 from app.subsystems.events.attendee_ids import enrich_events_attendees_user_ids
@@ -26,7 +28,7 @@ from app.subsystems.events.dbutil import (
     count_browse_events,
     create_event,
     delete_event,
-    event_requires_admin,
+    event_requires_staff_privilege,
     event_requires_membership,
     get_browse_events_page,
     get_event_attendance_records,
@@ -63,7 +65,11 @@ def _event_can_be_ended(event, attendee_count):
 
 
 def _is_admin(user_info) -> bool:
-    return user_info.get("association_role") == "管理员"
+    return user_is_admin(user_info)
+
+
+def _is_staff(user_info) -> bool:
+    return user_is_staff(user_info)
 
 
 def _render_add_event(user_info, selected_event_type="其他"):
@@ -71,6 +77,7 @@ def _render_add_event(user_info, selected_event_type="其他"):
         "add.html",
         current_user=user_info["name"],
         current_user_is_admin=_is_admin(user_info),
+        current_user_is_staff=_is_staff(user_info),
         event_type_values=EVENT_TYPE_VALUES,
         preset_locations=PRESET_LOCATIONS,
         admin_only_location=ADMIN_ONLY_LOCATION,
@@ -85,6 +92,7 @@ def _render_edit_event(event, user_info):
         event=event,
         current_user=user_info["name"],
         current_user_is_admin=_is_admin(user_info),
+        current_user_is_staff=_is_staff(user_info),
         event_type_values=EVENT_TYPE_VALUES,
         preset_locations=PRESET_LOCATIONS,
         admin_only_location=ADMIN_ONLY_LOCATION,
@@ -92,12 +100,12 @@ def _render_edit_event(event, user_info):
     )
 
 
-def _reject_non_admin_restricted(user_info, event_type, location):
-    """非管理员选用布鸽类型或南体活动室时返回错误文案，否则 None。"""
-    if _is_admin(user_info):
+def _reject_non_staff_restricted(user_info, event_type, location):
+    """非干事及以上选用布鸽类型或南体活动室时返回错误文案，否则 None。"""
+    if _is_staff(user_info):
         return None
-    if event_requires_admin(event_type, location):
-        return "仅管理员可发布「布鸽桌游活动」或地点为「南体活动室(布鸽专用)」的活动。"
+    if event_requires_staff_privilege(event_type, location):
+        return "仅干事及以上可发布「布鸽桌游活动」或地点为「南体活动室(布鸽专用)」的活动。"
     return None
 
 
@@ -164,7 +172,7 @@ def _browse_filters_from_request():
 @login_required_template
 def browse_events(user_info):
     current_user = user_info["name"]
-    current_user_is_admin = user_info.get("association_role") == "管理员"
+    current_user_is_admin = user_is_admin(user_info)
     current_user_is_member = user_is_member(user_info)
     browse_tab, browse_filters = _browse_filters_from_request()
     events_total = count_browse_events(current_user, browse_filters)
@@ -195,7 +203,7 @@ def browse_events(user_info):
 def browse_events_more(user_info):
     """分页追加活动卡片 HTML 片段（JSON）。"""
     current_user = user_info["name"]
-    current_user_is_admin = user_info.get("association_role") == "管理员"
+    current_user_is_admin = user_is_admin(user_info)
     current_user_is_member = user_is_member(user_info)
     browse_tab, browse_filters = _browse_tab_and_filters_for_tab(request.args.get("tab"))
     try:
@@ -346,7 +354,7 @@ def add_event_route(user_info):
             return _render_add_event(user_info, event_type)
 
         location = (request.form.get("location") or "").strip()
-        deny = _reject_non_admin_restricted(user_info, event_type, location)
+        deny = _reject_non_staff_restricted(user_info, event_type, location)
         if deny:
             flash(deny, "error")
             return _render_add_event(user_info, event_type)
@@ -399,7 +407,7 @@ def edit_event_route(user_info, event_id):
             return _render_edit_event(event, user_info)
 
         location = (request.form.get("location") or "").strip()
-        deny = _reject_non_admin_restricted(user_info, event_type, location)
+        deny = _reject_non_staff_restricted(user_info, event_type, location)
         if deny:
             flash(deny, "error")
             return _render_edit_event(event, user_info)
@@ -431,7 +439,7 @@ def archive_event_route(user_info, event_id):
     ensure_user_permission_schema()
     event = get_event_by_id(event_id)
     current_user = user_info["name"]
-    current_user_is_admin = user_info.get("association_role") == "管理员"
+    current_user_is_admin = user_is_admin(user_info)
     if event is None or (not current_user_is_admin and event["inviter"] != current_user):
         flash("您无权归档此活动或活动不存在。", "error")
         return redirect(url_for("events.browse_events"))
