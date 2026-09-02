@@ -7,17 +7,14 @@
     "mail_from": "sjtu-bga@yanice.online",
     "permission_bitmap": {
         "script_subsystem": {
-            "permission_manage_own_editions": 0,
-            "permission_manage_all_editions": 1,
-            "permission_manage_create_editions": 2,
-            "permission_storyteller": 3,
-            "permission_storyteller_vocal": 4
-        },
-        "lightboard_subsystem": {
-            "permission_create_official_event": 0,
-            "permission_manage_all_event": 1,
-            "permission_borrow_games": 2,
-            "permission_manage_games": 3
+            "permission_storyteller": 0,
+            "permission_botc_edition_author": 1,
+            "permission_trpg_dm": 2,
+            "permission_trpg_module_author": 3,
+            "permission_create_official_event": 4,
+            "permission_manage_all_event": 5,
+            "permission_borrow_games": 6,
+            "permission_manage_games": 7
         }
     }
 }

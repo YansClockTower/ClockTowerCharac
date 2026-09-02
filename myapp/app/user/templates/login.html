@@ -182,12 +182,11 @@
         if (!email) return alert("请先填写邮箱");
         const btn = document.getElementById("sendRegCodeBtn");
         try {
-          const res = await fetch("/user/send_code", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          });
-          const data = await res.json().catch(() => ({}));
+          const { cancelled, data } = await ClockTowerAuth.requestVerificationCode(
+            "/user/send_code",
+            { email }
+          );
+          if (cancelled) return;
           if (data.status !== "success") return alert(data.reason || "发送失败");
           startCooldown(btn, 60);
           alert(data.delivery === "dev-print" ? "验证码已打印到服务器控制台（本地调试）" : "验证码已发送，若未收到，请留意垃圾邮件");
@@ -201,12 +200,11 @@
         if (!account) return alert("请填写用户名或邮箱");
         const btn = document.getElementById("sendResetCodeBtn");
         try {
-          const res = await fetch("/user/send_reset_code", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ account }),
-          });
-          const data = await res.json().catch(() => ({}));
+          const { cancelled, data } = await ClockTowerAuth.requestVerificationCode(
+            "/user/send_reset_code",
+            { account }
+          );
+          if (cancelled) return;
           if (data.status !== "success") return alert(data.reason || "发送失败");
           startCooldown(btn, 60);
           alert(data.delivery === "dev-print" ? "验证码已打印到服务器控制台（本地调试）" : "验证码已发送，若未收到，请留意垃圾邮件");

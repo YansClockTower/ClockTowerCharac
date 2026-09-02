@@ -7,6 +7,9 @@ from typing import Optional, Tuple
 from app.identity.permissions import (
     ASSOCIATION_ROLE_COLUMN,
     ASSOCIATION_ROLE_RANK,
+    MEMBER_RANK,
+    association_role_of,
+    association_role_rank,
     MEMBER_ORDER_NO_COLUMN,
     MEMBER_REVIEW_NOTE_COLUMN,
     ensure_user_permission_schema,
@@ -34,14 +37,9 @@ def _row_get(user, key, default=None):
     return default
 
 
-def association_role_of(user) -> str:
-    role = _row_get(user, ASSOCIATION_ROLE_COLUMN, "普通玩家") or "普通玩家"
-    return role if role in ASSOCIATION_ROLE_RANK else "普通玩家"
-
-
 def user_is_member(user) -> bool:
-    """协会玩家及以上视为会员（用于展示与锁凭证）。"""
-    return ASSOCIATION_ROLE_RANK.get(association_role_of(user), 0) >= ASSOCIATION_ROLE_RANK[MEMBER_ROLE]
+    """协会玩家及以上视为会员（association_rank >= 1）。"""
+    return association_role_rank(user) >= MEMBER_RANK
 
 
 def user_member_locked(user) -> bool:

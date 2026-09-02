@@ -26,12 +26,11 @@
     <details>
       <summary>权限概览</summary>
       <table class="permissions-table">
-        <tr><td>用户权限管理</td><td>{{ '✅ 是' if profile.permission_manage_accounts else '❌ 否' }}</td></tr>
-        <tr><td>个人剧本管理</td><td>{{ '✅ 是' if profile.permission_manage_own_editions else '❌ 否' }}</td></tr>
-        <tr><td>全部剧本管理</td><td>{{ '✅ 是' if profile.permission_manage_all_editions else '❌ 否' }}</td></tr>
-        <tr><td>剧本导入与创建</td><td>{{ '✅ 是' if profile.permission_manage_create_editions else '❌ 否' }}</td></tr>
-        <tr><td>魔典说书人</td><td>{{ '✅ 是' if profile.permission_storyteller else '❌ 否' }}</td></tr>
-        <tr><td>语音说书人</td><td>{{ '✅ 是' if profile.permission_storyteller_vocal else '❌ 否' }}</td></tr>
+        <tr><td>账户管理（管理员）</td><td>{{ '✅ 是' if (profile.association_rank | default(0)) == 4 else '❌ 否' }}</td></tr>
+        <tr><td>说书人</td><td>{{ '✅ 是' if profile.permission_storyteller else '❌ 否' }}</td></tr>
+        <tr><td>《染》剧本作者</td><td>{{ '✅ 是' if profile.permission_botc_edition_author else '❌ 否' }}</td></tr>
+        <tr><td>跑团 DM</td><td>{{ '✅ 是' if profile.permission_trpg_dm else '❌ 否' }}</td></tr>
+        <tr><td>跑团模组作者</td><td>{{ '✅ 是' if profile.permission_trpg_module_author else '❌ 否' }}</td></tr>
       </table>
     </details>
     <div class="nav-row">

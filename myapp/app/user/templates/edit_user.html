@@ -16,12 +16,11 @@
 
     <fieldset>
       <legend>权限设置</legend>
-      <label><input type="checkbox" id="perm_manage_accounts"> 管理账户(编辑其他账户的权限)</label>
-      <label><input type="checkbox" id="perm_manage_own_editions"> 管理自己的剧本(暂未实现)</label>
-      <label><input type="checkbox" id="perm_manage_all_editions"> 管理所有剧本(编辑角色、剧本信息)</label>
-      <label><input type="checkbox" id="perm_manage_create_editions"> 创建剧本(导入剧本json)</label>
-      <label><input type="checkbox" id="perm_storyteller"> 说书人(魔典创建房间、下载json)</label>
-      <label><input type="checkbox" id="perm_storyteller_vocal"> 在线说书人(魔典创建内置语音房间)</label>
+      <label><input type="checkbox" id="perm_storyteller"> 说书人（魔典创建房间、下载 json 等）</label>
+      <label><input type="checkbox" id="perm_botc_edition_author"> 《染》剧本作者（导入/编辑剧本）</label>
+      <label><input type="checkbox" id="perm_trpg_dm"> 跑团 DM</label>
+      <label><input type="checkbox" id="perm_trpg_module_author"> 跑团模组作者</label>
+      <p class="hint">账户管理权限随「管理员」协会身份自动授予，无需单独勾选。</p>
     </fieldset>
     <fieldset>
       <legend>协会身份</legend>
@@ -30,6 +29,7 @@
         <option value="普通玩家">普通玩家</option>
         <option value="协会玩家">协会玩家</option>
         <option value="核心玩家">核心玩家</option>
+        <option value="干事">干事</option>
         <option value="管理员">管理员</option>
       </select>
     </fieldset>
@@ -52,12 +52,11 @@
         <tr><td>组织活动次数</td><td id="profile_activity_organized_count">0</td></tr>
         <tr><td>参与活动次数</td><td id="profile_activity_joined_count">0</td></tr>
         <tr><td>缺席活动次数</td><td id="profile_activity_absent_count">0</td></tr>
-        <tr><td>用户权限管理</td><td id="profile_permission_manage_accounts">❌ 否</td></tr>
-        <tr><td>个人剧本管理</td><td id="profile_permission_manage_own_editions">❌ 否</td></tr>
-        <tr><td>全部剧本管理</td><td id="profile_permission_manage_all_editions">❌ 否</td></tr>
-        <tr><td>剧本导入与创建</td><td id="profile_permission_manage_create_editions">❌ 否</td></tr>
-        <tr><td>魔典说书人</td><td id="profile_permission_storyteller">❌ 否</td></tr>
-        <tr><td>语音说书人</td><td id="profile_permission_storyteller_vocal">❌ 否</td></tr>
+        <tr><td>账户管理（管理员）</td><td id="profile_is_admin">❌ 否</td></tr>
+        <tr><td>说书人</td><td id="profile_permission_storyteller">❌ 否</td></tr>
+        <tr><td>《染》剧本作者</td><td id="profile_permission_botc_edition_author">❌ 否</td></tr>
+        <tr><td>跑团 DM</td><td id="profile_permission_trpg_dm">❌ 否</td></tr>
+        <tr><td>跑团模组作者</td><td id="profile_permission_trpg_module_author">❌ 否</td></tr>
       </table>
     </div>
   </div>
@@ -83,12 +82,11 @@
       document.getElementById("profile_activity_organized_count").textContent = data.activity_organized_count ?? 0;
       document.getElementById("profile_activity_joined_count").textContent = data.activity_joined_count ?? 0;
       document.getElementById("profile_activity_absent_count").textContent = data.activity_absent_count ?? 0;
-      document.getElementById("profile_permission_manage_accounts").textContent = toYesNo(!!data.permission_manage_accounts);
-      document.getElementById("profile_permission_manage_own_editions").textContent = toYesNo(!!data.permission_manage_own_editions);
-      document.getElementById("profile_permission_manage_all_editions").textContent = toYesNo(!!data.permission_manage_all_editions);
-      document.getElementById("profile_permission_manage_create_editions").textContent = toYesNo(!!data.permission_manage_create_editions);
+      document.getElementById("profile_is_admin").textContent = toYesNo((data.association_rank ?? 0) === 4);
       document.getElementById("profile_permission_storyteller").textContent = toYesNo(!!data.permission_storyteller);
-      document.getElementById("profile_permission_storyteller_vocal").textContent = toYesNo(!!data.permission_storyteller_vocal);
+      document.getElementById("profile_permission_botc_edition_author").textContent = toYesNo(!!data.permission_botc_edition_author);
+      document.getElementById("profile_permission_trpg_dm").textContent = toYesNo(!!data.permission_trpg_dm);
+      document.getElementById("profile_permission_trpg_module_author").textContent = toYesNo(!!data.permission_trpg_module_author);
     }
 
     document.getElementById("saveBtn").onclick = async () => {
@@ -100,12 +98,10 @@
 
       const payload = {
         username: username,
-        permission_manage_accounts: document.getElementById("perm_manage_accounts").checked ? 1 : 0,
-        permission_manage_own_editions: document.getElementById("perm_manage_own_editions").checked ? 1 : 0,
-        permission_manage_all_editions: document.getElementById("perm_manage_all_editions").checked ? 1 : 0,
-        permission_manage_create_editions: document.getElementById("perm_manage_create_editions").checked ? 1 : 0,
         permission_storyteller: document.getElementById("perm_storyteller").checked ? 1 : 0,
-        permission_storyteller_vocal: document.getElementById("perm_storyteller_vocal").checked ? 1 : 0,
+        permission_botc_edition_author: document.getElementById("perm_botc_edition_author").checked ? 1 : 0,
+        permission_trpg_dm: document.getElementById("perm_trpg_dm").checked ? 1 : 0,
+        permission_trpg_module_author: document.getElementById("perm_trpg_module_author").checked ? 1 : 0,
       };
 
       try {
@@ -170,6 +166,11 @@
         const data = await res.json();
         if (data.status === "success") {
           renderProfile(data);
+          document.getElementById("perm_storyteller").checked = !!data.permission_storyteller;
+          document.getElementById("perm_botc_edition_author").checked = !!data.permission_botc_edition_author;
+          document.getElementById("perm_trpg_dm").checked = !!data.permission_trpg_dm;
+          document.getElementById("perm_trpg_module_author").checked = !!data.permission_trpg_module_author;
+          document.getElementById("association_role").value = data.association_role || "普通玩家";
           setStatus(true, "✅ 档案读取成功");
         } else {
           setStatus(false, "❌ 读取失败：" + (data.reason || "未知错误"));

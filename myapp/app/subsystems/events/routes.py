@@ -9,7 +9,6 @@ from app.identity.permissions import (
     ACTIVITY_ORGANIZED_COUNT_COLUMN,
     ASSOCIATION_ROLE_COLUMN,
     CONTACT_INFO_COLUMN,
-    LIGHTBOARD_BITMAP_COLUMN,
     MANAGE_ACCOUNT_PERMISSION,
     SCRIPT_BITMAP_COLUMN,
     SOCIAL_ROLE_COLUMN,
@@ -115,7 +114,6 @@ def _ensure_temporary_user(user_db, username):
             title,
             {MANAGE_ACCOUNT_PERMISSION},
             {SCRIPT_BITMAP_COLUMN},
-            {LIGHTBOARD_BITMAP_COLUMN},
             {ASSOCIATION_ROLE_COLUMN},
             {SOCIAL_ROLE_COLUMN},
             {CONTACT_INFO_COLUMN},
@@ -123,14 +121,13 @@ def _ensure_temporary_user(user_db, username):
             {ACTIVITY_JOINED_COUNT_COLUMN},
             {ACTIVITY_ABSENT_COUNT_COLUMN},
             lastLogin
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             username,
             "",
             "",
             "",
-            0,
             0,
             0,
             "普通玩家",

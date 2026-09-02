@@ -70,12 +70,12 @@
         const email = document.getElementById("bindEmailInput").value.trim();
         if (!email) return setBindStatus(false, "请填写邮箱");
         try {
-          const res = await ClockTowerAuth.authFetch("/user/send_bind_code", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          });
-          const data = await res.json().catch(() => ({}));
+          const { cancelled, data } = await ClockTowerAuth.requestVerificationCode(
+            "/user/send_bind_code",
+            { email },
+            ClockTowerAuth.authFetch.bind(ClockTowerAuth)
+          );
+          if (cancelled) return;
           if (data.status !== "success") return setBindStatus(false, data.reason || "发送失败");
           startCooldown(sendBindCodeBtn, 60);
           setBindStatus(true, data.delivery === "dev-print" ? "验证码已打印到服务器控制台" : "验证码已发送，若未收到，请留意垃圾邮件");

@@ -65,6 +65,31 @@
     }
   }
 
+  /**
+   * 发送邮箱验证码；若后端仍有 10 分钟内有效码且未 confirm_resend，会弹出二次确认后重发同一码。
+   * @returns {{ cancelled: boolean, data?: object }}
+   */
+  async function requestVerificationCode(url, body, fetchFn) {
+    const doFetch = fetchFn || fetch;
+    const send = (confirmResend) =>
+      doFetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({}, body, { confirm_resend: confirmResend })),
+      }).then((res) => res.json().catch(() => ({})));
+
+    let data = await send(false);
+    if (data.status === "confirm_resend") {
+      const msg = data.reason || "监测到您当前有一个有效的验证码可以直接填写。确认重发吗？";
+      if (!global.confirm(msg)) {
+        return { cancelled: true };
+      }
+      data = await send(true);
+    }
+    return { cancelled: false, data };
+  }
+
   global.ClockTowerAuth = {
     AUTH_TOKEN_STORAGE_KEY,
     getStoredAuthToken,
@@ -73,5 +98,6 @@
     authHeaders,
     authFetch,
     establishSessionFromStoredToken,
+    requestVerificationCode,
   };
 })(typeof window !== "undefined" ? window : globalThis);

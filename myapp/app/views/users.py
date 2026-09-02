@@ -19,22 +19,31 @@ from app.identity.permissions import (
     ACTIVITY_ORGANIZED_COUNT_COLUMN,
     ASSOCIATION_ROLE_COLUMN,
     ASSOCIATION_ROLE_VALUES,
+    ADMIN_RANK,
+    association_role_of,
+    association_role_rank,
     CONTACT_INFO_COLUMN,
     EMAIL_COLUMN,
     EMAIL_VERIFIED_COLUMN,
     MANAGE_ACCOUNT_PERMISSION,
+    LEGACY_MANAGE_ACCOUNT_COLUMN,
     MEMBER_ORDER_NO_COLUMN,
     MEMBER_REVIEW_NOTE_COLUMN,
+    PERMISSION_BOTC_EDITION_AUTHOR,
+    PERMISSION_STORYTELLER,
+    PERMISSION_TRPG_DM,
+    PERMISSION_TRPG_MODULE_AUTHOR,
     SCRIPT_BITMAP_COLUMN,
     SOCIAL_ROLE_COLUMN,
     SOCIAL_ROLE_VALUES,
-    LIGHTBOARD_BITMAP_COLUMN,
     build_permission_update_fields,
     enrich_user_permissions,
     ensure_user_permission_schema,
     permission_bitmap_descriptions,
+    user_is_admin,
 )
 from app.user.email_codes import (
+    CONFIRM_RESEND_MESSAGE,
     bind_user_email,
     consume_email_code,
     create_email_code,
@@ -117,6 +126,39 @@ def _req_val(*keys):
     return None
 
 
+def _req_bool(*keys) -> bool:
+    body = _json_body()
+    for key in keys:
+        v = request.form.get(key)
+        if v is None:
+            v = body.get(key)
+        if v is None:
+            continue
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return int(v) != 0
+        if isinstance(v, str):
+            return v.strip().lower() in ("1", "true", "yes", "on")
+    return False
+
+
+def _dispatch_send_code(email: str, purpose: str):
+    code, err, need_confirm = create_email_code(
+        email,
+        purpose=purpose,
+        confirm_resend=_req_bool("confirm_resend"),
+    )
+    if need_confirm:
+        return jsonify({"status": "confirm_resend", "reason": CONFIRM_RESEND_MESSAGE})
+    if err:
+        return jsonify({"status": "failed", "reason": err})
+    ok, detail = send_verification_code(email, code, purpose=purpose)
+    if not ok:
+        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
+    return jsonify({"status": "success", "delivery": detail})
+
+
 def _serialize_user_profile(user):
     member_order = _row_get(user, MEMBER_ORDER_NO_COLUMN, "") or ""
     email = _row_get(user, EMAIL_COLUMN, "") or ""
@@ -124,16 +166,12 @@ def _serialize_user_profile(user):
         "status": "success",
         "username": user["name"],
         "id": user["id"],
-        "permission_manage_account": user[MANAGE_ACCOUNT_PERMISSION],
-        "permission_manage_accounts": user["permission_manage_accounts"],
-        "permission_manage_own_editions": user["permission_manage_own_editions"],
-        "permission_manage_all_editions": user["permission_manage_all_editions"],
-        "permission_manage_create_editions": user["permission_manage_create_editions"],
-        "permission_storyteller": user["permission_storyteller"],
-        "permission_storyteller_vocal": user["permission_storyteller_vocal"],
-        SCRIPT_BITMAP_COLUMN: user[SCRIPT_BITMAP_COLUMN],
-        LIGHTBOARD_BITMAP_COLUMN: user[LIGHTBOARD_BITMAP_COLUMN],
-        ASSOCIATION_ROLE_COLUMN: user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家"),
+        PERMISSION_STORYTELLER: user[PERMISSION_STORYTELLER],
+        PERMISSION_BOTC_EDITION_AUTHOR: user[PERMISSION_BOTC_EDITION_AUTHOR],
+        PERMISSION_TRPG_DM: user[PERMISSION_TRPG_DM],
+        PERMISSION_TRPG_MODULE_AUTHOR: user[PERMISSION_TRPG_MODULE_AUTHOR],
+        ASSOCIATION_ROLE_COLUMN: association_role_of(user),
+        "association_rank": association_role_rank(user),
         SOCIAL_ROLE_COLUMN: user.get(SOCIAL_ROLE_COLUMN, "保密"),
         CONTACT_INFO_COLUMN: user.get(CONTACT_INFO_COLUMN, "保密"),
         ACTIVITY_ORGANIZED_COUNT_COLUMN: user.get(ACTIVITY_ORGANIZED_COUNT_COLUMN, 0),
@@ -144,7 +182,6 @@ def _serialize_user_profile(user):
         "member_order_no": member_order,
         "member_review_note": _row_get(user, MEMBER_REVIEW_NOTE_COLUMN, "") or "",
         "member_credential_status": membership_credential_status(user),
-        "is_member": user_is_member(user),
         "member_locked": user_member_locked(user),
         "member_pending": bool(member_order) and not user_is_member(user),
         "lastLogin": user["lastLogin"],
@@ -235,7 +272,6 @@ def register():
                 title = ?,
                 {MANAGE_ACCOUNT_PERMISSION} = 0,
                 {SCRIPT_BITMAP_COLUMN} = 0,
-                {LIGHTBOARD_BITMAP_COLUMN} = 0,
                 {ASSOCIATION_ROLE_COLUMN} = '普通玩家',
                 {SOCIAL_ROLE_COLUMN} = '保密',
                 {CONTACT_INFO_COLUMN} = '保密',
@@ -256,7 +292,6 @@ def register():
                 title,
                 {MANAGE_ACCOUNT_PERMISSION},
                 {SCRIPT_BITMAP_COLUMN},
-                {LIGHTBOARD_BITMAP_COLUMN},
                 {ASSOCIATION_ROLE_COLUMN},
                 {SOCIAL_ROLE_COLUMN},
                 {CONTACT_INFO_COLUMN},
@@ -267,14 +302,13 @@ def register():
                 {EMAIL_VERIFIED_COLUMN},
                 lastLogin
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 username,
                 hashed_pw,
                 "",
                 "",
                 False,
-                0,
                 0,
                 "普通玩家",
                 "保密",
@@ -300,13 +334,7 @@ def send_code():
         return jsonify({"status": "failed", "reason": "请填写有效邮箱"})
     if find_user_by_email(email):
         return jsonify({"status": "failed", "reason": "该邮箱已被注册"})
-    code, err = create_email_code(email, purpose="register")
-    if err:
-        return jsonify({"status": "failed", "reason": err})
-    ok, detail = send_verification_code(email, code, purpose="register")
-    if not ok:
-        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
-    return jsonify({"status": "success", "delivery": detail})
+    return _dispatch_send_code(email, purpose="register")
 
 
 @users_bp.route("/send_reset_code", methods=["POST"])
@@ -318,13 +346,7 @@ def send_reset_code():
     if not user_email_verified(user):
         return jsonify({"status": "failed", "reason": "尚未验证邮箱，无法重设密码"})
     email = normalize_email(user["email"])
-    code, err = create_email_code(email, purpose="reset")
-    if err:
-        return jsonify({"status": "failed", "reason": err})
-    ok, detail = send_verification_code(email, code, purpose="reset")
-    if not ok:
-        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
-    return jsonify({"status": "success", "delivery": detail})
+    return _dispatch_send_code(email, purpose="reset")
 
 
 @users_bp.route("/reset_password_submit", methods=["POST"])
@@ -370,13 +392,7 @@ def send_bind_code(current_user):
     other = find_user_by_email(email)
     if other and other["id"] != current_user["id"]:
         return jsonify({"status": "failed", "reason": "该邮箱已被其他账号使用"})
-    code, err = create_email_code(email, purpose="bind")
-    if err:
-        return jsonify({"status": "failed", "reason": err})
-    ok, detail = send_verification_code(email, code, purpose="bind")
-    if not ok:
-        return jsonify({"status": "failed", "reason": f"发送失败：{detail}"})
-    return jsonify({"status": "success", "delivery": detail})
+    return _dispatch_send_code(email, purpose="bind")
 
 
 @users_bp.route("/bind_email_submit", methods=["POST"])
@@ -543,7 +559,7 @@ def view_user_by_name():
     operator = get_current_user(update_last_login=False)
     if not operator:
         return jsonify({"status": "failed", "reason": "请先登录"}), 401
-    if not operator['permission_manage_accounts']:
+    if not user_is_admin(operator):
         return jsonify({"status": "failed", "reason": "您没有权限查看其他用户档案"}), 403
 
     payload = request.get_json(silent=True) if request.is_json else {}
@@ -566,7 +582,7 @@ def edit_user():
     user = get_current_user(update_last_login=False)
     if not user:
         return redirect(url_for('users.user_page'))
-    if not user['permission_manage_accounts']:
+    if not user_is_admin(user):
         return "❌ 您没有权限编辑其他用户，请联系管理员。"
     return render_template("edit_user.html")
 
@@ -577,7 +593,7 @@ def permission_update():
     user = get_current_user(update_last_login=False)
     if not user:
         return redirect(url_for('users.user_page'))
-    if not user['permission_manage_accounts']:
+    if not user_is_admin(user):
         return jsonify({"status": "failed", "reason": "您没有权限编辑其他用户"})
     
     username = request.form.get("username") or (request.json.get("username") if request.is_json else None)
@@ -613,7 +629,7 @@ def association_role_update():
     user = get_current_user(update_last_login=False)
     if not user:
         return redirect(url_for('users.user_page'))
-    if not user['permission_manage_accounts']:
+    if not user_is_admin(user):
         return jsonify({"status": "failed", "reason": "您没有权限编辑其他用户"})
 
     payload = request.get_json(silent=True) if request.is_json else {}
@@ -633,9 +649,22 @@ def association_role_update():
         user_db.close()
         return jsonify({"status": "failed", "reason": "目标用户不存在"})
     user_db.execute(
-        f"UPDATE user_info SET {ASSOCIATION_ROLE_COLUMN}=? WHERE name=?",
-        (association_role, username),
+        f"""
+        UPDATE user_info
+        SET {ASSOCIATION_ROLE_COLUMN}=?,
+            {MANAGE_ACCOUNT_PERMISSION}=?
+        WHERE name=?
+        """,
+        (association_role, int(association_role_rank({ASSOCIATION_ROLE_COLUMN: association_role}) == ADMIN_RANK), username),
     )
+    column_names = {
+        row["name"] for row in user_db.execute("PRAGMA table_info(user_info)").fetchall()
+    }
+    if LEGACY_MANAGE_ACCOUNT_COLUMN in column_names:
+        user_db.execute(
+            f"UPDATE user_info SET {LEGACY_MANAGE_ACCOUNT_COLUMN}=? WHERE name=?",
+            (int(association_role_rank({ASSOCIATION_ROLE_COLUMN: association_role}) == ADMIN_RANK), username),
+        )
     user_db.commit()
     user_db.close()
     return jsonify({"status": "success", ASSOCIATION_ROLE_COLUMN: association_role})

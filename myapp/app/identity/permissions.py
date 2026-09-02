@@ -7,20 +7,46 @@ from app.models.database import get_user_db
 
 MANAGE_ACCOUNT_PERMISSION = "permission_manage_account"
 SCRIPT_BITMAP_COLUMN = "permission_script_bitmap"
-LIGHTBOARD_BITMAP_COLUMN = "permission_lightboard_bitmap"
+LEGACY_LIGHTBOARD_BITMAP_COLUMN = "permission_lightboard_bitmap"
+
+PERMISSION_STORYTELLER = "permission_storyteller"
+PERMISSION_BOTC_EDITION_AUTHOR = "permission_botc_edition_author"
+PERMISSION_TRPG_DM = "permission_trpg_dm"
+PERMISSION_TRPG_MODULE_AUTHOR = "permission_trpg_module_author"
+USER_PERMISSION_KEYS = (
+    PERMISSION_STORYTELLER,
+    PERMISSION_BOTC_EDITION_AUTHOR,
+    PERMISSION_TRPG_DM,
+    PERMISSION_TRPG_MODULE_AUTHOR,
+)
+
+# 旧 lightboard 独立列的位 → 合并进 script_subsystem 后的权限名
+LEGACY_LIGHTBOARD_BITMAP_BITS = {
+    "permission_create_official_event": 0,
+    "permission_manage_all_event": 1,
+    "permission_borrow_games": 2,
+    "permission_manage_games": 3,
+}
+
+# 旧版 5 项剧本权限位图（仅用于迁移）
+LEGACY_SCRIPT_BITMAP_CONFIG = {
+    "permission_manage_own_editions": 0,
+    "permission_manage_all_editions": 1,
+    "permission_manage_create_editions": 2,
+    "permission_storyteller": 3,
+    "permission_storyteller_vocal": 4,
+}
 
 DEFAULT_BITMAP_CONFIG = {
     "script_subsystem": {
-        "permission_manage_own_editions": 0,
-        "permission_manage_all_editions": 1,
-        "permission_manage_create_editions": 2,
-        "permission_storyteller": 3,
-        "permission_storyteller_vocal": 4,
-    },
-    "lightboard_subsystem": {
-        "permission_lightboard_create_event": 0,
-        "permission_lightboard_edit_any_event": 1,
-        "permission_lightboard_delete_any_event": 2,
+        PERMISSION_STORYTELLER: 0,
+        PERMISSION_BOTC_EDITION_AUTHOR: 1,
+        PERMISSION_TRPG_DM: 2,
+        PERMISSION_TRPG_MODULE_AUTHOR: 3,
+        "permission_create_official_event": 4,
+        "permission_manage_all_event": 5,
+        "permission_borrow_games": 6,
+        "permission_manage_games": 7,
     },
 }
 
@@ -30,6 +56,12 @@ LEGACY_SCRIPT_COLUMNS = (
     "permission_manage_create_editions",
     "permission_storyteller",
     "permission_storyteller_vocal",
+)
+
+LEGACY_EDITION_COLUMNS = (
+    "permission_manage_own_editions",
+    "permission_manage_all_editions",
+    "permission_manage_create_editions",
 )
 
 LEGACY_MANAGE_ACCOUNT_COLUMN = "permission_manage_accounts"
@@ -45,14 +77,136 @@ EMAIL_VERIFIED_COLUMN = "email_verified"
 MEMBER_ORDER_NO_COLUMN = "member_order_no"
 MEMBER_REVIEW_NOTE_COLUMN = "member_review_note"
 
-ASSOCIATION_ROLE_VALUES = ("普通玩家", "协会玩家", "核心玩家", "管理员")
+ASSOCIATION_ROLE_VALUES = ("普通玩家", "协会玩家", "核心玩家", "干事", "管理员")
 SOCIAL_ROLE_VALUES = ("交大学生", "华师学生", "校外人员", "保密")
 ASSOCIATION_ROLE_RANK = {
     "普通玩家": 0,
     "协会玩家": 1,
     "核心玩家": 2,
-    "管理员": 3,
+    "干事": 3,
+    "管理员": 4,
 }
+MEMBER_RANK = ASSOCIATION_ROLE_RANK["协会玩家"]
+ADMIN_RANK = ASSOCIATION_ROLE_RANK["管理员"]
+
+
+def association_role_of(user) -> str:
+    if user is None:
+        return "普通玩家"
+    role = user.get(ASSOCIATION_ROLE_COLUMN, "普通玩家") if isinstance(user, dict) else user[ASSOCIATION_ROLE_COLUMN]
+    role = role or "普通玩家"
+    return role if role in ASSOCIATION_ROLE_RANK else "普通玩家"
+
+
+def association_role_rank(user) -> int:
+    """协会身份等级，缺省 / 未知身份为 0（普通玩家）。"""
+    return ASSOCIATION_ROLE_RANK.get(association_role_of(user), 0)
+
+
+def user_is_admin(user) -> bool:
+    """管理员：association_rank == 4。"""
+    return association_role_rank(user) == ADMIN_RANK
+
+
+def _legacy_storyteller_from_row(row: Mapping[str, object], bitmap: int) -> bool:
+    if any(_bool_like(row.get(name)) for name in ("permission_storyteller", "permission_storyteller_vocal")):
+        return True
+    for name in ("permission_storyteller", "permission_storyteller_vocal"):
+        bit = LEGACY_SCRIPT_BITMAP_CONFIG.get(name)
+        if bit is not None and (bitmap & (1 << bit)):
+            return True
+    return False
+
+
+def _legacy_botc_author_from_row(row: Mapping[str, object], bitmap: int) -> bool:
+    if any(_bool_like(row.get(name)) for name in LEGACY_EDITION_COLUMNS):
+        return True
+    for name in LEGACY_EDITION_COLUMNS:
+        bit = LEGACY_SCRIPT_BITMAP_CONFIG.get(name)
+        if bit is not None and (bitmap & (1 << bit)):
+            return True
+    return False
+
+
+def _bitmap_mask(bit_map: Mapping[str, int]) -> int:
+    mask = 0
+    for bit in bit_map.values():
+        mask |= 1 << int(bit)
+    return mask
+
+
+def _merge_legacy_lightboard_bitmap(
+    script_bitmap: int,
+    lightboard_bitmap: int,
+    script_map: Mapping[str, int],
+) -> int:
+    merged = _to_uint64(script_bitmap)
+    for name, old_bit in LEGACY_LIGHTBOARD_BITMAP_BITS.items():
+        new_bit = script_map.get(name)
+        if new_bit is None:
+            continue
+        if lightboard_bitmap & (1 << int(old_bit)):
+            merged |= 1 << int(new_bit)
+    return merged
+
+
+def _normalize_script_bitmap(row: Mapping[str, object], config: Mapping[str, Dict[str, int]]) -> int:
+    """将旧列/旧 lightboard 列同步为 script_subsystem 定义的权限位。"""
+    raw_bitmap = _to_uint64(row.get(SCRIPT_BITMAP_COLUMN, 0))
+    script_map = config["script_subsystem"]
+    permission_mask = _bitmap_mask(script_map)
+
+    if LEGACY_LIGHTBOARD_BITMAP_COLUMN in row:
+        raw_bitmap = _merge_legacy_lightboard_bitmap(
+            raw_bitmap,
+            _to_uint64(row.get(LEGACY_LIGHTBOARD_BITMAP_COLUMN, 0)),
+            script_map,
+        )
+
+    storyteller_bit = int(script_map[PERMISSION_STORYTELLER])
+    botc_bit = int(script_map[PERMISSION_BOTC_EDITION_AUTHOR])
+    has_legacy_columns = any(_bool_like(row.get(name)) for name in LEGACY_SCRIPT_COLUMNS)
+
+    if has_legacy_columns:
+        new_bitmap = raw_bitmap & permission_mask
+        if _legacy_storyteller_from_row(row, raw_bitmap):
+            new_bitmap |= 1 << storyteller_bit
+        if _legacy_botc_author_from_row(row, raw_bitmap):
+            new_bitmap |= 1 << botc_bit
+        return _to_uint64(new_bitmap & permission_mask)
+
+    return _to_uint64(raw_bitmap & permission_mask)
+
+
+def _payload_to_user_permissions(payload: Mapping[str, object], current: Mapping[str, object]) -> Dict[str, bool]:
+    """解析更新载荷中的用户权限（兼容旧字段名）。"""
+    perms = {name: _bool_like(current.get(name, False)) for name in USER_PERMISSION_KEYS}
+
+    if PERMISSION_STORYTELLER in payload:
+        perms[PERMISSION_STORYTELLER] = _bool_like(payload[PERMISSION_STORYTELLER])
+    elif "permission_storyteller" in payload or "permission_storyteller_vocal" in payload:
+        perms[PERMISSION_STORYTELLER] = _bool_like(payload.get("permission_storyteller")) or _bool_like(
+            payload.get("permission_storyteller_vocal")
+        )
+
+    if PERMISSION_BOTC_EDITION_AUTHOR in payload:
+        perms[PERMISSION_BOTC_EDITION_AUTHOR] = _bool_like(payload[PERMISSION_BOTC_EDITION_AUTHOR])
+    elif any(key in payload for key in LEGACY_EDITION_COLUMNS):
+        perms[PERMISSION_BOTC_EDITION_AUTHOR] = any(_bool_like(payload.get(key)) for key in LEGACY_EDITION_COLUMNS)
+
+    for name in (PERMISSION_TRPG_DM, PERMISSION_TRPG_MODULE_AUTHOR):
+        if name in payload:
+            perms[name] = _bool_like(payload[name])
+
+    return {name: bool(perms[name]) for name in USER_PERMISSION_KEYS}
+
+
+def _permissions_dict_to_script_bitmap(perms: Mapping[str, bool], script_map: Mapping[str, int]) -> int:
+    bitmap = 0
+    for name in USER_PERMISSION_KEYS:
+        if perms.get(name) and name in script_map:
+            bitmap |= 1 << int(script_map[name])
+    return _to_uint64(bitmap)
 
 
 def _bool_like(value) -> bool:
@@ -85,22 +239,19 @@ def get_permission_bitmap_config() -> Dict[str, Dict[str, int]]:
     except Exception:
         return DEFAULT_BITMAP_CONFIG
 
-    script = config.get("script_subsystem", {})
+    script = {
+        name: int(bit)
+        for name, bit in config.get("script_subsystem", {}).items()
+        if isinstance(name, str)
+    }
+    # 兼容旧 config：lightboard_subsystem 合并进 script_subsystem（bit 4 起）
     lightboard = config.get("lightboard_subsystem", {})
+    for name, bit in lightboard.items():
+        if isinstance(name, str) and name not in script:
+            script[name] = int(bit) + 4
 
     return {
-        "script_subsystem": {
-            name: int(bit)
-            for name, bit in script.items()
-            if isinstance(name, str)
-        }
-        or DEFAULT_BITMAP_CONFIG["script_subsystem"],
-        "lightboard_subsystem": {
-            name: int(bit)
-            for name, bit in lightboard.items()
-            if isinstance(name, str)
-        }
-        or DEFAULT_BITMAP_CONFIG["lightboard_subsystem"],
+        "script_subsystem": script or DEFAULT_BITMAP_CONFIG["script_subsystem"],
     }
 
 
@@ -114,11 +265,7 @@ def _row_column_set(conn) -> set[str]:
 
 
 def _compute_script_bitmap_from_row(row: Mapping[str, object], config: Mapping[str, Dict[str, int]]) -> int:
-    bitmap = _to_uint64(row.get(SCRIPT_BITMAP_COLUMN, 0))
-    for name, bit in config["script_subsystem"].items():
-        if _bool_like(row.get(name)):
-            bitmap |= (1 << int(bit))
-    return bitmap
+    return _normalize_script_bitmap(row, config)
 
 
 def _permissions_to_bitmap(
@@ -148,8 +295,6 @@ def ensure_user_permission_schema() -> None:
         conn.execute(f"ALTER TABLE user_info ADD COLUMN {MANAGE_ACCOUNT_PERMISSION} BOOLEAN DEFAULT 0")
     if SCRIPT_BITMAP_COLUMN not in column_names:
         conn.execute(f"ALTER TABLE user_info ADD COLUMN {SCRIPT_BITMAP_COLUMN} INTEGER DEFAULT 0")
-    if LIGHTBOARD_BITMAP_COLUMN not in column_names:
-        conn.execute(f"ALTER TABLE user_info ADD COLUMN {LIGHTBOARD_BITMAP_COLUMN} INTEGER DEFAULT 0")
     if ASSOCIATION_ROLE_COLUMN not in column_names:
         conn.execute(f"ALTER TABLE user_info ADD COLUMN {ASSOCIATION_ROLE_COLUMN} TEXT DEFAULT '普通玩家'")
     if SOCIAL_ROLE_COLUMN not in column_names:
@@ -191,14 +336,25 @@ def ensure_user_permission_schema() -> None:
         """
     )
 
-    column_names = _row_column_set(conn)
+    conn.execute(
+        f"""
+        UPDATE user_info
+        SET {MANAGE_ACCOUNT_PERMISSION} = CASE
+            WHEN {ASSOCIATION_ROLE_COLUMN} = ? THEN 1
+            ELSE 0
+        END
+        """,
+        (ASSOCIATION_ROLE_VALUES[-1],),
+    )
     if LEGACY_MANAGE_ACCOUNT_COLUMN in column_names:
         conn.execute(
             f"""
             UPDATE user_info
-            SET {MANAGE_ACCOUNT_PERMISSION} = COALESCE({MANAGE_ACCOUNT_PERMISSION}, 0) OR COALESCE({LEGACY_MANAGE_ACCOUNT_COLUMN}, 0)
+            SET {LEGACY_MANAGE_ACCOUNT_COLUMN} = {MANAGE_ACCOUNT_PERMISSION}
             """
         )
+
+    column_names = _row_column_set(conn)
     conn.execute(
         f"""
         UPDATE user_info
@@ -223,7 +379,16 @@ def ensure_user_permission_schema() -> None:
         (*ASSOCIATION_ROLE_VALUES, *SOCIAL_ROLE_VALUES),
     )
 
-    row_columns = [name for name in (SCRIPT_BITMAP_COLUMN, *LEGACY_SCRIPT_COLUMNS) if name in column_names]
+    row_columns = [
+        name
+        for name in (
+            SCRIPT_BITMAP_COLUMN,
+            LEGACY_LIGHTBOARD_BITMAP_COLUMN,
+            ASSOCIATION_ROLE_COLUMN,
+            *LEGACY_SCRIPT_COLUMNS,
+        )
+        if name in column_names
+    ]
     if row_columns:
         rows = conn.execute(f"SELECT id, {', '.join(row_columns)} FROM user_info").fetchall()
         for row in rows:
@@ -241,23 +406,29 @@ def ensure_user_permission_schema() -> None:
 def enrich_user_permissions(user_info: Mapping[str, object]) -> Dict[str, object]:
     config = get_permission_bitmap_config()
     result = dict(user_info)
+    script_map = config["script_subsystem"]
 
-    result[MANAGE_ACCOUNT_PERMISSION] = _bool_like(result.get(MANAGE_ACCOUNT_PERMISSION)) or _bool_like(
-        result.get(LEGACY_MANAGE_ACCOUNT_COLUMN)
-    )
-    # 保持旧字段对外兼容
-    result[LEGACY_MANAGE_ACCOUNT_COLUMN] = result[MANAGE_ACCOUNT_PERMISSION]
-
-    script_bitmap = _to_uint64(result.get(SCRIPT_BITMAP_COLUMN, 0))
-    lightboard_bitmap = _to_uint64(result.get(LIGHTBOARD_BITMAP_COLUMN, 0))
+    script_bitmap = _normalize_script_bitmap(result, config)
     result[SCRIPT_BITMAP_COLUMN] = script_bitmap
-    result[LIGHTBOARD_BITMAP_COLUMN] = lightboard_bitmap
 
-    for name, bit in config["script_subsystem"].items():
+    for name, bit in script_map.items():
         result[name] = bool(script_bitmap & (1 << int(bit)))
 
-    for name, bit in config["lightboard_subsystem"].items():
-        result[name] = bool(lightboard_bitmap & (1 << int(bit)))
+    is_admin = user_is_admin(result)
+
+    result[ASSOCIATION_ROLE_COLUMN] = association_role_of(result)
+    result["association_rank"] = association_role_rank(result)
+
+    result[MANAGE_ACCOUNT_PERMISSION] = is_admin
+    result[LEGACY_MANAGE_ACCOUNT_COLUMN] = is_admin
+
+    # 旧字段别名，供现有业务代码只读使用
+    storyteller = result[PERMISSION_STORYTELLER]
+    botc_author = result[PERMISSION_BOTC_EDITION_AUTHOR]
+    result["permission_storyteller_vocal"] = storyteller
+    result["permission_manage_own_editions"] = botc_author
+    result["permission_manage_create_editions"] = botc_author
+    result["permission_manage_all_editions"] = botc_author or is_admin
 
     return result
 
@@ -268,42 +439,40 @@ def build_permission_update_fields(
 ) -> Dict[str, object]:
     config = get_permission_bitmap_config()
     current = enrich_user_permissions(existing_user)
-
-    next_manage = current[MANAGE_ACCOUNT_PERMISSION]
-    if MANAGE_ACCOUNT_PERMISSION in payload:
-        next_manage = _bool_like(payload[MANAGE_ACCOUNT_PERMISSION])
-    elif LEGACY_MANAGE_ACCOUNT_COLUMN in payload:
-        next_manage = _bool_like(payload[LEGACY_MANAGE_ACCOUNT_COLUMN])
-
     script_map = config["script_subsystem"]
-    lightboard_map = config["lightboard_subsystem"]
 
+    perms = _payload_to_user_permissions(payload, current)
+    script_bitmap = _to_uint64(current[SCRIPT_BITMAP_COLUMN])
+    for name, enabled in perms.items():
+        bit = int(script_map[name])
+        if enabled:
+            script_bitmap |= 1 << bit
+        else:
+            script_bitmap &= ~(1 << bit)
     script_bitmap = _permissions_to_bitmap(
-        script_map.keys(),
+        (name for name in script_map if name not in USER_PERMISSION_KEYS),
         payload,
-        current[SCRIPT_BITMAP_COLUMN],
+        script_bitmap,
         script_map,
-    )
-    lightboard_bitmap = _permissions_to_bitmap(
-        lightboard_map.keys(),
-        payload,
-        current[LIGHTBOARD_BITMAP_COLUMN],
-        lightboard_map,
     )
 
     update_fields = {
-        MANAGE_ACCOUNT_PERMISSION: int(next_manage),
         SCRIPT_BITMAP_COLUMN: script_bitmap,
-        LIGHTBOARD_BITMAP_COLUMN: lightboard_bitmap,
     }
 
-    # 老列如果还在表中，保持同步，方便灰度迁移期回滚。
     existing_columns = set(existing_user.keys())
     if LEGACY_MANAGE_ACCOUNT_COLUMN in existing_columns:
-        update_fields[LEGACY_MANAGE_ACCOUNT_COLUMN] = int(next_manage)
-    for name in script_map:
-        if name in LEGACY_SCRIPT_COLUMNS and name in existing_columns:
-            update_fields[name] = int(bool(script_bitmap & (1 << int(script_map[name]))))
+        update_fields[LEGACY_MANAGE_ACCOUNT_COLUMN] = int(user_is_admin(current))
+    if MANAGE_ACCOUNT_PERMISSION in existing_columns:
+        update_fields[MANAGE_ACCOUNT_PERMISSION] = int(user_is_admin(current))
+
+    for name in LEGACY_SCRIPT_COLUMNS:
+        if name not in existing_columns:
+            continue
+        if name in ("permission_storyteller", "permission_storyteller_vocal"):
+            update_fields[name] = int(perms[PERMISSION_STORYTELLER])
+        elif name in LEGACY_EDITION_COLUMNS:
+            update_fields[name] = int(perms[PERMISSION_BOTC_EDITION_AUTHOR])
 
     return update_fields
 
@@ -312,5 +481,4 @@ def permission_bitmap_descriptions() -> Dict[str, Dict[int, str]]:
     config = get_permission_bitmap_config()
     return {
         "script_subsystem": _build_bit_to_name_map(config["script_subsystem"]),
-        "lightboard_subsystem": _build_bit_to_name_map(config["lightboard_subsystem"]),
     }
