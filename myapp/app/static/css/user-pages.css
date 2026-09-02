@@ -20,6 +20,28 @@ body.user-page .card .row button {
   white-space: nowrap;
 }
 
+body.user-page .card .auth-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5em;
+  flex-wrap: nowrap;
+  margin: 8px 0 0;
+}
+
+body.user-page .card .auth-links button {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+
+body.user-page .card .auth-links-sep {
+  color: var(--color-text-muted);
+  user-select: none;
+  flex-shrink: 0;
+}
+
 body.user-page #avatar-container {
   display: flex;
   flex-direction: column;
@@ -95,19 +117,6 @@ body.user-page .card--wide {
 .nav-row a:hover {
   background: var(--color-bg-muted);
   text-decoration: none;
-}
-
-.auth-links {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.35em;
-  flex-wrap: wrap;
-}
-
-.auth-links-sep {
-  color: var(--color-text-muted);
-  user-select: none;
 }
 
 body.user-page.edit-user-page .card {

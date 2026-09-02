@@ -36,6 +36,30 @@ body.portal-home {
   width: min(360px, 100%);
 }
 
+.portal-home .become-member-cta {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  padding: 14px 12px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: #fff;
+  background: linear-gradient(135deg, #c4785a 0%, #a85d45 100%);
+  border: 2px solid #8f4a35;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(168, 93, 69, 0.35);
+}
+
+.portal-home .become-member-cta:hover {
+  background: linear-gradient(135deg, #d08768 0%, #b86a4f 100%);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 6px 16px rgba(168, 93, 69, 0.45);
+}
+
 .portal-home .primary-nav > button {
   width: 100%;
   text-align: center;

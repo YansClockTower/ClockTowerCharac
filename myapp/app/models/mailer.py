@@ -55,7 +55,7 @@ def send_verification_code(to_email, code, purpose="register"):
         "reset": "重设密码",
     }
     label = labels.get(purpose, "验证")
-    subject = f"ClockTower · {label}验证码"
+    subject = f"布鸽桌游协会 · {label}验证码"
     text = f"你的{label}验证码是 {code}，10 分钟内有效。如果不是你本人操作，请忽略此邮件。"
     html = f"<p>你的{label}验证码是 <strong>{code}</strong>，10 分钟内有效。</p>"
     return send_email(to_email, subject, text, html)
