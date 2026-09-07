@@ -116,6 +116,50 @@
 
 .borrow-actions {
   margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.borrow-actions .btn {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.borrow-contact-modal h3 {
+  margin-top: 0;
+}
+
+.borrow-contact-hint {
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.borrow-contact-fields {
+  margin: 0 0 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+}
+
+.borrow-contact-fields dt {
+  margin: 0;
+  font-weight: 600;
+  color: #555;
+}
+
+.borrow-contact-fields dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+.borrow-contact-actions {
+  margin: 0;
+  text-align: right;
 }
 
 .smart-json-title {
@@ -144,7 +188,26 @@
 }
 
 .smart-json-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+.smart-url-row {
+  margin-bottom: 16px;
+}
+
+.smart-url-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.5em 0.65em;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
 }
 
 .smart-json-msg {

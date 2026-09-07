@@ -6,11 +6,18 @@
 
 <div class="card smart-json-card">
   <h2 class="smart-json-title">智能识别</h2>
-  <p class="smart-json-hint">将集石脚本输出的 JSON 粘贴到下方，点击「识别」即可自动填入表单（所有者等需自行核对）。</p>
-  <label class="smart-json-label" for="smartJsonInput">JSON</label>
-  <textarea id="smartJsonInput" class="smart-json-textarea" rows="10" spellcheck="false" placeholder='{"name":"…","game_type_line":"…",…}'></textarea>
+  <p class="smart-json-hint">可粘贴集石详情页网址，如<a href="https://www.gstonegames.com/game/info-45174.html" target="_blank">这个</a>，由服务器自动识别（全局限流约 20 秒一次）。若遇验证页失败，可改用本机脚本导出 JSON 粘贴识别。</p>
+
+  <label class="smart-json-label" for="gstoneUrlInput">集石网址</label>
+  <div class="smart-json-actions smart-url-row">
+    <input type="url" id="gstoneUrlInput" class="smart-url-input" placeholder="https://www.gstonegames.com/game/info-xxxxx.html" autocomplete="off">
+    <button type="button" id="gstoneFetchBtn" class="btn btn-primary">从集石抓取</button>
+  </div>
+
+  <label class="smart-json-label" for="smartJsonInput">或粘贴 JSON</label>
+  <textarea id="smartJsonInput" class="smart-json-textarea" rows="8" spellcheck="false" placeholder='{"name":"…","game_type_line":"…",…}'></textarea>
   <div class="smart-json-actions">
-    <button type="button" id="smartJsonRecognizeBtn" class="btn btn-secondary">识别</button>
+    <button type="button" id="smartJsonRecognizeBtn" class="btn btn-secondary">识别 JSON</button>
   </div>
   <p id="smartJsonMsg" class="smart-json-msg" aria-live="polite"></p>
 </div>
@@ -55,6 +62,8 @@
 <script>
 (function () {
   const btn = document.getElementById("smartJsonRecognizeBtn");
+  const fetchBtn = document.getElementById("gstoneFetchBtn");
+  const urlInput = document.getElementById("gstoneUrlInput");
   const jsonInput = document.getElementById("smartJsonInput");
   const msg = document.getElementById("smartJsonMsg");
   const form = document.getElementById("boardGameRegisterForm");
@@ -70,6 +79,24 @@
     const el = form.querySelector("[name=\"" + name + "\"]");
     if (!el) return;
     el.value = value;
+  }
+
+  function applyRegisterFields(fields) {
+    if (!fields || typeof fields !== "object") return;
+    [
+      "board_game_name",
+      "game_type",
+      "min_players",
+      "max_players",
+      "recommended_players",
+      "playing_time",
+      "description",
+      "image_path",
+    ].forEach(function (key) {
+      if (fields[key] !== undefined && fields[key] !== null) {
+        fillField(key, String(fields[key]));
+      }
+    });
   }
 
   function parseMinutes(duration) {
@@ -107,6 +134,23 @@
     return d.trim();
   }
 
+  function startCooldown(button, seconds) {
+    var left = seconds;
+    var original = button.textContent;
+    button.disabled = true;
+    button.textContent = left + "s";
+    var t = setInterval(function () {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(t);
+        button.disabled = false;
+        button.textContent = original;
+      } else {
+        button.textContent = left + "s";
+      }
+    }, 1000);
+  }
+
   btn.addEventListener("click", function () {
     var raw = (jsonInput.value || "").trim();
     if (!raw) {
@@ -139,6 +183,54 @@
     fillField("image_path", o.image_url != null ? String(o.image_url) : "");
     setMsg("已根据 JSON 填入字段，请核对所有者等信息后提交。", false);
   });
+
+  if (fetchBtn && urlInput) {
+    fetchBtn.addEventListener("click", async function () {
+      var url = (urlInput.value || "").trim();
+      if (!url) {
+        setMsg("请填写集石详情页网址。", true);
+        return;
+      }
+      fetchBtn.disabled = true;
+      setMsg("正在从服务器抓取集石页面…", false);
+      try {
+        if (window.ClockTowerAuth) {
+          await ClockTowerAuth.establishSessionFromStoredToken();
+        }
+        var res = await (window.ClockTowerAuth
+          ? ClockTowerAuth.authFetch("{{ url_for('boardgames.gstone_fetch') }}", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: url }),
+            })
+          : fetch("{{ url_for('boardgames.gstone_fetch') }}", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: url }),
+            }));
+        var data = await res.json().catch(function () { return {}; });
+        if (data.status !== "success") {
+          setMsg(data.reason || "抓取失败", true);
+          var cool = data.cooldown_remaining || (res.status === 429 ? 20 : 0);
+          if (cool > 0) startCooldown(fetchBtn, cool);
+          else fetchBtn.disabled = false;
+          return;
+        }
+        applyRegisterFields(data.fields);
+        if (data.raw) {
+          try {
+            jsonInput.value = JSON.stringify(data.raw, null, 2);
+          } catch (e) {}
+        }
+        setMsg("已从集石抓取并填入字段，请核对所有者等信息后提交。", false);
+        startCooldown(fetchBtn, data.cooldown_seconds || 20);
+      } catch (e) {
+        setMsg("网络错误或未登录，请刷新后重试。", true);
+        fetchBtn.disabled = false;
+      }
+    });
+  }
 })();
 </script>
 {% endblock %}

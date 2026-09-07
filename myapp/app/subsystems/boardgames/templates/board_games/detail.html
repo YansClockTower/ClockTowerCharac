@@ -4,9 +4,6 @@
 <h1>{{ game.board_game_name }}</h1>
 <p class="toolbar">
   <a href="{{ url_for('boardgames.browse') }}">返回浏览</a>
-  {% if can_edit %}
-  · <a href="{{ url_for('boardgames.game_edit', game_id=game.id) }}">编辑信息</a>
-  {% endif %}
 </p>
 <div class="game-detail-layout">
   <div class="game-detail-image">
@@ -34,6 +31,60 @@
 <br/>
 <dd class="multiline">{{ game.description or '—' }}</dd>
 <p class="borrow-actions">
-  <button type="button" class="btn btn-secondary" onclick="alert('借用功能暂未开放。')">申请借用</button>
+  <button type="button" class="btn btn-secondary" id="borrowRequestBtn">申请借用</button>
+  {% if can_edit %}
+  <a class="btn btn-primary" href="{{ url_for('boardgames.game_edit', game_id=game.id) }}">编辑信息</a>
+  {% endif %}
 </p>
+
+<div id="borrowContactModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="borrowContactTitle">
+  <div class="modal-content borrow-contact-modal">
+    <h3 id="borrowContactTitle">联系所有者借用</h3>
+    <p class="borrow-contact-hint">在线借用流程尚未完善。请通过以下联系方式联系所有者 <strong>{{ owner_contact.owner_name }}</strong>，自行约定借用事宜。</p>
+    {% if not owner_contact.owner_found %}
+      <p class="muted">未在本站找到与所有者同名的账号，无法显示站内登记的联系方式。请尝试通过协会群等渠道联系「{{ owner_contact.owner_name }}」。</p>
+    {% elif not owner_contact.has_contact %}
+      <p class="muted">该所有者尚未在个人中心填写可用的联系方式或邮箱。请尝试通过协会群等其他渠道联系。</p>
+    {% else %}
+      <dl class="borrow-contact-fields">
+        <dt>微信号 / 联系方式</dt>
+        <dd>{% if owner_contact.contact_info %}{{ owner_contact.contact_info }}{% else %}<span class="muted">未填写</span>{% endif %}</dd>
+        <dt>邮箱</dt>
+        <dd>
+          {% if owner_contact.email %}
+            <a href="mailto:{{ owner_contact.email }}">{{ owner_contact.email }}</a>
+            {% if not owner_contact.email_verified %}<span class="muted">（未验证）</span>{% endif %}
+          {% else %}
+            <span class="muted">未绑定</span>
+          {% endif %}
+        </dd>
+      </dl>
+    {% endif %}
+    <p class="borrow-contact-actions">
+      <button type="button" class="btn btn-primary" id="borrowContactCloseBtn">知道了</button>
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var openBtn = document.getElementById("borrowRequestBtn");
+  var modal = document.getElementById("borrowContactModal");
+  var closeBtn = document.getElementById("borrowContactCloseBtn");
+  if (!openBtn || !modal) return;
+
+  function openModal() {
+    modal.style.display = "flex";
+  }
+  function closeModal() {
+    modal.style.display = "none";
+  }
+
+  openBtn.addEventListener("click", openModal);
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", function (e) {
+    if (e.target === modal) closeModal();
+  });
+})();
+</script>
 {% endblock %}
