@@ -62,6 +62,7 @@ from app.user.membership import (
 )
 
 from app.models.usericon import save_user_icon, user_icon_url
+from app.models.wechat_bills import import_qr_income_from_text, list_qr_income_rows
 
 # 注意：db和app在主程序中初始化，然后注入
 users_bp = Blueprint(
@@ -585,6 +586,51 @@ def edit_user():
     if not user_is_admin(user):
         return "❌ 您没有权限编辑其他用户，请联系管理员。"
     return render_template("edit_user.html")
+
+
+@users_bp.route("/import_wechat_bills", methods=["GET", "POST"])
+def import_wechat_bills():
+    """管理员：粘贴微信账单原始 CSV，提取二维码收款并去重入库。"""
+    user = get_current_user(update_last_login=False)
+    if not user:
+        return redirect(url_for("users.user_page"))
+    if not user_is_admin(user):
+        return "❌ 您没有权限导入账单，请联系管理员。"
+
+    error = None
+    pasted = ""
+    if request.method == "POST":
+        pasted = (request.form.get("bill_csv") or "").strip()
+        if not pasted:
+            error = "请粘贴微信导出的账单 CSV 全文。"
+        else:
+            try:
+                stats = import_qr_income_from_text(
+                    pasted,
+                    source_label=f"web_paste:{user.get('name') or 'admin'}",
+                )
+                flash(
+                    f"解析 {stats['parsed']} 条，新写入 {stats['inserted']} 条，"
+                    f"跳过重复 {stats['skipped']} 条；库中现有 {stats['total']} 条。",
+                    "success",
+                )
+                return redirect(url_for("users.import_wechat_bills"))
+            except ValueError as exc:
+                error = str(exc)
+            except Exception:
+                error = "导入失败，请检查粘贴内容是否为完整的微信账单 CSV。"
+
+    all_rows = list_qr_income_rows()
+    recent = list(reversed(all_rows))[:20]
+    return render_template(
+        "import_wechat_bills.html",
+        current_user=user.get("name"),
+        error=error,
+        pasted=pasted,
+        recent=recent,
+        total_count=len(all_rows),
+    )
+
 
 @users_bp.route("/permission_update", methods=["POST"])
 def permission_update():

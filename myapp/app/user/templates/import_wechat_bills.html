@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>账单导入</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/user-pages.css') }}">
+  <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+</head>
+<body class="user-page import-bills-page">
+  <div class="card card--wide">
+    <h2>微信账单导入</h2>
+    <p class="hint">
+      将微信导出的账单 CSV <strong>全文</strong>粘贴到下方（含「微信支付账单明细列表」表头与数据行）。
+      系统仅提取「二维码收款」记录，按订单号去重入库；已存在的订单不会被覆盖。
+    </p>
+    <p class="hint">库中现有记录：{{ total_count }} 条</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="status {{ 'success' if category == 'success' else 'error' }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if error %}
+      <div class="status error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('users.import_wechat_bills') }}">
+      <label for="bill_csv">账单 CSV 全文</label>
+      <textarea id="bill_csv" name="bill_csv" rows="16" placeholder="在此粘贴微信账单 CSV…">{{ pasted }}</textarea>
+      <div class="btn-row">
+        <button type="submit">提取并导入</button>
+        <button type="button" onclick="location.href='/user/edit_user'">编辑用户权限</button>
+        <button type="button" onclick="location.href='/user/'">返回个人中心</button>
+      </div>
+    </form>
+
+    {% if recent %}
+    <h3>最近入库（最多 20 条）</h3>
+    <table class="import-preview-table">
+      <thead>
+        <tr><th>订单号</th><th>交易对方</th><th>备注</th><th>核销</th></tr>
+      </thead>
+      <tbody>
+        {% for row in recent %}
+        <tr>
+          <td>{{ row['订单号'] }}</td>
+          <td>{{ row['交易对方'] }}</td>
+          <td>{{ row['备注'] or '—' }}</td>
+          <td>{{ row['核销'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -14,22 +14,26 @@
 
 import argparse
 import csv
-import io
-import json
 import sys
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# config.txt 相对路径：从 myapp 目录加载
 import os
 
 os.chdir(ROOT)
 
-from app.models.wechat_bills import connect_wechat, wechat_db_path
+from app.models.wechat_bills import (
+    connect_wechat,
+    extract_qr_income_rows,
+    insert_qr_income_rows,
+    list_qr_income_rows,
+    row_from_db,
+    wechat_db_path,
+    write_qr_income_exports,
+)
 
 DEFAULT_DIR = ROOT / "database"
 DEFAULT_CSV = DEFAULT_DIR / "wechat_qr_income.csv"
@@ -37,14 +41,8 @@ DEFAULT_JSON = DEFAULT_DIR / "wechat_qr_income.json"
 DEFAULT_DB = Path(wechat_db_path())
 
 ENCODINGS = ("utf-8-sig", "gb18030", "gbk")
-TABLE_MARKERS = ("微信支付账单明细列表", "微信账单明细列表")
-TYPE_NAME = "二维码收款"
-FIELDS = ("订单号", "交易对方", "备注")
 LIST_FIELDS = ("订单号", "交易对方", "备注", "核销")
-HEADER_ORDER_KEYS = ("订单号", "交易单号")
-HEADER_PEER = "交易对方"
-HEADER_NOTE = "备注"
-HEADER_TYPE = "交易类型"
+
 
 def decode_text(path: Path) -> str:
     raw = path.read_bytes()
@@ -55,153 +53,6 @@ def decode_text(path: Path) -> str:
         except UnicodeDecodeError as exc:
             last_error = exc
     raise last_error
-
-
-def find_table(text: str):
-    lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        if any(mark in line for mark in TABLE_MARKERS):
-            start = i + 1
-            break
-    if start is None:
-        for i, line in enumerate(lines):
-            if HEADER_TYPE in line and HEADER_PEER in line:
-                start = i
-                break
-    if start is None or start >= len(lines):
-        raise ValueError("未找到正表（微信支付账单明细列表）")
-    return lines[start:]
-
-
-def pick_column(fieldnames, *candidates):
-    for name in candidates:
-        if name in fieldnames:
-            return name
-    raise KeyError("缺少列：" + " / ".join(candidates))
-
-
-def extract_rows(text: str):
-    table_lines = find_table(text)
-    reader = csv.DictReader(io.StringIO("\n".join(table_lines)))
-    if not reader.fieldnames:
-        raise ValueError("正表没有表头")
-
-    type_col = pick_column(reader.fieldnames, HEADER_TYPE)
-    order_col = pick_column(reader.fieldnames, *HEADER_ORDER_KEYS)
-    peer_col = pick_column(reader.fieldnames, HEADER_PEER)
-    note_col = pick_column(reader.fieldnames, HEADER_NOTE)
-
-    rows = []
-    for row in reader:
-        if (row.get(type_col) or "").strip() != TYPE_NAME:
-            continue
-        note = (row.get(note_col) or "").strip()
-        if note == "/":
-            note = ""
-        order_no = (row.get(order_col) or "").strip()
-        if not order_no:
-            continue
-        rows.append({
-            "订单号": order_no,
-            "交易对方": (row.get(peer_col) or "").strip(),
-            "备注": note,
-        })
-    return rows
-
-
-def write_csv(rows, dest: Path):
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with dest.open("w", encoding="utf-8-sig", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(FIELDS), extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def write_json(rows, dest: Path):
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(
-        json.dumps(
-            [{key: row[key] for key in FIELDS} for row in rows],
-            ensure_ascii=False,
-            indent=2,
-        ) + "\n",
-        encoding="utf-8",
-    )
-
-
-def connect_db(db_path: Path):
-    return connect_wechat(str(db_path))
-
-
-def dedupe_rows(rows):
-    unique = {}
-    for row in rows:
-        unique.setdefault(row["订单号"], row)
-    return list(unique.values())
-
-
-def insert_new_rows(rows, db_path: Path, source_file: str = ""):
-    """只插入尚未存在的订单号，已有记录保持不变。"""
-    unique_rows = dedupe_rows(rows)
-    conn = connect_db(db_path)
-    existing = {
-        record["order_no"]
-        for record in conn.execute("SELECT order_no FROM wechat_qr_income").fetchall()
-    }
-    imported_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_rows = [row for row in unique_rows if row["订单号"] not in existing]
-    conn.executemany(
-        """
-        INSERT OR IGNORE INTO wechat_qr_income
-            (order_no, peer, note, source_file, imported_at)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        [
-            (row["订单号"], row["交易对方"], row["备注"], source_file, imported_at)
-            for row in new_rows
-        ],
-    )
-    conn.commit()
-    all_rows = [row_from_db(record) for record in conn.execute(
-        "SELECT * FROM wechat_qr_income ORDER BY imported_at, order_no"
-    ).fetchall()]
-    conn.close()
-    skipped = len(rows) - len(new_rows)
-    return new_rows, skipped, all_rows
-
-
-def row_from_db(record):
-    redeemed = 0
-    try:
-        redeemed = record["redeemed"]
-    except (IndexError, KeyError):
-        pass
-    return {
-        "订单号": record["order_no"],
-        "交易对方": record["peer"],
-        "备注": record["note"] or "",
-        "核销": "是" if redeemed else "否",
-    }
-
-
-def lookup_order(order_no: str, db_path: Path):
-    conn = connect_db(db_path)
-    record = conn.execute(
-        "SELECT * FROM wechat_qr_income WHERE order_no = ?",
-        (order_no.strip(),),
-    ).fetchone()
-    conn.close()
-    return row_from_db(record) if record else None
-
-
-def list_orders(db_path: Path):
-    conn = connect_db(db_path)
-    records = conn.execute(
-        "SELECT * FROM wechat_qr_income ORDER BY imported_at DESC, order_no"
-    ).fetchall()
-    conn.close()
-    return [row_from_db(record) for record in records]
 
 
 def print_rows(rows):
@@ -215,22 +66,33 @@ def import_bill(args):
         print(f"找不到文件：{args.csv}", file=sys.stderr)
         sys.exit(1)
 
-    rows = extract_rows(decode_text(args.csv))
-    csv_path = args.output or DEFAULT_CSV
-    json_path = args.json or DEFAULT_JSON
-    db_path = args.db or DEFAULT_DB
+    # 允许从任意 cwd 传入相对路径；脚本已 chdir 到 myapp
+    csv_path = args.csv if args.csv.is_absolute() else (Path.cwd() / args.csv)
+    if not csv_path.is_file():
+        # 兼容在 scripts/ 下传文件名：回退到 scripts/<name>
+        alt = ROOT / "scripts" / args.csv.name
+        if alt.is_file():
+            csv_path = alt
+        else:
+            print(f"找不到文件：{args.csv}", file=sys.stderr)
+            sys.exit(1)
 
-    inserted, skipped, all_rows = insert_new_rows(
-        rows, db_path, source_file=str(args.csv.resolve())
+    rows = extract_qr_income_rows(decode_text(csv_path))
+    out_csv = args.output or DEFAULT_CSV
+    out_json = args.json or DEFAULT_JSON
+
+    inserted, skipped, all_rows = insert_qr_income_rows(
+        rows,
+        source_label=str(csv_path.resolve()),
+        sync_exports=False,
     )
-    write_csv(all_rows, csv_path)
-    write_json(all_rows, json_path)
+    write_qr_income_exports(all_rows, csv_path=out_csv, json_path=out_json)
 
     print(f"本文件 {len(rows)} 条，新写入 {len(inserted)} 条，跳过重复 {skipped} 条。")
     print(f"库中现有 {len(all_rows)} 条：")
-    print(f"  SQLite  {db_path}")
-    print(f"  CSV     {csv_path}")
-    print(f"  JSON    {json_path}")
+    print(f"  SQLite  {args.db or DEFAULT_DB}")
+    print(f"  CSV     {out_csv}")
+    print(f"  JSON    {out_json}")
     print("查询：python3 scripts/extract_wechat_qr_income.py --check 订单号")
 
 
@@ -242,13 +104,20 @@ def check_orders(args):
 
     found = []
     missing = []
-    for order_no in args.check:
-        order_no = order_no.strip()
-        row = lookup_order(order_no, db_path)
-        if row:
-            found.append(row)
-        else:
-            missing.append(order_no)
+    conn = connect_wechat(str(db_path))
+    try:
+        for order_no in args.check:
+            order_no = order_no.strip()
+            record = conn.execute(
+                "SELECT * FROM wechat_qr_income WHERE order_no = ?",
+                (order_no,),
+            ).fetchone()
+            if record:
+                found.append(row_from_db(record))
+            else:
+                missing.append(order_no)
+    finally:
+        conn.close()
 
     if found:
         print("命中：")
@@ -278,7 +147,9 @@ def main():
     args = parser.parse_args()
 
     if args.list:
-        rows = list_orders(args.db or DEFAULT_DB)
+        rows = list_qr_income_rows()
+        # 列表按导入时间倒序更适合 CLI 浏览
+        rows = list(reversed(rows))
         print_rows(rows)
         print(f"# 共 {len(rows)} 条", file=sys.stderr)
         return

@@ -68,6 +68,7 @@
       </div>
       {% if (user_info.association_rank | default(0)) == 4 %}
       <button onclick="location.href='/user/edit_user'">编辑用户权限</button>
+      <button onclick="location.href='/user/import_wechat_bills'">账单导入</button>
       {% endif %}
       <button onclick="location.href='/'">返回首页</button>
       <button onclick="handleLogout()">退出登录</button>
