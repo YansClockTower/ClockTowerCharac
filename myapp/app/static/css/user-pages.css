@@ -73,6 +73,10 @@ body.user-page .card--wide {
   border-radius: var(--radius-sm);
 }
 
+.membership-action {
+  margin: 8px 0 20px;
+}
+
 .instructions {
   margin: 12px 0 16px;
   padding: 12px 14px;
