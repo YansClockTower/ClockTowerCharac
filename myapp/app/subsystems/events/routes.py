@@ -227,6 +227,7 @@ def browse_events_more(user_info):
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
         current_user_is_member=current_user_is_member,
+        browse_tab=browse_tab,
         now=datetime.now,
     )
     return jsonify(
@@ -637,6 +638,7 @@ def fixed_create_table_route(user_info, event_id):
     note = request.form.get("note") or ""
     min_players = request.form.get("self_min_players")
     max_players = request.form.get("self_max_players")
+    self_game_name = request.form.get("self_game_name") or ""
     ok, err, _tid = fixed.create_table(
         event_id,
         current_user,
@@ -644,6 +646,7 @@ def fixed_create_table_route(user_info, event_id):
         note=note,
         min_players=min_players,
         max_players=max_players,
+        self_game_name=self_game_name,
     )
     if ok:
         if board_game_id == fixed.SELF_BROUGHT_GAME_ID:
@@ -691,19 +694,31 @@ def fixed_leave_table_route(user_info, table_id):
     return redirect(url_for("events.browse_events"))
 
 
-@events_bp.route("/fixed/tables/<int:table_id>/confirm", methods=["POST"])
+@events_bp.route("/fixed/tables/<int:table_id>/confirm", methods=["POST"], endpoint="fixed_confirm_table_route")
+@events_bp.route("/fixed/tables/<int:table_id>/reject", methods=["POST"], endpoint="fixed_reject_table_route")
 @login_required_template
-def fixed_confirm_table_route(user_info, table_id):
+def fixed_set_table_commitment_route(user_info, table_id):
     deny = _require_fixed_member(user_info)
     if deny:
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
-    ok, err = fixed.confirm_table_commitment(table_id, user_info["name"])
+    approved = request.path.rstrip("/").endswith("/confirm")
+    ok, err = fixed.set_table_commitment(table_id, user_info["name"], approved)
     event_id = request.form.get("event_id")
     if ok:
-        flash("已确认承诺：允许使用该桌游 / 能将桌游带到场地。", "success")
+        flash(
+            "已确认承诺：允许使用该桌游 / 能将桌游带到场地。"
+            if approved
+            else "已拒绝本桌使用该桌游。",
+            "success" if approved else "info",
+        )
     else:
-        flash(err or "确认失败。", "warning")
+        flash(err or "操作失败。", "warning")
+    if (request.form.get("next") or "") == "browse":
+        tab = (request.form.get("tab") or "").strip()
+        if tab:
+            return redirect(url_for("events.browse_events", tab=tab))
+        return redirect(url_for("events.browse_events"))
     if event_id:
         return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
     return redirect(url_for("events.browse_events"))

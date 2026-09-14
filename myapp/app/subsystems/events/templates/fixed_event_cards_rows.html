@@ -103,9 +103,107 @@
                 {% if event.minplayer and event.maxplayer %} / {% endif %}
                 {% if event.maxplayer %}最多 {{ event.maxplayer }} 人{% endif %}
             {% endif %}
-            <br>
-            <strong>分桌:</strong> {{ event.table_count|default(0) }} 桌
+            · <strong>分桌:</strong> {{ event.table_count|default(0) }} 桌
             （有效 {{ event.valid_table_count|default(0) }} 桌）
+        </div>
+        {% if event.tables %}
+        <div class="fixed-table-groups">
+            {% for table in event.tables %}
+            <div class="fixed-table-group {% if table.is_valid %}is-valid{% else %}is-invalid{% endif %}">
+                <div class="fixed-table-group-head">
+                    <strong class="fixed-table-group-name">{{ table.board_game_name }}</strong>
+                    {% if table.is_self_brought %}<span class="status-tag" style="background:#e8f4f4;color:#2a6f6f;">(自备)</span>{% endif %}
+                    {% if table.is_valid %}
+                    <span class="status-tag status-min-met">(有效桌)</span>
+                    {% else %}
+                    <span class="status-tag status-min-not-met">(未生效)</span>
+                    {% endif %}
+                    <span class="fixed-table-group-count">
+                        {{ table.min_players if table.min_players is not none else '—' }}
+                        / {{ table.attendee_count }}
+                        / {{ table.max_players if table.max_players is not none else '—' }}
+                    </span>
+                </div>
+                <div class="fixed-table-group-players">
+                    {% if table.attendees %}
+                    <span class="player-list">
+                        {% if event.starttime_obj < now() %}
+                            {% for attendance in table.attendees if attendance.signed > 0 %}
+                                {{ player_tag_link(attendance, current_user, "") }}
+                            {% endfor %}
+                            {% for attendance in table.attendees if attendance.signed == 0 %}
+                                {{ player_tag_link(attendance, current_user, "unsigned-player-tag") }}
+                            {% endfor %}
+                        {% else %}
+                            {% for attendance in table.attendees %}
+                                {{ player_tag_link(attendance, current_user, "") }}
+                            {% endfor %}
+                        {% endif %}
+                    </span>
+                    {% else %}
+                    <span class="hint">暂无玩家</span>
+                    {% endif %}
+                </div>
+                <div class="fixed-table-group-commit">
+                    {% if table.is_self_brought %}
+                    <span>来源：组局者自备 · 无需所有者/持有者确认</span>
+                    {% else %}
+                    <span>
+                        所有者 {{ table.owner_name }}：
+                        {% if table.owner_status == 1 %}已确认
+                        {% elif table.owner_status == -1 %}已拒绝
+                        {% else %}待确认{% endif %}
+                    </span>
+                    {% if table.holder_required %}
+                    <span>
+                        持有者 {{ table.holder_name }}：
+                        {% if table.holder_status == 1 %}已确认
+                        {% elif table.holder_status == -1 %}已拒绝
+                        {% else %}待确认{% endif %}
+                    </span>
+                    {% endif %}
+                    {% if not archived and (table.can_confirm or table.can_reject) %}
+                    <span class="fixed-table-group-actions">
+                        {% if table.can_confirm %}
+                        <form method="POST" action="{{ url_for('events.fixed_confirm_table_route', table_id=table.id) }}">
+                            <input type="hidden" name="event_id" value="{{ event.id }}">
+                            <input type="hidden" name="next" value="browse">
+                            <input type="hidden" name="tab" value="{{ browse_tab|default('') }}">
+                            <button type="submit" class="base-btn sign-btn">确认承诺</button>
+                        </form>
+                        {% endif %}
+                        {% if table.can_reject %}
+                        <form method="POST" action="{{ url_for('events.fixed_reject_table_route', table_id=table.id) }}">
+                            <input type="hidden" name="event_id" value="{{ event.id }}">
+                            <input type="hidden" name="next" value="browse">
+                            <input type="hidden" name="tab" value="{{ browse_tab|default('') }}">
+                            <button type="submit" class="base-btn leave-btn">拒绝承诺</button>
+                        </form>
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% if current_user_is_member and not archived and can_end_event %}
+        <div class="event-summary">
+            {% if event.inviter == current_user or current_user_is_admin %}
+            <p><strong>活动签到码:</strong> {{ event.signcode }}</p>
+            <p>请将签到码 <strong>线下</strong> 告知到场的成员。</p>
+            {% endif %}
+            {% if event.is_attending %}
+                {% if not event.user_signed %}
+                    <input type="text" class="base-btn" id="input_signcode-fixed-{{ event.id }}" placeholder="请输入活动签到码">
+                    <button type="button" class="base-btn sign-btn" onclick="signInFixed({{ event.id }}, document.getElementById('input_signcode-fixed-{{ event.id }}').value)">签到</button>
+                {% else %}
+                    <p><strong>已签到，感谢你的支持！</strong></p>
+                {% endif %}
+            {% endif %}
         </div>
         {% endif %}
     </div>

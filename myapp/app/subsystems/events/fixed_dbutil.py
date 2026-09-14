@@ -37,11 +37,11 @@ def _holder_confirmation_required(owner_name, holder_name) -> bool:
 
 
 def _commitments_satisfied(table) -> bool:
-    if not int(table.get("owner_confirmed") or 0):
+    if int(table.get("owner_confirmed") or 0) != 1:
         return False
     if not _holder_confirmation_required(table.get("owner_name"), table.get("holder_name")):
         return True
-    return bool(int(table.get("holder_confirmed") or 0))
+    return int(table.get("holder_confirmed") or 0) == 1
 
 
 def table_is_valid(table) -> bool:
@@ -49,6 +49,9 @@ def table_is_valid(table) -> bool:
     count = int(table.get("attendee_count") or 0)
     if min_p is not None and count < int(min_p):
         return False
+    # 组局者自备：无库内桌游，不检查所有者/持有者承诺
+    if int(table.get("board_game_id") or 0) == SELF_BROUGHT_GAME_ID:
+        return True
     return _commitments_satisfied(table)
 
 
@@ -233,25 +236,37 @@ def list_tables_for_event(event_id, current_user=None, db=None):
         table["is_full"] = table["attendee_count"] >= int(table["max_players"])
         table["is_self_brought"] = int(table.get("board_game_id") or 0) == SELF_BROUGHT_GAME_ID
         table["is_valid"] = table_is_valid(table)
-        table["holder_required"] = _holder_confirmation_required(
-            table.get("owner_name"), table.get("holder_name")
-        )
-        table["commitments_ok"] = _commitments_satisfied(table)
-        if current_user:
+        if table["is_self_brought"]:
+            table["holder_required"] = False
+            table["commitments_ok"] = True
+        else:
+            table["holder_required"] = _holder_confirmation_required(
+                table.get("owner_name"), table.get("holder_name")
+            )
+            table["commitments_ok"] = _commitments_satisfied(table)
+        owner_st = int(table.get("owner_confirmed") or 0)
+        holder_st = int(table.get("holder_confirmed") or 0)
+        table["owner_status"] = owner_st
+        table["holder_status"] = holder_st
+        table["can_confirm"] = False
+        table["can_reject"] = False
+        table["user_on_table"] = False
+        table["user_is_owner"] = False
+        table["user_is_holder"] = False
+        if current_user and not table["is_self_brought"]:
             table["user_on_table"] = any(a["player"] == current_user for a in attendees)
             owner = (table.get("owner_name") or "").strip()
             holder = (table.get("holder_name") or "").strip()
             table["user_is_owner"] = current_user == owner
             table["user_is_holder"] = bool(holder) and current_user == holder
-            table["can_confirm"] = False
-            if table["user_is_owner"] and not int(table.get("owner_confirmed") or 0):
-                table["can_confirm"] = True
-            elif (
-                table["holder_required"]
-                and table["user_is_holder"]
-                and not int(table.get("holder_confirmed") or 0)
-            ):
-                table["can_confirm"] = True
+            if table["user_is_owner"]:
+                table["can_confirm"] = owner_st != 1
+                table["can_reject"] = owner_st != -1
+            elif table["holder_required"] and table["user_is_holder"]:
+                table["can_confirm"] = holder_st != 1
+                table["can_reject"] = holder_st != -1
+        elif current_user:
+            table["user_on_table"] = any(a["player"] == current_user for a in attendees)
         tables.append(table)
     return tables
 
@@ -296,6 +311,7 @@ def create_table(
     note="",
     min_players=None,
     max_players=None,
+    self_game_name="",
 ) -> Tuple[bool, Optional[str], Optional[int]]:
     db = get_db()
     event = get_fixed_event_by_id(event_id)
@@ -323,19 +339,26 @@ def create_table(
     holder_confirmed = 0
 
     if game_id == SELF_BROUGHT_GAME_ID:
-        # 组局者自备：所有者=持有者=开桌者；开桌即视为承诺自带
+        # 组局者自备：临时桌游名与人数写入本桌字段；无所有者/持有者承诺
+        custom_name = (self_game_name or "").strip()
+        if not custom_name:
+            return False, "组局者自备请填写桌游名称。", None
+        if len(custom_name) > 80:
+            return False, "桌游名称过长（最多 80 字）。", None
         try:
-            max_players_val = int(max_players) if max_players is not None else 6
-            min_players_val = int(min_players) if min_players is not None else 2
+            max_players_val = int(max_players) if max_players not in (None, "") else None
+            min_players_val = int(min_players) if min_players not in (None, "") else None
         except (TypeError, ValueError):
-            return False, "自备桌游请填写有效的人数上下限。", None
-        if max_players_val < 1:
-            return False, "自备桌游的人数上限至少为 1。", None
-        if min_players_val is not None and min_players_val > max_players_val:
+            return False, "请填写有效的人数上下限。", None
+        if max_players_val is None or max_players_val < 1:
+            return False, "请填写有效的最大人数。", None
+        if min_players_val is None or min_players_val < 1:
+            return False, "请填写有效的最小人数。", None
+        if min_players_val > max_players_val:
             return False, "人数下限不能大于上限。", None
-        board_game_name = SELF_BROUGHT_GAME_NAME
-        owner_name = host
-        holder_name = host
+        board_game_name = custom_name
+        owner_name = ""
+        holder_name = None
         owner_confirmed = 1
         holder_confirmed = 1
     else:
@@ -468,7 +491,8 @@ def leave_table(table_id, player) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
-def confirm_table_commitment(table_id, username) -> Tuple[bool, Optional[str]]:
+def set_table_commitment(table_id, username, approved: bool) -> Tuple[bool, Optional[str]]:
+    """所有者/持有者确认或拒绝本桌使用该桌游。approved=True 确认，False 拒绝。"""
     db = get_db()
     table_row = db.execute("SELECT * FROM fixed_tables WHERE id = ?", (table_id,)).fetchone()
     if table_row is None:
@@ -478,38 +502,42 @@ def confirm_table_commitment(table_id, username) -> Tuple[bool, Optional[str]]:
     if event is None:
         return False, "活动不存在。"
     if is_event_archived(event):
-        return False, "活动已归档，无法确认。"
+        return False, "活动已归档，无法变更承诺。"
 
     owner = (table.get("owner_name") or "").strip()
     holder = (table.get("holder_name") or "").strip()
     user = (username or "").strip()
     if user != owner and user != holder:
-        return False, "仅桌游所有者或持有者可确认承诺。"
+        return False, "仅桌游所有者或持有者可确认或拒绝承诺。"
 
+    value = 1 if approved else -1
     holder_req = _holder_confirmation_required(owner, holder)
     if user == owner:
         if holder_req:
             db.execute(
-                "UPDATE fixed_tables SET owner_confirmed = 1 WHERE id = ?",
-                (table_id,),
+                "UPDATE fixed_tables SET owner_confirmed = ? WHERE id = ?",
+                (value, table_id),
             )
         else:
-            # 同人 / 无持有者：一次确认同时满足两条件
             db.execute(
                 """
                 UPDATE fixed_tables
-                SET owner_confirmed = 1, holder_confirmed = 1
+                SET owner_confirmed = ?, holder_confirmed = ?
                 WHERE id = ?
                 """,
-                (table_id,),
+                (value, value, table_id),
             )
     elif user == holder:
         db.execute(
-            "UPDATE fixed_tables SET holder_confirmed = 1 WHERE id = ?",
-            (table_id,),
+            "UPDATE fixed_tables SET holder_confirmed = ? WHERE id = ?",
+            (value, table_id),
         )
     db.commit()
     return True, None
+
+
+def confirm_table_commitment(table_id, username) -> Tuple[bool, Optional[str]]:
+    return set_table_commitment(table_id, username, True)
 
 
 def signin_fixed_event(event_id, player, code) -> Tuple[bool, Optional[str]]:

@@ -40,17 +40,6 @@
         · <strong>分桌:</strong> {{ event.table_count }}（有效 {{ event.valid_table_count }}）
       </p>
     </div>
-    {% if event_owner_or_admin and not archived %}
-    <div class="action-buttons" style="margin-top: 8px;">
-      <a class="base-btn edit-btn" style="display:inline-block;text-decoration:none;"
-         href="{{ url_for('events.fixed_edit_route', event_id=event.id) }}">编辑活动</a>
-      <form method="POST" action="{{ url_for('events.fixed_archive_route', event_id=event.id) }}"
-            style="display:inline;"
-            onsubmit="return confirm('{% if can_end_event %}确定结束并归档吗？{% else %}确定删除吗？{% endif %}')">
-        <button type="submit" class="base-btn leave-btn">{% if can_end_event %}结束活动{% else %}删除活动{% endif %}</button>
-      </form>
-    </div>
-    {% endif %}
   </div>
 
   {% if not archived and can_end_event %}
@@ -105,15 +94,20 @@
         <script type="application/json" id="gamePickerData">{{ games|tojson }}</script>
 
         <div id="selfBroughtFields" class="self-brought-fields">
-          <p class="hint">组局者自备：请填写本桌人数上下限（开桌即视为您承诺自带桌游）。</p>
+          <p class="hint">组局者自备：不占用库内桌游，无需所有者/持有者确认。请填写临时桌游名与本桌人数上下限。</p>
+          <p style="margin: 0 0 8px;">
+            <label for="self_game_name">桌游名称 (必填):</label>
+            <input type="text" name="self_game_name" id="self_game_name" maxlength="80" required
+                   placeholder="例如：卡坦岛（自带）" style="width: 98%; max-width: 360px;">
+          </p>
           <div style="display: flex; gap: 16px; flex-wrap: wrap;">
             <p style="margin: 0;">
               <label for="self_min_players">最少人数:</label>
-              <input type="number" name="self_min_players" id="self_min_players" min="1" value="2" style="width: 5rem;">
+              <input type="number" name="self_min_players" id="self_min_players" min="1" value="2" required style="width: 5rem;">
             </p>
             <p style="margin: 0;">
               <label for="self_max_players">最多人数:</label>
-              <input type="number" name="self_max_players" id="self_max_players" min="1" value="6" style="width: 5rem;">
+              <input type="number" name="self_max_players" id="self_max_players" min="1" value="6" required style="width: 5rem;">
             </p>
           </div>
         </div>
@@ -139,75 +133,110 @@
   {% endif %}
 
   {% for table in event.tables %}
-  <div class="event-item fixed-table-card {% if table.is_valid %}is-valid-table{% endif %}">
-    <div class="event-main">
-      <h4>
-        {{ table.board_game_name }}
-        {% if table.is_self_brought %}
-          <span class="status-tag" style="background:#e8f4f4;color:#2a6f6f;">(自备)</span>
+  {% set table_status = "status-archived" if archived else ("status-min-met" if table.is_valid else "status-min-not-met") %}
+  <div class="event-item fixed-table-card {{ table_status }}">
+    <div class="event-details">
+      <div class="event-main">
+        <h3>
+          {{ table.board_game_name }}
+          {% if table.is_self_brought %}
+            <span class="status-tag" style="background:#e8f4f4;color:#2a6f6f;">(自备)</span>
+          {% endif %}
+          {% if archived %}
+            <span class="status-tag status-archived">(已结束)</span>
+          {% elif table.is_valid %}
+            <span class="status-tag status-min-met">(有效桌)</span>
+          {% else %}
+            <span class="status-tag status-min-not-met">(未生效)</span>
+          {% endif %}
+          {% if table.is_full and not archived %}<span class="status-tag status-full">(桌已满)</span>{% endif %}
+        </h3>
+      </div>
+      <div class="event-meta-row">
+        <div class="event-info table-card-fields">
+          <p>
+            <strong>所选桌游:</strong>
+            {% if table.is_self_brought %}
+              {{ table.board_game_name }}
+              <span class="hint">（组局者自备，库中无对应桌游）</span>
+            {% else %}
+              {{ table.board_game_name }}
+            {% endif %}
+            {% if table.note %}<br><strong>备注:</strong> {{ table.note }}{% endif %}
+          </p>
+          <p>
+            <strong>所有玩家:</strong>
+            <span class="player-list">
+              {% for a in table.attendees %}
+                <span class="player-tag{% if a.player == current_user %} current-player-tag{% endif %}{% if event.starttime_obj < now() and a.signed == 0 %} unsigned-player-tag{% endif %}">
+                  {{ a.player }}{% if a.player == table.host %}（建桌）{% endif %}
+                </span>
+              {% endfor %}
+            </span>
+          </p>
+          <p>
+            <strong>人数:</strong>
+            最小 {{ table.min_players if table.min_players is not none else '—' }}
+            / 玩家 {{ table.attendee_count }}
+            / 最大 {{ table.max_players if table.max_players is not none else '—' }}
+          </p>
+          {% if not table.is_self_brought %}
+          <p>
+            <strong>所有者确认:</strong>
+            {% if table.owner_status == 1 %}已确认（{{ table.owner_name }}）
+            {% elif table.owner_status == -1 %}已拒绝（{{ table.owner_name }}）
+            {% else %}未确认（{{ table.owner_name }}）{% endif %}
+            <br>
+            <strong>持有者确认:</strong>
+            {% if not table.holder_required %}
+              无需单独确认（持有者与所有者相同或未填写）
+            {% elif table.holder_status == 1 %}
+              已确认（{{ table.holder_name }}）
+            {% elif table.holder_status == -1 %}
+              已拒绝（{{ table.holder_name }}）
+            {% else %}
+              未确认（{{ table.holder_name }}）
+            {% endif %}
+          </p>
+          {% else %}
+          <p>
+            <strong>承诺确认:</strong> 无需（组局者自备）
+          </p>
+          {% endif %}
+        </div>
+        {% if not archived and not locked %}
+        <div class="action-buttons">
+          {% if table.can_confirm %}
+          <form method="POST" action="{{ url_for('events.fixed_confirm_table_route', table_id=table.id) }}">
+            <input type="hidden" name="event_id" value="{{ event.id }}">
+            <button type="submit" class="base-btn sign-btn">确认承诺</button>
+          </form>
+          {% endif %}
+          {% if table.can_reject %}
+          <form method="POST" action="{{ url_for('events.fixed_reject_table_route', table_id=table.id) }}">
+            <input type="hidden" name="event_id" value="{{ event.id }}">
+            <button type="submit" class="base-btn leave-btn">拒绝承诺</button>
+          </form>
+          {% endif %}
+          {% if table.user_on_table %}
+          <form method="POST" action="{{ url_for('events.fixed_leave_table_route', table_id=table.id) }}">
+            <input type="hidden" name="event_id" value="{{ event.id }}">
+            <button type="submit" class="base-btn leave-btn">退出此桌</button>
+          </form>
+          {% elif event.is_attending %}
+          <button type="button" class="base-btn leave-btn" disabled>已报名其他桌</button>
+          {% elif table.is_full or gathering_full %}
+          <button type="button" class="base-btn leave-btn" disabled>名额已满</button>
+          {% else %}
+          <form method="POST" action="{{ url_for('events.fixed_join_table_route', table_id=table.id) }}">
+            <input type="hidden" name="event_id" value="{{ event.id }}">
+            <button type="submit" class="base-btn join-btn">报名此桌</button>
+          </form>
+          {% endif %}
+        </div>
         {% endif %}
-        {% if table.is_valid %}
-          <span class="status-tag status-min-met">(有效桌)</span>
-        {% else %}
-          <span class="status-tag status-min-not-met">(未生效)</span>
-        {% endif %}
-        {% if table.is_full %}<span class="status-tag status-full">(桌已满)</span>{% endif %}
-      </h4>
-      <p>
-        <strong>开桌:</strong> {{ table.host }} ·
-        <strong>人数:</strong> {{ table.attendee_count }} /
-        {% if table.min_players %}最少 {{ table.min_players }} · {% endif %}
-        最多 {{ table.max_players }}
-        {% if table.note %}<br><strong>备注:</strong> {{ table.note }}{% endif %}
-        <br>
-        {% if table.is_self_brought %}
-        <strong>桌游来源:</strong> 组局者自备（{{ table.owner_name }}）
-        {% if table.commitments_ok %}✅{% else %}⏳{% endif %}
-        {% else %}
-        <strong>桌游所有者:</strong> {{ table.owner_name }}
-        {% if table.owner_confirmed %}✅{% else %}⏳{% endif %}
-        {% if table.holder_required %}
-          · <strong>持有者:</strong> {{ table.holder_name }}
-          {% if table.holder_confirmed %}✅{% else %}⏳{% endif %}
-        {% else %}
-          · <span class="hint">持有者与所有者相同或未填写，所有者确认即可</span>
-        {% endif %}
-        {% endif %}
-      </p>
-      <p>
-        <strong>报名:</strong>
-        {% for a in table.attendees %}
-          <span class="player-tag{% if a.player == current_user %} current-player-tag{% endif %}{% if event.starttime_obj < now() and a.signed == 0 %} unsigned-player-tag{% endif %}">{{ a.player }}</span>
-        {% endfor %}
-      </p>
+      </div>
     </div>
-
-    {% if not archived and not locked %}
-    <div class="action-buttons">
-      {% if table.can_confirm %}
-      <form method="POST" action="{{ url_for('events.fixed_confirm_table_route', table_id=table.id) }}">
-        <input type="hidden" name="event_id" value="{{ event.id }}">
-        <button type="submit" class="base-btn sign-btn">确认承诺（允许使用/带到场）</button>
-      </form>
-      {% endif %}
-
-      {% if table.user_on_table %}
-      <form method="POST" action="{{ url_for('events.fixed_leave_table_route', table_id=table.id) }}">
-        <input type="hidden" name="event_id" value="{{ event.id }}">
-        <button type="submit" class="base-btn leave-btn">退出此桌</button>
-      </form>
-      {% elif event.is_attending %}
-      <button type="button" class="base-btn leave-btn" disabled>已报名其他桌</button>
-      {% elif table.is_full or gathering_full %}
-      <button type="button" class="base-btn leave-btn" disabled>名额已满</button>
-      {% else %}
-      <form method="POST" action="{{ url_for('events.fixed_join_table_route', table_id=table.id) }}">
-        <input type="hidden" name="event_id" value="{{ event.id }}">
-        <button type="submit" class="base-btn join-btn">报名此桌</button>
-      </form>
-      {% endif %}
-    </div>
-    {% endif %}
   </div>
   {% endfor %}
 </div>
@@ -267,8 +296,15 @@ function fixedSignIn(eventId) {
   function setSelection(id, text) {
     hidden.value = String(id);
     label.textContent = text;
+    const isSelf = String(id) === selfId;
     if (selfFields) {
-      selfFields.style.display = (String(id) === selfId) ? "block" : "none";
+      selfFields.style.display = isSelf ? "block" : "none";
+      ["self_game_name", "self_min_players", "self_max_players"].forEach(function (fid) {
+        const el = document.getElementById(fid);
+        if (!el) return;
+        el.required = isSelf;
+        if (!isSelf) el.removeAttribute("required");
+      });
     }
     closePanel();
   }

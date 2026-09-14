@@ -119,6 +119,66 @@
     font-size: 0.95em;
     text-align: center;
 }
+.fixed-table-groups {
+    padding: 8px 4px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.fixed-table-group {
+    text-align: left;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: #fff;
+}
+.fixed-table-group.is-valid {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+.fixed-table-group.is-invalid {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+.fixed-table-group-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    margin-bottom: 6px;
+}
+.fixed-table-group-name {
+    font-size: 0.98rem;
+}
+.fixed-table-group-count {
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: #555;
+}
+.fixed-table-group-players {
+    margin-bottom: 6px;
+}
+.fixed-table-group-commit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    font-size: 0.88rem;
+    color: #444;
+}
+.fixed-table-group-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: auto;
+}
+.fixed-table-group-actions .base-btn {
+    white-space: nowrap;
+}
+.fixed-table-group-actions form {
+    display: inline;
+    margin: 0;
+}
 .player-list {
     display: inline;
     margin-left: 5px;
@@ -239,9 +299,26 @@ a.player-tag:hover {
     color: #fff;
     background: #2a6f6f;
 }
-.fixed-table-card.is-valid-table {
-    border-color: #c3e6cb;
-    background-color: #f6fff8;
+.fixed-detail .event-main p,
+.fixed-detail .event-main br {
+    display: revert;
+}
+.fixed-detail .event-info p {
+    margin: 0 0 8px;
+    line-height: 1.55;
+}
+.fixed-detail .event-info p:last-child {
+    margin-bottom: 0;
+}
+.fixed-detail .table-card-fields .player-list {
+    display: inline;
+    margin-left: 0;
+}
+.fixed-detail .fixed-table-card .event-meta-row {
+    align-items: flex-start;
+}
+.fixed-detail .fixed-table-card .action-buttons {
+    justify-content: flex-start;
 }
 .fixed-detail .hint,
 .event-form .hint {
