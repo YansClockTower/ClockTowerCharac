@@ -15,6 +15,9 @@ from app.subsystems.events.dbutil import (
     is_event_archived,
 )
 
+SELF_BROUGHT_GAME_ID = 0
+SELF_BROUGHT_GAME_NAME = "组局者自备"
+
 
 def _parse_times(event_dict):
     event_dict["starttime_obj"] = datetime.strptime(event_dict["starttime"], "%Y-%m-%dT%H:%M")
@@ -228,6 +231,7 @@ def list_tables_for_event(event_id, current_user=None, db=None):
         table["attendees"] = attendees
         table["attendee_count"] = len(attendees)
         table["is_full"] = table["attendee_count"] >= int(table["max_players"])
+        table["is_self_brought"] = int(table.get("board_game_id") or 0) == SELF_BROUGHT_GAME_ID
         table["is_valid"] = table_is_valid(table)
         table["holder_required"] = _holder_confirmation_required(
             table.get("owner_name"), table.get("holder_name")
@@ -285,7 +289,14 @@ def list_fixed_events_for_browse(current_user, filters=None):
     return [_materialize_fixed_event(row, current_user, db) for row in rows]
 
 
-def create_table(event_id, host, board_game_id, note="") -> Tuple[bool, Optional[str], Optional[int]]:
+def create_table(
+    event_id,
+    host,
+    board_game_id,
+    note="",
+    min_players=None,
+    max_players=None,
+) -> Tuple[bool, Optional[str], Optional[int]]:
     db = get_db()
     event = get_fixed_event_by_id(event_id)
     if event is None:
@@ -302,19 +313,46 @@ def create_table(event_id, host, board_game_id, note="") -> Tuple[bool, Optional
     if maxp is not None and count_fixed_event_attendees(event_id, db) >= int(maxp):
         return False, "聚会总人数已满，无法开桌。", None
 
-    game = boardgames_api.get_game_by_id(int(board_game_id))
-    if not game:
-        return False, "所选桌游不存在。", None
-    max_players = game.get("max_players")
-    if max_players is None or int(max_players) < 1:
-        return False, "该桌游未设置有效的人数上限，无法开桌。", None
+    try:
+        game_id = int(board_game_id) if board_game_id is not None else SELF_BROUGHT_GAME_ID
+    except (TypeError, ValueError):
+        return False, "请选择有效的桌游。", None
 
-    owner_name = (game.get("owner") or "").strip()
-    if not owner_name:
-        return False, "该桌游缺少所有者信息，无法开桌。", None
-    holder_name = (game.get("current_holder") or "").strip() or None
-    min_players = game.get("min_players")
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    owner_confirmed = 0
+    holder_confirmed = 0
+
+    if game_id == SELF_BROUGHT_GAME_ID:
+        # 组局者自备：所有者=持有者=开桌者；开桌即视为承诺自带
+        try:
+            max_players_val = int(max_players) if max_players is not None else 6
+            min_players_val = int(min_players) if min_players is not None else 2
+        except (TypeError, ValueError):
+            return False, "自备桌游请填写有效的人数上下限。", None
+        if max_players_val < 1:
+            return False, "自备桌游的人数上限至少为 1。", None
+        if min_players_val is not None and min_players_val > max_players_val:
+            return False, "人数下限不能大于上限。", None
+        board_game_name = SELF_BROUGHT_GAME_NAME
+        owner_name = host
+        holder_name = host
+        owner_confirmed = 1
+        holder_confirmed = 1
+    else:
+        game = boardgames_api.get_game_by_id(game_id)
+        if not game:
+            return False, "所选桌游不存在。", None
+        max_players_val = game.get("max_players")
+        if max_players_val is None or int(max_players_val) < 1:
+            return False, "该桌游未设置有效的人数上限，无法开桌。", None
+        max_players_val = int(max_players_val)
+        min_raw = game.get("min_players")
+        min_players_val = int(min_raw) if min_raw is not None else None
+        owner_name = (game.get("owner") or "").strip()
+        if not owner_name:
+            return False, "该桌游缺少所有者信息，无法开桌。", None
+        holder_name = (game.get("current_holder") or "").strip() or None
+        board_game_name = game.get("board_game_name") or f"游戏#{game_id}"
 
     try:
         cur = db.execute(
@@ -323,17 +361,19 @@ def create_table(event_id, host, board_game_id, note="") -> Tuple[bool, Optional
                 fixed_event_id, host, board_game_id, board_game_name,
                 min_players, max_players, owner_name, holder_name,
                 owner_confirmed, holder_confirmed, note, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 event_id,
                 host,
-                int(board_game_id),
-                game.get("board_game_name") or f"游戏#{board_game_id}",
-                int(min_players) if min_players is not None else None,
-                int(max_players),
+                game_id,
+                board_game_name,
+                min_players_val,
+                max_players_val,
                 owner_name,
                 holder_name,
+                owner_confirmed,
+                holder_confirmed,
                 (note or "").strip(),
                 created_at,
             ),

@@ -599,12 +599,15 @@ def fixed_detail_route(user_info, event_id):
     enrich_events_attendees_user_ids([event])
     for table in event.get("tables") or []:
         enrich_events_attendees_user_ids([{"attendee_notes": table.get("attendees") or []}])
-    games = boardgames_api.list_browse_rows()
+    games = boardgames_api.list_picker_rows()
     can_end = _event_can_be_ended(event, event.get("attendee_count", 0))
     return render_template(
         "fixed_detail.html",
         event=event,
         games=games,
+        association_owner=boardgames_api.ASSOCIATION_GAME_OWNER,
+        self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
+        self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
         current_user=current_user,
         current_user_is_admin=_is_admin(user_info),
         now=datetime.now,
@@ -622,15 +625,31 @@ def fixed_create_table_route(user_info, event_id):
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
     current_user = user_info["name"]
-    try:
-        board_game_id = int(request.form.get("board_game_id") or 0)
-    except ValueError:
-        flash("请选择有效的桌游。", "error")
-        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+    raw_id = (request.form.get("board_game_id") or "").strip()
+    if raw_id in ("", "0", "self"):
+        board_game_id = fixed.SELF_BROUGHT_GAME_ID
+    else:
+        try:
+            board_game_id = int(raw_id)
+        except ValueError:
+            flash("请选择有效的桌游。", "error")
+            return redirect(url_for("events.fixed_detail_route", event_id=event_id))
     note = request.form.get("note") or ""
-    ok, err, _tid = fixed.create_table(event_id, current_user, board_game_id, note=note)
+    min_players = request.form.get("self_min_players")
+    max_players = request.form.get("self_max_players")
+    ok, err, _tid = fixed.create_table(
+        event_id,
+        current_user,
+        board_game_id,
+        note=note,
+        min_players=min_players,
+        max_players=max_players,
+    )
     if ok:
-        flash("开桌成功！您已自动加入该桌。请催促桌游所有者/持有者确认承诺。", "success")
+        if board_game_id == fixed.SELF_BROUGHT_GAME_ID:
+            flash("开桌成功（组局者自备）！您已自动加入该桌。", "success")
+        else:
+            flash("开桌成功！您已自动加入该桌。请催促桌游所有者/持有者确认承诺。", "success")
     else:
         flash(err or "开桌失败。", "error")
     return redirect(url_for("events.fixed_detail_route", event_id=event_id))

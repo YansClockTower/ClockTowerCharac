@@ -18,6 +18,22 @@ def list_browse_rows():
     return [dict(row) for row in cur.fetchall()]
 
 
+ASSOCIATION_GAME_OWNER = "布鸽桌游协会"
+
+
+def list_picker_rows():
+    """开桌选桌游用：含所有者与人数上下限。"""
+    db = get_db()
+    cur = db.execute(
+        """
+        SELECT id, board_game_name, owner, min_players, max_players, image_path
+        FROM registered_board_games
+        ORDER BY board_game_name COLLATE NOCASE ASC, id DESC
+        """
+    )
+    return [dict(row) for row in cur.fetchall()]
+
+
 def get_game_by_id(game_id: int) -> Optional[dict[str, Any]]:
     db = get_db()
     row = db.execute(

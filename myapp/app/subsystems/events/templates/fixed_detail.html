@@ -78,16 +78,46 @@
     {% elif gathering_full %}
       <p class="hint">聚会总人数已满，无法开桌。</p>
     {% else %}
-      <form method="POST" action="{{ url_for('events.fixed_create_table_route', event_id=event.id) }}">
+      <form method="POST" action="{{ url_for('events.fixed_create_table_route', event_id=event.id) }}" id="openTableForm">
         <p>
-          <label for="board_game_id">选择桌游 (必填):</label>
-          <select name="board_game_id" id="board_game_id" required style="width: 98%; max-width: 480px;">
-            <option value="">-- 从桌游库选择 --</option>
-            {% for g in games %}
-            <option value="{{ g.id }}">{{ g.board_game_name }} (#{{ g.id }})</option>
-            {% endfor %}
-          </select>
+          <label>选择桌游 (必填):</label>
         </p>
+        <div class="game-picker" id="gamePicker"
+             data-association-owner="{{ association_owner }}"
+             data-self-id="{{ self_brought_id }}"
+             data-self-name="{{ self_brought_name }}">
+          <input type="hidden" name="board_game_id" id="board_game_id" value="{{ self_brought_id }}" required>
+          <button type="button" class="game-picker-trigger" id="gamePickerTrigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="game-picker-label" id="gamePickerLabel">{{ self_brought_name }}</span>
+            <span class="game-picker-caret">▾</span>
+          </button>
+          <div class="game-picker-panel" id="gamePickerPanel" hidden>
+            <div class="game-picker-toolbar">
+              <input type="search" id="gamePickerSearch" class="game-picker-search" placeholder="关键词搜索桌游…" autocomplete="off">
+              <label class="game-picker-filter">
+                <input type="checkbox" id="gamePickerAssocOnly">
+                仅显示协会桌游
+              </label>
+            </div>
+            <ul class="game-picker-list" id="gamePickerList" role="listbox"></ul>
+          </div>
+        </div>
+        <script type="application/json" id="gamePickerData">{{ games|tojson }}</script>
+
+        <div id="selfBroughtFields" class="self-brought-fields">
+          <p class="hint">组局者自备：请填写本桌人数上下限（开桌即视为您承诺自带桌游）。</p>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <p style="margin: 0;">
+              <label for="self_min_players">最少人数:</label>
+              <input type="number" name="self_min_players" id="self_min_players" min="1" value="2" style="width: 5rem;">
+            </p>
+            <p style="margin: 0;">
+              <label for="self_max_players">最多人数:</label>
+              <input type="number" name="self_max_players" id="self_max_players" min="1" value="6" style="width: 5rem;">
+            </p>
+          </div>
+        </div>
+
         <p>
           <label for="note">桌备注 (可选):</label>
           <input type="text" name="note" maxlength="120" style="width: 98%; max-width: 480px;" placeholder="例如：新手友好 / 需要自备扩展">
@@ -95,7 +125,7 @@
         <p><button type="submit" class="base-btn join-btn">开桌并加入</button></p>
       </form>
       {% if not games %}
-      <p class="hint">桌游库为空，请先到 <a href="{{ url_for('boardgames.browse') }}">桌游浏览</a> 登记游戏。</p>
+      <p class="hint">桌游库暂无登记；仍可选择「{{ self_brought_name }}」开桌，或先到 <a href="{{ url_for('boardgames.browse') }}">桌游浏览</a> 登记游戏。</p>
       {% endif %}
     {% endif %}
   </div>
@@ -113,6 +143,9 @@
     <div class="event-main">
       <h4>
         {{ table.board_game_name }}
+        {% if table.is_self_brought %}
+          <span class="status-tag" style="background:#e8f4f4;color:#2a6f6f;">(自备)</span>
+        {% endif %}
         {% if table.is_valid %}
           <span class="status-tag status-min-met">(有效桌)</span>
         {% else %}
@@ -127,6 +160,10 @@
         最多 {{ table.max_players }}
         {% if table.note %}<br><strong>备注:</strong> {{ table.note }}{% endif %}
         <br>
+        {% if table.is_self_brought %}
+        <strong>桌游来源:</strong> 组局者自备（{{ table.owner_name }}）
+        {% if table.commitments_ok %}✅{% else %}⏳{% endif %}
+        {% else %}
         <strong>桌游所有者:</strong> {{ table.owner_name }}
         {% if table.owner_confirmed %}✅{% else %}⏳{% endif %}
         {% if table.holder_required %}
@@ -134,6 +171,7 @@
           {% if table.holder_confirmed %}✅{% else %}⏳{% endif %}
         {% else %}
           · <span class="hint">持有者与所有者相同或未填写，所有者确认即可</span>
+        {% endif %}
         {% endif %}
       </p>
       <p>
@@ -191,5 +229,123 @@ function fixedSignIn(eventId) {
   })
   .catch(() => alert("提交请求出错，请稍后再试。"));
 }
+
+(function initGamePicker() {
+  const root = document.getElementById("gamePicker");
+  if (!root) return;
+  const dataEl = document.getElementById("gamePickerData");
+  let games = [];
+  try { games = JSON.parse(dataEl.textContent || "[]"); } catch (e) { games = []; }
+
+  const associationOwner = root.dataset.associationOwner || "布鸽桌游协会";
+  const selfId = String(root.dataset.selfId || "0");
+  const selfName = root.dataset.selfName || "组局者自备";
+  const hidden = document.getElementById("board_game_id");
+  const trigger = document.getElementById("gamePickerTrigger");
+  const label = document.getElementById("gamePickerLabel");
+  const panel = document.getElementById("gamePickerPanel");
+  const search = document.getElementById("gamePickerSearch");
+  const assocOnly = document.getElementById("gamePickerAssocOnly");
+  const list = document.getElementById("gamePickerList");
+  const selfFields = document.getElementById("selfBroughtFields");
+
+  function isAssoc(g) {
+    return ((g.owner || "").trim() === associationOwner);
+  }
+
+  function optionLabel(g) {
+    const parts = [g.board_game_name || ("#" + g.id)];
+    if (g.owner) parts.push("所有者:" + g.owner);
+    const minp = g.min_players;
+    const maxp = g.max_players;
+    if (minp != null || maxp != null) {
+      parts.push("人数:" + (minp != null ? minp : "?") + "-" + (maxp != null ? maxp : "?"));
+    }
+    return parts.join(" · ");
+  }
+
+  function setSelection(id, text) {
+    hidden.value = String(id);
+    label.textContent = text;
+    if (selfFields) {
+      selfFields.style.display = (String(id) === selfId) ? "block" : "none";
+    }
+    closePanel();
+  }
+
+  function renderList() {
+    const q = (search.value || "").trim().toLowerCase();
+    const onlyAssoc = assocOnly.checked;
+    list.innerHTML = "";
+
+    const selfItem = document.createElement("li");
+    selfItem.className = "game-picker-option" + (hidden.value === selfId ? " is-selected" : "");
+    selfItem.setAttribute("role", "option");
+    selfItem.dataset.id = selfId;
+    selfItem.textContent = selfName + "（默认）";
+    if (!q || selfName.toLowerCase().indexOf(q) >= 0) {
+      list.appendChild(selfItem);
+    }
+
+    let shown = 0;
+    games.forEach(function (g) {
+      if (onlyAssoc && !isAssoc(g)) return;
+      const name = (g.board_game_name || "").toLowerCase();
+      const owner = (g.owner || "").toLowerCase();
+      if (q && name.indexOf(q) < 0 && owner.indexOf(q) < 0 && String(g.id).indexOf(q) < 0) return;
+      const li = document.createElement("li");
+      li.className = "game-picker-option" + (String(hidden.value) === String(g.id) ? " is-selected" : "");
+      li.setAttribute("role", "option");
+      li.dataset.id = String(g.id);
+      li.dataset.label = optionLabel(g);
+      li.innerHTML = "<span class='gp-name'></span><span class='gp-meta'></span>";
+      li.querySelector(".gp-name").textContent = g.board_game_name || ("#" + g.id);
+      const metaBits = [];
+      if (g.owner) metaBits.push(g.owner);
+      if (g.min_players != null || g.max_players != null) {
+        metaBits.push((g.min_players != null ? g.min_players : "?") + "-" + (g.max_players != null ? g.max_players : "?") + "人");
+      }
+      li.querySelector(".gp-meta").textContent = metaBits.join(" · ");
+      list.appendChild(li);
+      shown += 1;
+    });
+
+    if (shown === 0 && q) {
+      const empty = document.createElement("li");
+      empty.className = "game-picker-empty";
+      empty.textContent = onlyAssoc ? "没有匹配的协会桌游" : "没有匹配的桌游";
+      list.appendChild(empty);
+    }
+  }
+
+  function openPanel() {
+    panel.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    renderList();
+    search.focus();
+  }
+  function closePanel() {
+    panel.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+  }
+
+  trigger.addEventListener("click", function () {
+    if (panel.hidden) openPanel(); else closePanel();
+  });
+  search.addEventListener("input", renderList);
+  assocOnly.addEventListener("change", renderList);
+  list.addEventListener("click", function (e) {
+    const li = e.target.closest(".game-picker-option");
+    if (!li || !li.dataset.id) return;
+    const id = li.dataset.id;
+    const text = id === selfId ? selfName : (li.dataset.label || li.querySelector(".gp-name").textContent);
+    setSelection(id, id === selfId ? selfName : li.querySelector(".gp-name").textContent);
+  });
+  document.addEventListener("click", function (e) {
+    if (!root.contains(e.target)) closePanel();
+  });
+
+  setSelection(selfId, selfName);
+})();
 </script>
 {% endblock %}
