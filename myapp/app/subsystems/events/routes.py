@@ -606,7 +606,7 @@ def fixed_detail_route(user_info, event_id):
         "fixed_detail.html",
         event=event,
         games=games,
-        association_owner=boardgames_api.ASSOCIATION_GAME_OWNER,
+        picker_owners=boardgames_api.PICKER_OWNER_FILTERS,
         self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
         self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
         current_user=current_user,

@@ -379,18 +379,22 @@ a.player-tag:hover {
     border: 1px solid #ccc;
     border-radius: 6px;
     background: #fff;
+    color: #222;
     cursor: pointer;
     text-align: left;
     font-size: 0.95rem;
 }
 .game-picker-trigger:hover {
     border-color: #2a6f6f;
+    background: #fff;
+    color: #222;
 }
 .game-picker-label {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: #222;
 }
 .game-picker-caret {
     margin-left: 8px;
@@ -423,11 +427,16 @@ a.player-tag:hover {
     border-radius: 5px;
     font-size: 0.92rem;
 }
-.game-picker-filter {
+.game-picker-owners {
     display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+}
+.game-picker-filter {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     color: #444;
     cursor: pointer;
     user-select: none;

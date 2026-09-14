@@ -20,6 +20,14 @@ def list_browse_rows():
 
 ASSOCIATION_GAME_OWNER = "布鸽桌游协会"
 
+# 开桌富下拉按所有者筛选时可选的用户（影编码阶段固定名单）
+PICKER_OWNER_FILTERS = (
+    ASSOCIATION_GAME_OWNER,
+    "不是鱼子酱",
+    "Upkeep",
+    "Doing",
+)
+
 
 def list_picker_rows():
     """开桌选桌游用：含所有者与人数上下限。"""

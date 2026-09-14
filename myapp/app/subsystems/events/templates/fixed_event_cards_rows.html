@@ -149,14 +149,14 @@
                     <span>来源：组局者自备 · 无需所有者/持有者确认</span>
                     {% else %}
                     <span>
-                        桌游所有者{{ table.owner_name }}：
+                        桌游所有者({{ table.owner_name }})：
                         {% if table.owner_status == 1 %}已确认
                         {% elif table.owner_status == -1 %}已拒绝
                         {% else %}待确认{% endif %}
                     </span>
                     {% if table.holder_required %}
                     <span>
-                        持有者{{ table.holder_name }}：
+                        持有者({{ table.holder_name }})：
                         {% if table.holder_status == 1 %}已确认
                         {% elif table.holder_status == -1 %}已拒绝
                         {% else %}待确认{% endif %}
