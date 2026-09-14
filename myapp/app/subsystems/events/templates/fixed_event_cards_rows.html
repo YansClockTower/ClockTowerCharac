@@ -120,17 +120,10 @@
             <div class="fixed-table-group {% if table.is_valid %}is-valid{% else %}is-invalid{% endif %}">
                 <div class="fixed-table-group-head">
                     <strong class="fixed-table-group-name">{{ table.board_game_name }}</strong>
-                    {% if table.is_self_brought %}<span class="status-tag" style="background:#e8f4f4;color:#2a6f6f;">(自备)</span>{% endif %}
-                    {% if table.is_valid %}
-                    <span class="status-tag status-min-met">(有效桌)</span>
-                    {% else %}
-                    <span class="status-tag status-min-not-met">(未生效)</span>
-                    {% endif %}
-                    {% if table.is_full and not archived %}<span class="status-tag status-full">(桌已满)</span>{% endif %}
                     <span class="fixed-table-group-count">
-                        最少 {{ table.min_players if table.min_players is not none else '—' }} 人
-                        / 当前 {{ table.attendee_count }} 人
-                        / 最多 {{ table.max_players if table.max_players is not none else '—' }} 人
+                        最少 {{ table.min_players if table.min_players is not none else '—' }}
+                        / 当前 {{ table.attendee_count }}
+                        / 最多 {{ table.max_players if table.max_players is not none else '—' }}
                     </span>
                 </div>
                 {% if table.note %}
@@ -160,7 +153,7 @@
                 </div>
                 <div class="fixed-table-group-commit">
                     {% if table.is_self_brought %}
-                    <span>来源：组局者自备 · 无需所有者/持有者确认</span>
+                    <span>组局者自备·无需所有/持有者确认</span>
                     {% else %}
                     <span>
                         桌游所有者({{ table.owner_name }})：
