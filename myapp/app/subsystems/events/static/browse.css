@@ -155,6 +155,11 @@
     font-size: 0.85rem;
     color: #555;
 }
+.fixed-table-group-note {
+    margin: 0 0 6px;
+    font-size: 0.88rem;
+    color: #444;
+}
 .fixed-table-group-players {
     margin-bottom: 6px;
 }

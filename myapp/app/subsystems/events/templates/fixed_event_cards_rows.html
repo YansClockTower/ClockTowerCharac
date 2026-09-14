@@ -91,7 +91,7 @@
                     {% endif %}
                     {% if event_owner_or_admin and not archived %}
                         <a class="base-btn edit-btn" style="display:inline-block;text-align:center;text-decoration:none;"
-                           href="{{ url_for('events.fixed_edit_route', event_id=event.id) }}">编辑</a>
+                           href="{{ url_for('events.fixed_edit_route', event_id=event.id) }}">编辑活动</a>
                         <form method="POST"
                               action="{{ url_for('events.fixed_archive_route', event_id=event.id) }}"
                               onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除该固定聚会吗？{% endif %}')">
@@ -113,8 +113,6 @@
                 {% if event.minplayer and event.maxplayer %} / {% endif %}
                 {% if event.maxplayer %}最多 {{ event.maxplayer }} 人{% endif %}
             {% endif %}
-            · <strong>分桌:</strong> {{ event.table_count|default(0) }} 桌
-            （有效 {{ event.valid_table_count|default(0) }} 桌）
         </div>
         {% if event.tables %}
         <div class="fixed-table-groups">
@@ -135,6 +133,11 @@
                         / 最多 {{ table.max_players if table.max_players is not none else '—' }} 人
                     </span>
                 </div>
+                {% if table.note %}
+                <div class="fixed-table-group-note">
+                    <strong>备注:</strong> {{ table.note }}
+                </div>
+                {% endif %}
                 <div class="fixed-table-group-players">
                     {% if table.attendees %}
                     <span class="player-list">
