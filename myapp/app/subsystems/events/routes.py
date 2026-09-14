@@ -169,6 +169,19 @@ def _browse_merged_page(current_user, browse_filters, limit, offset):
     return page, total
 
 
+def _redirect_after_fixed_table_action(event_id=None):
+    """开桌/报名/退桌/承诺后：列表操作回活动板，否则回详情。"""
+    if (request.form.get("next") or "").strip() == "browse":
+        tab = (request.form.get("tab") or "").strip()
+        if tab:
+            return redirect(url_for("events.browse_events", tab=tab))
+        return redirect(url_for("events.browse_events"))
+    eid = event_id or request.form.get("event_id")
+    if eid:
+        return redirect(url_for("events.fixed_detail_route", event_id=int(eid)))
+    return redirect(url_for("events.browse_events"))
+
+
 @events_bp.route("/")
 @login_required_template
 def browse_events(user_info):
@@ -197,6 +210,10 @@ def browse_events(user_info):
         current_user_is_staff=_is_staff(user_info),
         pigeon_tab_label=BROWSE_BOOKMARK_PIGEON_LABEL,
         now=datetime.now,
+        games=boardgames_api.list_picker_rows() if current_user_is_member else [],
+        picker_owners=boardgames_api.PICKER_OWNER_FILTERS,
+        self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
+        self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
     )
 
 
@@ -580,8 +597,8 @@ def fixed_add_route(user_info):
             return _render_fixed_add(user_info)
         data["inviter"] = user_info["name"]
         event_id = fixed.create_fixed_event(data)
-        flash("布鸽桌游聚会已发布！会员可进入分桌、开桌与报名。", "success")
-        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+        flash("布鸽桌游聚会已发布！会员可在活动面板创建分桌与报名。", "success")
+        return redirect(url_for("events.browse_events", tab="pigeon"))
     return _render_fixed_add(user_info)
 
 
@@ -634,7 +651,7 @@ def fixed_create_table_route(user_info, event_id):
             board_game_id = int(raw_id)
         except ValueError:
             flash("请选择有效的桌游。", "error")
-            return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+            return _redirect_after_fixed_table_action(event_id)
     note = request.form.get("note") or ""
     min_players = request.form.get("self_min_players")
     max_players = request.form.get("self_max_players")
@@ -655,7 +672,7 @@ def fixed_create_table_route(user_info, event_id):
             flash("开桌成功！您已自动加入该桌。请催促桌游所有者/持有者确认承诺。", "success")
     else:
         flash(err or "开桌失败。", "error")
-    return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+    return _redirect_after_fixed_table_action(event_id)
 
 
 @events_bp.route("/fixed/tables/<int:table_id>/join", methods=["POST"])
@@ -666,14 +683,11 @@ def fixed_join_table_route(user_info, table_id):
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
     ok, err = fixed.join_table(table_id, user_info["name"])
-    event_id = request.form.get("event_id")
     if ok:
         flash("已报名该桌。", "success")
     else:
         flash(err or "报名失败。", "warning")
-    if event_id:
-        return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
-    return redirect(url_for("events.browse_events"))
+    return _redirect_after_fixed_table_action()
 
 
 @events_bp.route("/fixed/tables/<int:table_id>/leave", methods=["POST"])
@@ -684,14 +698,11 @@ def fixed_leave_table_route(user_info, table_id):
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
     ok, err = fixed.leave_table(table_id, user_info["name"])
-    event_id = request.form.get("event_id")
     if ok:
         flash("已退出该桌。", "info")
     else:
         flash(err or "退桌失败。", "warning")
-    if event_id:
-        return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
-    return redirect(url_for("events.browse_events"))
+    return _redirect_after_fixed_table_action()
 
 
 @events_bp.route("/fixed/tables/<int:table_id>/confirm", methods=["POST"], endpoint="fixed_confirm_table_route")
@@ -704,7 +715,6 @@ def fixed_set_table_commitment_route(user_info, table_id):
         return redirect(url_for("users.membership"))
     approved = request.path.rstrip("/").endswith("/confirm")
     ok, err = fixed.set_table_commitment(table_id, user_info["name"], approved)
-    event_id = request.form.get("event_id")
     if ok:
         flash(
             "已确认承诺：允许使用该桌游 / 能将桌游带到场地。"
@@ -714,14 +724,7 @@ def fixed_set_table_commitment_route(user_info, table_id):
         )
     else:
         flash(err or "操作失败。", "warning")
-    if (request.form.get("next") or "") == "browse":
-        tab = (request.form.get("tab") or "").strip()
-        if tab:
-            return redirect(url_for("events.browse_events", tab=tab))
-        return redirect(url_for("events.browse_events"))
-    if event_id:
-        return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
-    return redirect(url_for("events.browse_events"))
+    return _redirect_after_fixed_table_action()
 
 
 @events_bp.route("/fixed/<int:event_id>/signin", methods=["POST"])

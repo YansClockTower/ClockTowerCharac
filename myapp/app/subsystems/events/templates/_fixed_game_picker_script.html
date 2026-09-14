@@ -1,0 +1,146 @@
+<script>
+(function initGamePicker() {
+  const root = document.getElementById("gamePicker");
+  if (!root || root.dataset.pickerReady === "1") return;
+  root.dataset.pickerReady = "1";
+  const dataEl = document.getElementById("gamePickerData");
+  let games = [];
+  try { games = JSON.parse(dataEl.textContent || "[]"); } catch (e) { games = []; }
+
+  const selfId = String(root.dataset.selfId || "0");
+  const selfName = root.dataset.selfName || "组局者自备";
+  const hidden = document.getElementById("board_game_id");
+  const trigger = document.getElementById("gamePickerTrigger");
+  const label = document.getElementById("gamePickerLabel");
+  const panel = document.getElementById("gamePickerPanel");
+  const search = document.getElementById("gamePickerSearch");
+  const ownersBox = document.getElementById("gamePickerOwners");
+  const list = document.getElementById("gamePickerList");
+  const selfFields = document.getElementById("selfBroughtFields");
+
+  function selectedOwners() {
+    if (!ownersBox) return [];
+    return Array.from(ownersBox.querySelectorAll(".game-picker-owner-cb:checked")).map(function (cb) {
+      return (cb.value || "").trim();
+    }).filter(Boolean);
+  }
+
+  function matchesOwnerFilter(g) {
+    const selected = selectedOwners();
+    if (!selected.length) return true;
+    return selected.indexOf((g.owner || "").trim()) >= 0;
+  }
+
+  function optionLabel(g) {
+    const parts = [g.board_game_name || ("#" + g.id)];
+    if (g.owner) parts.push("所有者:" + g.owner);
+    const minp = g.min_players;
+    const maxp = g.max_players;
+    if (minp != null || maxp != null) {
+      parts.push("人数:" + (minp != null ? minp : "?") + "-" + (maxp != null ? maxp : "?"));
+    }
+    return parts.join(" · ");
+  }
+
+  function setSelection(id, text) {
+    hidden.value = String(id);
+    label.textContent = text;
+    const isSelf = String(id) === selfId;
+    if (selfFields) {
+      selfFields.style.display = isSelf ? "block" : "none";
+      ["self_game_name", "self_min_players", "self_max_players"].forEach(function (fid) {
+        const el = document.getElementById(fid);
+        if (!el) return;
+        el.required = isSelf;
+        if (!isSelf) el.removeAttribute("required");
+      });
+    }
+    closePanel();
+  }
+
+  function renderList() {
+    const q = (search.value || "").trim().toLowerCase();
+    const ownerFiltered = selectedOwners().length > 0;
+    list.innerHTML = "";
+
+    const selfItem = document.createElement("li");
+    selfItem.className = "game-picker-option" + (hidden.value === selfId ? " is-selected" : "");
+    selfItem.setAttribute("role", "option");
+    selfItem.dataset.id = selfId;
+    selfItem.textContent = selfName + "（默认）";
+    if (!q || selfName.toLowerCase().indexOf(q) >= 0) {
+      list.appendChild(selfItem);
+    }
+
+    let shown = 0;
+    games.forEach(function (g) {
+      if (!matchesOwnerFilter(g)) return;
+      const name = (g.board_game_name || "").toLowerCase();
+      const owner = (g.owner || "").toLowerCase();
+      if (q && name.indexOf(q) < 0 && owner.indexOf(q) < 0 && String(g.id).indexOf(q) < 0) return;
+      const li = document.createElement("li");
+      li.className = "game-picker-option" + (String(hidden.value) === String(g.id) ? " is-selected" : "");
+      li.setAttribute("role", "option");
+      li.dataset.id = String(g.id);
+      li.dataset.label = optionLabel(g);
+      li.innerHTML = "<span class='gp-name'></span><span class='gp-meta'></span>";
+      li.querySelector(".gp-name").textContent = g.board_game_name || ("#" + g.id);
+      const metaBits = [];
+      if (g.owner) metaBits.push(g.owner);
+      if (g.min_players != null || g.max_players != null) {
+        metaBits.push((g.min_players != null ? g.min_players : "?") + "-" + (g.max_players != null ? g.max_players : "?") + "人");
+      }
+      li.querySelector(".gp-meta").textContent = metaBits.join(" · ");
+      list.appendChild(li);
+      shown += 1;
+    });
+
+    if (shown === 0 && (q || ownerFiltered)) {
+      const empty = document.createElement("li");
+      empty.className = "game-picker-empty";
+      empty.textContent = "没有匹配的桌游";
+      list.appendChild(empty);
+    }
+  }
+
+  function openPanel() {
+    panel.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    renderList();
+    search.focus();
+  }
+  function closePanel() {
+    panel.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+  }
+
+  trigger.addEventListener("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (panel.hidden) openPanel(); else closePanel();
+  });
+  search.addEventListener("input", renderList);
+  if (ownersBox) {
+    ownersBox.addEventListener("change", renderList);
+  }
+  list.addEventListener("click", function (e) {
+    const li = e.target.closest(".game-picker-option");
+    if (!li || !li.dataset.id) return;
+    const id = li.dataset.id;
+    setSelection(id, id === selfId ? selfName : li.querySelector(".gp-name").textContent);
+  });
+  document.addEventListener("click", function (e) {
+    if (!root.contains(e.target)) closePanel();
+  });
+
+  window.__fixedGamePickerReset = function () {
+    if (search) search.value = "";
+    if (ownersBox) {
+      ownersBox.querySelectorAll(".game-picker-owner-cb").forEach(function (cb) { cb.checked = false; });
+    }
+    setSelection(selfId, selfName);
+  };
+
+  setSelection(selfId, selfName);
+})();
+</script>

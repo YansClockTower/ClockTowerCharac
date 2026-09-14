@@ -1,0 +1,56 @@
+{# 开桌表单字段（详情页 / 列表浮窗共用）；需传入 self_brought_*、picker_owners、games #}
+<p>
+  <label>选择桌游 (必填):</label>
+</p>
+<div class="game-picker" id="gamePicker"
+     data-self-id="{{ self_brought_id }}"
+     data-self-name="{{ self_brought_name }}">
+  <input type="hidden" name="board_game_id" id="board_game_id" value="{{ self_brought_id }}" required>
+  <button type="button" class="game-picker-trigger" id="gamePickerTrigger" aria-haspopup="listbox" aria-expanded="false">
+    <span class="game-picker-label" id="gamePickerLabel">{{ self_brought_name }}</span>
+    <span class="game-picker-caret">▾</span>
+  </button>
+  <div class="game-picker-panel" id="gamePickerPanel" hidden>
+    <div class="game-picker-toolbar">
+      <input type="search" id="gamePickerSearch" class="game-picker-search" placeholder="关键词搜索桌游…" autocomplete="off">
+      <div class="game-picker-owners" id="gamePickerOwners" aria-label="按所有者筛选">
+        {% for owner in picker_owners %}
+        <label class="game-picker-filter">
+          <input type="checkbox" class="game-picker-owner-cb" value="{{ owner }}">
+          {{ owner }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <ul class="game-picker-list" id="gamePickerList" role="listbox"></ul>
+  </div>
+</div>
+<script type="application/json" id="gamePickerData">{{ games|tojson }}</script>
+
+<div id="selfBroughtFields" class="self-brought-fields">
+  <p class="hint">组局者自备：不占用库内桌游，无需所有者/持有者确认。请填写临时桌游名与本桌人数上下限。</p>
+  <p style="margin: 0 0 8px;">
+    <label for="self_game_name">桌游名称 (必填):</label>
+    <input type="text" name="self_game_name" id="self_game_name" maxlength="80" required
+           placeholder="例如：卡坦岛（自带）" style="width: 98%; max-width: 360px;">
+  </p>
+  <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+    <p style="margin: 0;">
+      <label for="self_min_players">最少人数:</label>
+      <input type="number" name="self_min_players" id="self_min_players" min="1" value="2" required style="width: 5rem;">
+    </p>
+    <p style="margin: 0;">
+      <label for="self_max_players">最多人数:</label>
+      <input type="number" name="self_max_players" id="self_max_players" min="1" value="6" required style="width: 5rem;">
+    </p>
+  </div>
+</div>
+
+<p>
+  <label for="note">桌备注 (可选):</label>
+  <input type="text" name="note" id="fixed_table_note" maxlength="120" style="width: 98%; max-width: 480px;" placeholder="例如：新手友好 / 需要自备扩展">
+</p>
+<p><button type="submit" class="base-btn join-btn">开桌并加入</button></p>
+{% if not games %}
+<p class="hint">桌游库暂无登记；仍可选择「{{ self_brought_name }}」开桌，或先到 <a href="{{ url_for('boardgames.browse') }}">桌游浏览</a> 登记游戏。</p>
+{% endif %}

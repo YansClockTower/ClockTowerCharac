@@ -481,4 +481,69 @@ a.player-tag:hover {
     max-width: 520px;
 }
 
+/* 列表页：创建分桌浮窗 */
+body.fixed-modal-open {
+    overflow: hidden;
+}
+.fixed-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 8vh 16px 24px;
+    box-sizing: border-box;
+}
+.fixed-modal[hidden] {
+    display: none !important;
+}
+.fixed-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 30, 30, 0.45);
+}
+.fixed-modal-dialog {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 560px;
+    max-height: 84vh;
+    overflow: auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+    padding: 16px 18px 18px;
+    box-sizing: border-box;
+}
+.fixed-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.fixed-modal-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+.fixed-modal-close {
+    border: none;
+    background: transparent;
+    color: #444;
+    font-size: 1.6rem;
+    line-height: 1;
+    padding: 0 4px;
+    cursor: pointer;
+}
+.fixed-modal-close:hover {
+    color: #111;
+    background: transparent;
+}
+.fixed-modal .game-picker {
+    max-width: none;
+}
+.fixed-modal .self-brought-fields {
+    max-width: none;
+}
 

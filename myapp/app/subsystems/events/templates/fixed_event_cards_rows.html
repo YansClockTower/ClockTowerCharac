@@ -13,6 +13,8 @@
 {% for event in events %}
     {% if event.mode == 'fixed' or event.event_type == '固定聚会' %}
     {% set archived = ((event.signcode|string)|trim == '0') %}
+    {% set locked = event.locktime_obj < now() %}
+    {% set gathering_full = event.maxplayer and event.attendee_count >= event.maxplayer %}
     {% set status_class = "" %}
     {% set status_text = "" %}
     {% if archived %}
@@ -73,8 +75,16 @@
                 </div>
                 <div class="action-buttons">
                     {% if current_user_is_member %}
-                    <a class="base-btn join-btn" style="display:inline-block;text-align:center;text-decoration:none;"
-                       href="{{ url_for('events.fixed_detail_route', event_id=event.id) }}">进入分桌</a>
+                      {% if not archived %}
+                      <button type="button"
+                              class="base-btn join-btn fixed-create-table-btn"
+                              data-event-id="{{ event.id }}"
+                              data-attending="{{ 1 if event.is_attending else 0 }}"
+                              data-full="{{ 1 if gathering_full else 0 }}"
+                              data-locked="{{ 1 if locked else 0 }}">
+                        创建分桌
+                      </button>
+                      {% endif %}
                     {% else %}
                     <a class="base-btn join-btn" style="display:inline-block;text-align:center;text-decoration:none;"
                        href="{{ url_for('users.membership') }}">验证会员资质</a>
@@ -118,6 +128,7 @@
                     {% else %}
                     <span class="status-tag status-min-not-met">(未生效)</span>
                     {% endif %}
+                    {% if table.is_full and not archived %}<span class="status-tag status-full">(桌已满)</span>{% endif %}
                     <span class="fixed-table-group-count">
                         最少 {{ table.min_players if table.min_players is not none else '—' }} 人
                         / 当前 {{ table.attendee_count }} 人
@@ -162,7 +173,8 @@
                         {% else %}待确认{% endif %}
                     </span>
                     {% endif %}
-                    {% if not archived and (table.can_confirm or table.can_reject) %}
+                    {% endif %}
+                    {% if not archived and (table.can_confirm or table.can_reject or not locked) %}
                     <span class="fixed-table-group-actions">
                         {% if table.can_confirm %}
                         <form method="POST" action="{{ url_for('events.fixed_confirm_table_route', table_id=table.id) }}">
@@ -180,8 +192,28 @@
                             <button type="submit" class="base-btn leave-btn">拒绝承诺</button>
                         </form>
                         {% endif %}
+                        {% if not locked %}
+                          {% if table.user_on_table %}
+                          <form method="POST" action="{{ url_for('events.fixed_leave_table_route', table_id=table.id) }}">
+                            <input type="hidden" name="event_id" value="{{ event.id }}">
+                            <input type="hidden" name="next" value="browse">
+                            <input type="hidden" name="tab" value="{{ browse_tab|default('') }}">
+                            <button type="submit" class="base-btn leave-btn">退出此桌</button>
+                          </form>
+                          {% elif event.is_attending %}
+                          <button type="button" class="base-btn leave-btn" disabled>已报名其他桌</button>
+                          {% elif table.is_full or gathering_full %}
+                          <button type="button" class="base-btn leave-btn" disabled>名额已满</button>
+                          {% else %}
+                          <form method="POST" action="{{ url_for('events.fixed_join_table_route', table_id=table.id) }}">
+                            <input type="hidden" name="event_id" value="{{ event.id }}">
+                            <input type="hidden" name="next" value="browse">
+                            <input type="hidden" name="tab" value="{{ browse_tab|default('') }}">
+                            <button type="submit" class="base-btn join-btn">报名此桌</button>
+                          </form>
+                          {% endif %}
+                        {% endif %}
                     </span>
-                    {% endif %}
                     {% endif %}
                 </div>
             </div>
