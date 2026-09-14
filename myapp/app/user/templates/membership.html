@@ -28,6 +28,33 @@
         <li>对于曾经就已支付过会费、已在桌游社的老会员，请参考桌游群公告指示，或私聊<strong>旧桌游社官号(微信号：SJTU-BGA)</strong>。</li>
       </ol>
     </div>
+
+    <div class="membership-qr-block">
+      <p class="membership-qr-lead">也可直接用微信扫描下方二维码：添加社团官号好友，或扫码支付会费。</p>
+      <div class="membership-qr-grid">
+        <figure class="membership-qr-card">
+          <img src="{{ url_for('users.static', filename='img/add_wechat.jpg') }}"
+               alt="布鸽轻桌游协会官号微信二维码"
+               width="220" height="220"
+               loading="lazy">
+          <figcaption>
+            <strong>添加官号好友</strong>
+            <span>微信号 SJTU_PartyBGA</span>
+          </figcaption>
+        </figure>
+        <figure class="membership-qr-card">
+          <img src="{{ url_for('users.static', filename='img/pay_qrcode.jpg') }}"
+               alt="支付会费微信收款二维码"
+               width="220" height="220"
+               loading="lazy">
+          <figcaption>
+            <strong>扫码支付会费</strong>
+            <span>支付后复制账单中的支付单号</span>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+
     <p class="muted">每个支付单号只能核销一次。账单导入可能有延迟；若提交后尚未出现在账单库中，状态为「审核中」，之后访问时会自动复核。</p>
 
     {% if is_member and member_locked %}
