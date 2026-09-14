@@ -1,0 +1,113 @@
+{# 固定聚会面板卡片 #}
+{% macro player_tag_link(attendance, current_user, extra_class="") %}
+  {% set pid = attendance.player %}
+  {% set uid = attendance.user_id %}
+  {% if uid %}
+  <a href="{{ url_for('users.view_user_profile', user_id=uid) }}" class="player-tag{% if extra_class %} {{ extra_class }}{% endif %}{% if pid == current_user %} current-player-tag{% endif %}">
+  {% else %}
+  <span class="player-tag{% if extra_class %} {{ extra_class }}{% endif %}{% if pid == current_user %} current-player-tag{% endif %}">
+  {% endif %}
+      {{ pid }}
+  {% if uid %}</a>{% else %}</span>{% endif %}
+{% endmacro %}
+{% for event in events %}
+    {% if event.mode == 'fixed' or event.event_type == '固定聚会' %}
+    {% set archived = ((event.signcode|string)|trim == '0') %}
+    {% set status_class = "" %}
+    {% set status_text = "" %}
+    {% if archived %}
+        {% set status_class = "status-archived" %}
+        {% set status_text = "(活动已结束)" %}
+    {% elif event.maxplayer and event.attendee_count >= event.maxplayer %}
+        {% set status_class = "status-full" %}
+        {% set status_text = "(名额已满)" %}
+    {% elif event.minplayer and event.attendee_count < event.minplayer %}
+        {% set status_class = "status-min-not-met" %}
+        {% set status_text = "(人数不足)" %}
+    {% elif event.starttime_obj < now() %}
+        {% set status_class = "status-started" %}
+        {% set status_text = "(活动已开始)" %}
+    {% elif event.locktime_obj < now() %}
+        {% set status_class = "status-lock" %}
+        {% set status_text = "(名单已确认)" %}
+    {% elif event.attendee_count > 0 %}
+        {% set status_class = "status-min-met" %}
+        {% set status_text = "(招募中)" %}
+    {% endif %}
+    {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
+    {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
+
+    <div class="event-item fixed-event-item {{ status_class }}">
+        <div class="event-details">
+            <div class="event-main">
+                <h3>
+                    <span class="fixed-badge">布鸽桌游聚会</span>
+                    {{ event.name }}
+                    {% if status_text %}
+                        <span class="status-tag {{ status_class }}">{{ status_text }}</span>
+                    {% endif %}
+                    {% if event.inviter == current_user %}
+                        <span style="font-size: 0.7em; color: green; font-weight: bold;">(我的活动)</span>
+                    {% endif %}
+                    {% if event.is_attending %}
+                        <span style="font-size: 0.7em; color: #0b5; font-weight: bold;">(已报桌)</span>
+                    {% endif %}
+                </h3>
+                {% if event.description %}
+                    {{ event.description }}
+                {% endif %}
+            </div>
+            <div class="event-meta-row">
+                <div class="event-info">
+                    <p>
+                        <strong>活动模式:</strong> 布鸽桌游聚会（分桌报名）<br>
+                        <strong>组织者:</strong> {{ event.inviter }}<br>
+                        {% if current_user_is_member %}
+                        <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
+                        <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
+                        <strong>活动地点:</strong> {{ event.location }}
+                        {% else %}
+                        <span style="font-size:0.9em;color:#666;">（正式会员活动，验证会员后可查看分桌）</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="action-buttons">
+                    {% if current_user_is_member %}
+                    <a class="base-btn join-btn" style="display:inline-block;text-align:center;text-decoration:none;"
+                       href="{{ url_for('events.fixed_detail_route', event_id=event.id) }}">进入分桌</a>
+                    {% else %}
+                    <a class="base-btn join-btn" style="display:inline-block;text-align:center;text-decoration:none;"
+                       href="{{ url_for('users.membership') }}">验证会员资质</a>
+                    {% endif %}
+                    {% if event_owner_or_admin and not archived %}
+                        <a class="base-btn edit-btn" style="display:inline-block;text-align:center;text-decoration:none;"
+                           href="{{ url_for('events.fixed_edit_route', event_id=event.id) }}">编辑</a>
+                        <form method="POST"
+                              action="{{ url_for('events.fixed_archive_route', event_id=event.id) }}"
+                              onsubmit="return confirm('{% if can_end_event %}确定结束活动并归档参与记录吗？{% else %}确定删除该固定聚会吗？{% endif %}')">
+                            <button type="submit" class="base-btn leave-btn">
+                                {% if can_end_event %}结束活动{% else %}删除活动{% endif %}
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if current_user_is_member %}
+        <div class="event-summary">
+            <strong>已报名:</strong>
+            <span style="font-weight: bold; color: #007bff;">{{ event.attendee_count }} 人</span>
+            {% if event.minplayer or event.maxplayer %}
+                /
+                {% if event.minplayer %}最少 {{ event.minplayer }} 人{% endif %}
+                {% if event.minplayer and event.maxplayer %} / {% endif %}
+                {% if event.maxplayer %}最多 {{ event.maxplayer }} 人{% endif %}
+            {% endif %}
+            <br>
+            <strong>分桌:</strong> {{ event.table_count|default(0) }} 桌
+            （有效 {{ event.valid_table_count|default(0) }} 桌）
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endfor %}

@@ -40,9 +40,9 @@
     {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
     {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
     {% set is_full = (status_class == "status-full") %}
-    {% set member_only = (event.event_type or '其他') == '布鸽桌游活动' %}
-    {% set can_join = (not member_only) or current_user_is_member %}
-    {% set show_schedule = (not member_only) or can_join or event.is_attending or event_owner_or_admin %}
+    {% set member_only = false %}
+    {% set can_join = true %}
+    {% set show_schedule = true %}
 
     <div class="event-item {{ status_class }}">
         <div class="event-details">

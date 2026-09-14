@@ -17,31 +17,33 @@ from app.identity.permissions import (
     user_is_staff,
 )
 from app.models.database import get_user_db
+from app.subsystems.boardgames import api as boardgames_api
 from app.subsystems.events.attendee_ids import enrich_events_attendees_user_ids
 from app.subsystems.events.dbutil import (
-    ADMIN_ONLY_LOCATION,
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
-    BROWSE_BOOKMARK_PIGEON_EVENT_TYPE,
-    EVENT_TYPE_VALUES,
+    BROWSE_BOOKMARK_PIGEON_LABEL,
+    FIXED_GATHERING_LABEL,
+    FIXED_GATHERING_LOCATION,
+    FREE_EVENT_TYPE_VALUES,
     PRESET_LOCATIONS,
     archive_event,
-    count_browse_events,
     create_event,
     delete_event,
-    event_requires_staff_privilege,
-    event_requires_membership,
     get_browse_events_page,
     get_event_attendance_records,
     get_event_by_id,
     get_event_listing_by_id,
     friend_event,
     is_event_archived,
+    is_saturday_evening,
     join_event,
     leave_event,
     note_event,
+    saturday_evening_error_message,
     signin_event,
     update_event,
 )
+from app.subsystems.events import fixed_dbutil as fixed
 from app.user.membership import user_is_member
 
 events_bp = Blueprint(
@@ -78,11 +80,9 @@ def _render_add_event(user_info, selected_event_type="其他"):
         current_user=user_info["name"],
         current_user_is_admin=_is_admin(user_info),
         current_user_is_staff=_is_staff(user_info),
-        event_type_values=EVENT_TYPE_VALUES,
+        event_type_values=FREE_EVENT_TYPE_VALUES,
         preset_locations=PRESET_LOCATIONS,
-        admin_only_location=ADMIN_ONLY_LOCATION,
-        pigeon_event_type=BROWSE_BOOKMARK_PIGEON_EVENT_TYPE,
-        selected_event_type=selected_event_type if selected_event_type in EVENT_TYPE_VALUES else "其他",
+        selected_event_type=selected_event_type if selected_event_type in FREE_EVENT_TYPE_VALUES else "其他",
     )
 
 
@@ -93,20 +93,9 @@ def _render_edit_event(event, user_info):
         current_user=user_info["name"],
         current_user_is_admin=_is_admin(user_info),
         current_user_is_staff=_is_staff(user_info),
-        event_type_values=EVENT_TYPE_VALUES,
+        event_type_values=FREE_EVENT_TYPE_VALUES,
         preset_locations=PRESET_LOCATIONS,
-        admin_only_location=ADMIN_ONLY_LOCATION,
-        pigeon_event_type=BROWSE_BOOKMARK_PIGEON_EVENT_TYPE,
     )
-
-
-def _reject_non_staff_restricted(user_info, event_type, location):
-    """非干事及以上选用布鸽类型或南体活动室时返回错误文案，否则 None。"""
-    if _is_staff(user_info):
-        return None
-    if event_requires_staff_privilege(event_type, location):
-        return "仅干事及以上可发布「布鸽桌游活动」或地点为「南体活动室(布鸽专用)」的活动。"
-    return None
 
 
 def _ensure_temporary_user(user_db, username):
@@ -157,8 +146,9 @@ def _browse_tab_and_filters_for_tab(tab_raw):
     filters = {}
     if tab == "light":
         filters["event_type"] = BROWSE_BOOKMARK_LIGHT_EVENT_TYPE
+        filters["free_only"] = True
     elif tab == "pigeon":
-        filters["event_type"] = BROWSE_BOOKMARK_PIGEON_EVENT_TYPE
+        filters["fixed_only"] = True
     elif tab == "my":
         filters["my_activities_only"] = True
     return tab, filters
@@ -168,6 +158,17 @@ def _browse_filters_from_request():
     return _browse_tab_and_filters_for_tab(request.args.get("tab"))
 
 
+def _browse_merged_page(current_user, browse_filters, limit, offset):
+    """合并自由聚会与固定聚会，按开始时间降序分页。"""
+    if browse_filters.get("fixed_only"):
+        free = []
+    else:
+        free = get_browse_events_page(current_user, browse_filters, limit=None, offset=0)
+    fixed_list = fixed.list_fixed_events_for_browse(current_user, browse_filters)
+    page, total = fixed.merge_browse_items(free, fixed_list, limit=limit, offset=offset)
+    return page, total
+
+
 @events_bp.route("/")
 @login_required_template
 def browse_events(user_info):
@@ -175,8 +176,7 @@ def browse_events(user_info):
     current_user_is_admin = user_is_admin(user_info)
     current_user_is_member = user_is_member(user_info)
     browse_tab, browse_filters = _browse_filters_from_request()
-    events_total = count_browse_events(current_user, browse_filters)
-    events = get_browse_events_page(current_user, browse_filters, BROWSE_PAGE_SIZE, 0)
+    events, events_total = _browse_merged_page(current_user, browse_filters, BROWSE_PAGE_SIZE, 0)
     enrich_events_attendees_user_ids(events)
     events_loaded = len(events)
     has_more_browse = events_loaded < events_total
@@ -194,6 +194,8 @@ def browse_events(user_info):
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
         current_user_is_member=current_user_is_member,
+        current_user_is_staff=_is_staff(user_info),
+        pigeon_tab_label=BROWSE_BOOKMARK_PIGEON_LABEL,
         now=datetime.now,
     )
 
@@ -216,12 +218,11 @@ def browse_events_more(user_info):
         limit = BROWSE_PAGE_SIZE
     limit = max(1, min(BROWSE_MORE_MAX_LIMIT, limit))
 
-    total = count_browse_events(current_user, browse_filters)
-    events = get_browse_events_page(current_user, browse_filters, limit, offset)
+    events, total = _browse_merged_page(current_user, browse_filters, limit, offset)
     enrich_events_attendees_user_ids(events)
     loaded_total = offset + len(events)
     html = render_template(
-        "event_cards_rows.html",
+        "browse_cards_mixed.html",
         events=events,
         current_user=current_user,
         current_user_is_admin=current_user_is_admin,
@@ -240,6 +241,19 @@ def browse_events_more(user_info):
     )
 
 
+@events_bp.route("/choose_mode")
+@login_required_template
+def choose_event_mode(user_info):
+    return render_template(
+        "choose_mode.html",
+        current_user=user_info["name"],
+        current_user_is_staff=_is_staff(user_info),
+        current_user_is_member=user_is_member(user_info),
+        fixed_label=FIXED_GATHERING_LABEL,
+        fixed_location=FIXED_GATHERING_LOCATION,
+    )
+
+
 @events_bp.route("/join/<int:event_id>", methods=["POST"])
 @login_required_template
 def join_event_route(user_info, event_id):
@@ -251,9 +265,6 @@ def join_event_route(user_info, event_id):
     if is_event_archived(ev):
         flash("活动已归档，无法报名。", "warning")
         return redirect(url_for("events.browse_events"))
-    if event_requires_membership(ev.get("event_type")) and not user_is_member(user_info):
-        flash("「布鸽桌游活动」仅限会员报名，请先验证会员资质。", "warning")
-        return redirect(url_for("users.membership"))
     success, error = join_event(event_id, current_user)
     if success:
         flash("报名成功！期待您的参与。", "success")
@@ -349,14 +360,13 @@ def add_event_route(user_info):
             return _render_add_event(user_info, request.form.get("event_type", "其他"))
 
         event_type = request.form.get("event_type", "其他")
-        if event_type not in EVENT_TYPE_VALUES:
+        if event_type not in FREE_EVENT_TYPE_VALUES:
             flash("活动类型无效，请重新选择。", "error")
             return _render_add_event(user_info, event_type)
 
         location = (request.form.get("location") or "").strip()
-        deny = _reject_non_staff_restricted(user_info, event_type, location)
-        if deny:
-            flash(deny, "error")
+        if location == FIXED_GATHERING_LOCATION:
+            flash("南体活动室仅用于布鸽桌游聚会（固定聚会）。", "error")
             return _render_add_event(user_info, event_type)
 
         data = {
@@ -402,14 +412,13 @@ def edit_event_route(user_info, event_id):
             return _render_edit_event(event, user_info)
 
         event_type = request.form.get("event_type", "其他")
-        if event_type not in EVENT_TYPE_VALUES:
+        if event_type not in FREE_EVENT_TYPE_VALUES:
             flash("活动类型无效，请重新选择。", "error")
             return _render_edit_event(event, user_info)
 
         location = (request.form.get("location") or "").strip()
-        deny = _reject_non_staff_restricted(user_info, event_type, location)
-        if deny:
-            flash(deny, "error")
+        if location == FIXED_GATHERING_LOCATION:
+            flash("南体活动室仅用于布鸽桌游聚会（固定聚会）。", "error")
             return _render_edit_event(event, user_info)
 
         data = {
@@ -493,5 +502,285 @@ def archive_event_route(user_info, event_id):
         # 如果活动无法结束（可能根本没组起来），就直接删除即可，不需要归档。
         delete_event(event_id)
         flash("活动和所有相关报名记录已成功删除！", "success")
+
+    return redirect(url_for("events.browse_events"))
+
+
+# ----- 固定聚会（布鸽桌游聚会） -----
+
+
+def _render_fixed_add(user_info):
+    return render_template(
+        "fixed_add.html",
+        current_user=user_info["name"],
+        fixed_label=FIXED_GATHERING_LABEL,
+        fixed_location=FIXED_GATHERING_LOCATION,
+    )
+
+
+def _render_fixed_edit(event, user_info):
+    return render_template(
+        "fixed_edit.html",
+        event=event,
+        current_user=user_info["name"],
+        fixed_label=FIXED_GATHERING_LABEL,
+        fixed_location=FIXED_GATHERING_LOCATION,
+    )
+
+
+def _require_fixed_staff(user_info):
+    if _is_staff(user_info):
+        return None
+    return "仅干事及以上可发布布鸽桌游聚会。"
+
+
+def _require_fixed_member(user_info):
+    if user_is_member(user_info):
+        return None
+    return "布鸽桌游聚会仅限正式会员查看与报名，请先验证会员资质。"
+
+
+def _fixed_payload_from_form(form):
+    starttime = form.get("starttime", "")
+    if not is_saturday_evening(starttime):
+        return None, saturday_evening_error_message()
+    try:
+        minplayer_str = form.get("minplayer")
+        maxplayer_str = form.get("maxplayer")
+        minplayer = int(minplayer_str) if minplayer_str else None
+        maxplayer = int(maxplayer_str) if maxplayer_str else None
+    except ValueError:
+        return None, "最小/最大玩家数必须是数字！"
+    data = {
+        "name": (form.get("name") or "").strip(),
+        "location": FIXED_GATHERING_LOCATION,
+        "starttime": starttime,
+        "locktime": form.get("locktime", ""),
+        "description": form.get("description", ""),
+        "minplayer": minplayer,
+        "maxplayer": maxplayer,
+    }
+    if not (data["name"] and data["starttime"] and data["locktime"]):
+        return None, "请完整填写名称、开始时间与锁定时间。"
+    return data, None
+
+
+@events_bp.route("/fixed/add", methods=["GET", "POST"])
+@login_required_template
+def fixed_add_route(user_info):
+    deny = _require_fixed_staff(user_info)
+    if deny:
+        flash(deny, "error")
+        return redirect(url_for("events.choose_event_mode"))
+    if request.method == "POST":
+        data, err = _fixed_payload_from_form(request.form)
+        if err:
+            flash(err, "error")
+            return _render_fixed_add(user_info)
+        data["inviter"] = user_info["name"]
+        event_id = fixed.create_fixed_event(data)
+        flash("布鸽桌游聚会已发布！会员可进入分桌、开桌与报名。", "success")
+        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+    return _render_fixed_add(user_info)
+
+
+@events_bp.route("/fixed/<int:event_id>")
+@login_required_template
+def fixed_detail_route(user_info, event_id):
+    deny = _require_fixed_member(user_info)
+    if deny:
+        flash(deny, "warning")
+        return redirect(url_for("users.membership"))
+    current_user = user_info["name"]
+    event = fixed.get_fixed_event_detail(event_id, current_user)
+    if event is None:
+        flash("布鸽桌游聚会不存在。", "error")
+        return redirect(url_for("events.browse_events"))
+    enrich_events_attendees_user_ids([event])
+    for table in event.get("tables") or []:
+        enrich_events_attendees_user_ids([{"attendee_notes": table.get("attendees") or []}])
+    games = boardgames_api.list_browse_rows()
+    can_end = _event_can_be_ended(event, event.get("attendee_count", 0))
+    return render_template(
+        "fixed_detail.html",
+        event=event,
+        games=games,
+        current_user=current_user,
+        current_user_is_admin=_is_admin(user_info),
+        now=datetime.now,
+        can_end_event=can_end,
+        fixed_label=FIXED_GATHERING_LABEL,
+        fixed_location=FIXED_GATHERING_LOCATION,
+    )
+
+
+@events_bp.route("/fixed/<int:event_id>/tables", methods=["POST"])
+@login_required_template
+def fixed_create_table_route(user_info, event_id):
+    deny = _require_fixed_member(user_info)
+    if deny:
+        flash(deny, "warning")
+        return redirect(url_for("users.membership"))
+    current_user = user_info["name"]
+    try:
+        board_game_id = int(request.form.get("board_game_id") or 0)
+    except ValueError:
+        flash("请选择有效的桌游。", "error")
+        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+    note = request.form.get("note") or ""
+    ok, err, _tid = fixed.create_table(event_id, current_user, board_game_id, note=note)
+    if ok:
+        flash("开桌成功！您已自动加入该桌。请催促桌游所有者/持有者确认承诺。", "success")
+    else:
+        flash(err or "开桌失败。", "error")
+    return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+
+
+@events_bp.route("/fixed/tables/<int:table_id>/join", methods=["POST"])
+@login_required_template
+def fixed_join_table_route(user_info, table_id):
+    deny = _require_fixed_member(user_info)
+    if deny:
+        flash(deny, "warning")
+        return redirect(url_for("users.membership"))
+    ok, err = fixed.join_table(table_id, user_info["name"])
+    event_id = request.form.get("event_id")
+    if ok:
+        flash("已报名该桌。", "success")
+    else:
+        flash(err or "报名失败。", "warning")
+    if event_id:
+        return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
+    return redirect(url_for("events.browse_events"))
+
+
+@events_bp.route("/fixed/tables/<int:table_id>/leave", methods=["POST"])
+@login_required_template
+def fixed_leave_table_route(user_info, table_id):
+    deny = _require_fixed_member(user_info)
+    if deny:
+        flash(deny, "warning")
+        return redirect(url_for("users.membership"))
+    ok, err = fixed.leave_table(table_id, user_info["name"])
+    event_id = request.form.get("event_id")
+    if ok:
+        flash("已退出该桌。", "info")
+    else:
+        flash(err or "退桌失败。", "warning")
+    if event_id:
+        return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
+    return redirect(url_for("events.browse_events"))
+
+
+@events_bp.route("/fixed/tables/<int:table_id>/confirm", methods=["POST"])
+@login_required_template
+def fixed_confirm_table_route(user_info, table_id):
+    deny = _require_fixed_member(user_info)
+    if deny:
+        flash(deny, "warning")
+        return redirect(url_for("users.membership"))
+    ok, err = fixed.confirm_table_commitment(table_id, user_info["name"])
+    event_id = request.form.get("event_id")
+    if ok:
+        flash("已确认承诺：允许使用该桌游 / 能将桌游带到场地。", "success")
+    else:
+        flash(err or "确认失败。", "warning")
+    if event_id:
+        return redirect(url_for("events.fixed_detail_route", event_id=int(event_id)))
+    return redirect(url_for("events.browse_events"))
+
+
+@events_bp.route("/fixed/<int:event_id>/signin", methods=["POST"])
+@token_required
+def fixed_signin_route(current_user, event_id):
+    if not user_is_member(current_user):
+        return jsonify({"success": False, "message": "仅限正式会员签到"}), 200
+    data = request.get_json(silent=True) or {}
+    signcode = data.get("signcode")
+    success, error = fixed.signin_fixed_event(event_id, current_user["name"], signcode)
+    if success:
+        return jsonify({"success": True, "message": "签到成功"}), 200
+    return jsonify({"success": False, "message": error}), 200
+
+
+@events_bp.route("/fixed/<int:event_id>/edit", methods=["GET", "POST"])
+@login_required_template
+def fixed_edit_route(user_info, event_id):
+    event = fixed.get_fixed_event_by_id(event_id)
+    current_user = user_info["name"]
+    if event is None or (not _is_admin(user_info) and event["inviter"] != current_user):
+        flash("您无权编辑此活动或活动不存在。", "error")
+        return redirect(url_for("events.browse_events"))
+    if is_event_archived(event):
+        flash("该活动已归档，无法编辑。", "warning")
+        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+
+    if request.method == "POST":
+        data, err = _fixed_payload_from_form(request.form)
+        if err:
+            flash(err, "error")
+            return _render_fixed_edit(event, user_info)
+        fixed.update_fixed_event(event_id, data)
+        flash("布鸽桌游聚会信息已更新。", "success")
+        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+    return _render_fixed_edit(event, user_info)
+
+
+@events_bp.route("/fixed/<int:event_id>/archive", methods=["POST"])
+@login_required_template
+def fixed_archive_route(user_info, event_id):
+    ensure_user_permission_schema()
+    event = fixed.get_fixed_event_by_id(event_id)
+    current_user = user_info["name"]
+    if event is None or (not _is_admin(user_info) and event["inviter"] != current_user):
+        flash("您无权归档此活动或活动不存在。", "error")
+        return redirect(url_for("events.browse_events"))
+    if is_event_archived(event):
+        flash("该活动已经归档。", "info")
+        return redirect(url_for("events.browse_events"))
+
+    detail = fixed.get_fixed_event_detail(event_id, current_user)
+    attendee_count = int(detail.get("attendee_count", 0)) if detail else 0
+
+    if _event_can_be_ended(event, attendee_count):
+        attendance_records = fixed.get_fixed_event_attendance_records(event_id)
+        user_db = get_user_db()
+        _ensure_temporary_user(user_db, event["inviter"])
+        user_db.execute(
+            f"""
+            UPDATE user_info
+            SET {ACTIVITY_ORGANIZED_COUNT_COLUMN} = COALESCE({ACTIVITY_ORGANIZED_COUNT_COLUMN}, 0) + 1
+            WHERE name = ?
+            """,
+            (event["inviter"],),
+        )
+        for attendance in attendance_records:
+            player = attendance["player"]
+            _ensure_temporary_user(user_db, player)
+            if int(attendance.get("signed", 0)) > 0:
+                user_db.execute(
+                    f"""
+                    UPDATE user_info
+                    SET {ACTIVITY_JOINED_COUNT_COLUMN} = COALESCE({ACTIVITY_JOINED_COUNT_COLUMN}, 0) + 1
+                    WHERE name = ?
+                    """,
+                    (player,),
+                )
+            else:
+                user_db.execute(
+                    f"""
+                    UPDATE user_info
+                    SET {ACTIVITY_ABSENT_COUNT_COLUMN} = COALESCE({ACTIVITY_ABSENT_COUNT_COLUMN}, 0) + 1
+                    WHERE name = ?
+                    """,
+                    (player,),
+                )
+        user_db.commit()
+        user_db.close()
+        fixed.archive_fixed_event(event_id)
+        flash("固定聚会已结束，参与记录已归档。", "success")
+    else:
+        fixed.delete_fixed_event(event_id)
+        flash("固定聚会及分桌报名已删除。", "success")
 
     return redirect(url_for("events.browse_events"))

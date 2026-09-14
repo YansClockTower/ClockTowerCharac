@@ -11,7 +11,7 @@
     <div class="event-list">
         <div class="browse-header-row">
             <h2>活动列表 <span class="browse-count">（共 {{ events_total }} 个）</span></h2>
-            <a href="{{ url_for('events.add_event_route') }}" class="base-btn corner-button">
+            <a href="{{ url_for('events.choose_event_mode') }}" class="base-btn corner-button">
                 + 新活动
             </a>
         </div>
@@ -22,25 +22,25 @@
             <a class="browse-tab {% if browse_tab == 'light' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events', tab='light') }}">轻桌游聚会</a>
             <a class="browse-tab {% if browse_tab == 'pigeon' %}is-active{% endif %}"
-               href="{{ url_for('events.browse_events', tab='pigeon') }}">布鸽桌游活动</a>
+               href="{{ url_for('events.browse_events', tab='pigeon') }}">{{ pigeon_tab_label|default('布鸽桌游聚会') }}</a>
             <a class="browse-tab {% if browse_tab == 'my' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events', tab='my') }}">我的活动</a>
         </nav>
 
-        {# 活动列表容器：events_total、browse_tab、has_more_browse；行模板见 event_cards_rows.html #}
+        {# 活动列表容器：events_total、browse_tab、has_more_browse；行模板见 browse_cards_mixed.html #}
         {% if events_total == 0 %}
             {% if browse_tab == 'light' %}
-                <p>当前没有「轻桌游聚会」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
+                <p>当前没有「轻桌游聚会」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.choose_event_mode') }}">添加活动</a>。</p>
             {% elif browse_tab == 'pigeon' %}
-                <p>当前没有「布鸽桌游活动」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
+                <p>当前没有「{{ pigeon_tab_label|default('布鸽桌游聚会') }}」。<a href="{{ url_for('events.browse_events') }}">查看全部</a>{% if current_user_is_staff %} 或 <a href="{{ url_for('events.fixed_add_route') }}">发布一场</a>{% endif %}。</p>
             {% elif browse_tab == 'my' %}
-                <p>暂无您组织或已报名的活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.add_event_route') }}">添加活动</a>。</p>
+                <p>暂无您组织或已报名的活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.choose_event_mode') }}">添加活动</a>。</p>
             {% else %}
-                <p>目前还没有活动信息。去 <a href="{{ url_for('events.add_event_route') }}">添加一个</a> 吧！</p>
+                <p>目前还没有活动信息。去 <a href="{{ url_for('events.choose_event_mode') }}">添加一个</a> 吧！</p>
             {% endif %}
         {% else %}
         <div id="browse-events-list" class="browse-events-list">
-        {% include "event_cards_rows.html" %}
+        {% include "browse_cards_mixed.html" %}
         </div>
         <p id="browse-load-status" class="browse-load-status" role="status" aria-live="polite" hidden>加载中…</p>
         {% if has_more_browse %}

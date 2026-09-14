@@ -26,23 +26,21 @@
                 <label for="event_type">活动类型 (必填):</label>
                 <select id="event_type" name="event_type" required>
                     {% set current_event_type = event.event_type or "其他" %}
+                    {% set selectable_type = current_event_type if current_event_type in event_type_values else "其他" %}
                     {% for type_name in event_type_values %}
-                    {% if type_name != pigeon_event_type or current_user_is_staff or type_name == current_event_type %}
-                    <option value="{{ type_name }}" {% if type_name == current_event_type %}selected{% endif %}
-                      {% if type_name == pigeon_event_type and not current_user_is_staff %}disabled{% endif %}>{{ type_name }}</option>
-                    {% endif %}
+                    <option value="{{ type_name }}" {% if type_name == selectable_type %}selected{% endif %}>{{ type_name }}</option>
                     {% endfor %}
                 </select>
+                {% if current_event_type not in event_type_values %}
+                <span class="hint">原类型「{{ current_event_type }}」已改为固定聚会模式，保存时请改选自由聚会类型。</span>
+                {% endif %}
             </p>
             <p>
                 <label for="location_select">活动地点 (必填):</label>
                 <select id="location_select" name="location_select" required onchange="checkLocation(this)">
                     <option value="">-- 请选择地点 --</option>
                     {% for loc in preset_locations %}
-                    {% if loc != admin_only_location or current_user_is_staff or loc == event.location %}
-                    <option value="{{ loc }}"
-                      {% if loc == admin_only_location and not current_user_is_staff %}disabled{% endif %}>{{ loc }}</option>
-                    {% endif %}
+                    <option value="{{ loc }}">{{ loc }}</option>
                     {% endfor %}
                     <option value="其他（自己填写）">其他（自己填写）</option>
                 </select>

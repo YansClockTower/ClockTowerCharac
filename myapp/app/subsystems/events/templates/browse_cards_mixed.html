@@ -1,0 +1,15 @@
+{# 混合列表：自由聚会 + 固定聚会卡片 #}
+{% set free_events = events | selectattr('mode', 'ne', 'fixed') | list %}
+{% set fixed_only = events | selectattr('mode', 'equalto', 'fixed') | list %}
+{# 保序：按传入 events 顺序逐条渲染 #}
+{% for event in events %}
+  {% if event.mode == 'fixed' %}
+    {% with events=[event] %}
+      {% include "fixed_event_cards_rows.html" %}
+    {% endwith %}
+  {% else %}
+    {% with events=[event] %}
+      {% include "event_cards_rows.html" %}
+    {% endwith %}
+  {% endif %}
+{% endfor %}

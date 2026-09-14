@@ -7,20 +7,23 @@ from flask import g
 
 from app.models.config import get_config
 
+# 含历史「布鸽桌游活动」以便旧自由聚会记录归一化；新建自由聚会勿再用该类型
 EVENT_TYPE_VALUES = ("轻桌游聚会", "布鸽桌游活动", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "其他")
+# 自由聚会可选类型（布鸽改为固定聚会模式）
+FREE_EVENT_TYPE_VALUES = ("轻桌游聚会", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "其他")
 
-# 活动板书签对应的类型，须与 EVENT_TYPE_VALUES 中该项一致
 BROWSE_BOOKMARK_LIGHT_EVENT_TYPE = "轻桌游聚会"
+# 面板「布鸽」书签：固定聚会（布鸽桌游聚会）
+BROWSE_BOOKMARK_PIGEON_LABEL = "布鸽桌游聚会"
+FIXED_GATHERING_LABEL = "布鸽桌游聚会"
+FIXED_GATHERING_LOCATION = "南体活动室(布鸽专用)"
+# 周六晚：weekday==5（周六），且小时 >= 18
+FIXED_GATHERING_EVENING_HOUR_START = 18
+
+# 兼容旧导入名
 BROWSE_BOOKMARK_PIGEON_EVENT_TYPE = "布鸽桌游活动"
-
-MEMBER_ONLY_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
-
-# 仅干事及以上可选用的活动类型 / 地点（association_rank >= 3）
-STAFF_PRIVILEGE_EVENT_TYPES = frozenset({BROWSE_BOOKMARK_PIGEON_EVENT_TYPE})
-STAFF_ONLY_LOCATION = "南体活动室(布鸽专用)"
-# 兼容旧名
-ADMIN_ONLY_EVENT_TYPES = STAFF_PRIVILEGE_EVENT_TYPES
-ADMIN_ONLY_LOCATION = STAFF_ONLY_LOCATION
+STAFF_ONLY_LOCATION = FIXED_GATHERING_LOCATION
+ADMIN_ONLY_LOCATION = FIXED_GATHERING_LOCATION
 PRESET_LOCATIONS = (
     "交大紫矜街(博雅厅)",
     "交大玉兰苑",
@@ -28,19 +31,27 @@ PRESET_LOCATIONS = (
     "华师秋实",
     "华师冬日",
     "华师研寓",
-    ADMIN_ONLY_LOCATION,
 )
 
 
-def event_requires_membership(event_type: str) -> bool:
-    return (event_type or "其他") in MEMBER_ONLY_EVENT_TYPES
+def parse_event_datetime(value: str):
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M")
 
 
-def event_requires_staff_privilege(event_type: str, location: str) -> bool:
-    """布鸽桌游活动类型，或南体活动室(布鸽专用)地点，需干事及以上身份。"""
-    if (event_type or "其他") in STAFF_PRIVILEGE_EVENT_TYPES:
-        return True
-    return (location or "").strip() == STAFF_ONLY_LOCATION
+def is_saturday_evening(starttime: str) -> bool:
+    """固定聚会开始时间须为周六晚（周六、当地时间 18:00 及以后）。"""
+    try:
+        dt = parse_event_datetime(starttime)
+    except (TypeError, ValueError):
+        return False
+    return dt.weekday() == 5 and dt.hour >= FIXED_GATHERING_EVENING_HOUR_START
+
+
+def saturday_evening_error_message() -> str:
+    return (
+        f"布鸽桌游聚会须安排在周六晚"
+        f"（周六 {FIXED_GATHERING_EVENING_HOUR_START}:00 及以后）。"
+    )
 
 
 # signcode 置为该值表示活动已归档（结束），不再允许报名/编辑等操作
@@ -96,6 +107,58 @@ def _ensure_events_schema(db):
         END
         """,
         EVENT_TYPE_VALUES,
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fixed_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signcode TEXT NOT NULL,
+            name TEXT NOT NULL,
+            inviter TEXT NOT NULL,
+            location TEXT NOT NULL,
+            starttime TEXT NOT NULL,
+            locktime TEXT NOT NULL,
+            description TEXT,
+            minplayer INTEGER,
+            maxplayer INTEGER
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fixed_tables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fixed_event_id INTEGER NOT NULL,
+            host TEXT NOT NULL,
+            board_game_id INTEGER NOT NULL,
+            board_game_name TEXT NOT NULL,
+            min_players INTEGER,
+            max_players INTEGER NOT NULL,
+            owner_name TEXT NOT NULL,
+            holder_name TEXT,
+            owner_confirmed INTEGER NOT NULL DEFAULT 0,
+            holder_confirmed INTEGER NOT NULL DEFAULT 0,
+            note TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(fixed_event_id) REFERENCES fixed_events(id) ON DELETE CASCADE
+        )
+        """
+    )
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fixed_table_attend (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            table_id INTEGER NOT NULL,
+            fixed_event_id INTEGER NOT NULL,
+            player TEXT NOT NULL,
+            note TEXT,
+            signed INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(fixed_event_id, player),
+            UNIQUE(table_id, player),
+            FOREIGN KEY(table_id) REFERENCES fixed_tables(id) ON DELETE CASCADE,
+            FOREIGN KEY(fixed_event_id) REFERENCES fixed_events(id) ON DELETE CASCADE
+        )
+        """
     )
     db.commit()
 

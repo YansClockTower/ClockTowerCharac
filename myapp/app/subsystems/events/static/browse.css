@@ -221,3 +221,68 @@ a.player-tag:hover {
     justify-content: center;
     width: 100%;
 }
+
+/* 固定聚会卡片 */
+.fixed-event-item {
+    border-left: 4px solid #2a6f6f;
+    background: linear-gradient(90deg, #f3faf9 0%, #fff 48px);
+}
+.fixed-badge {
+    display: inline-block;
+    font-size: 0.65em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    margin-right: 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+    color: #fff;
+    background: #2a6f6f;
+}
+.fixed-table-card.is-valid-table {
+    border-color: #c3e6cb;
+    background-color: #f6fff8;
+}
+.fixed-detail .hint,
+.event-form .hint {
+    color: #666;
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+.mode-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 18px;
+}
+@media (min-width: 640px) {
+    .mode-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+.mode-card {
+    display: block;
+    padding: 18px 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    background: #fff;
+}
+.mode-card:hover {
+    border-color: #2a6f6f;
+    box-shadow: 0 2px 8px rgba(42, 111, 111, 0.12);
+}
+.mode-card h3 {
+    margin: 0 0 8px;
+}
+.mode-card p {
+    margin: 0;
+    color: #555;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+.mode-card-fixed {
+    border-left: 4px solid #2a6f6f;
+}
+
