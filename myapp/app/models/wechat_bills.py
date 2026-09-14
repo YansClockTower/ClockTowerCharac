@@ -264,6 +264,59 @@ def insert_qr_income_rows(rows, source_label: str = "", sync_exports: bool = Tru
     return new_rows, skipped, all_rows
 
 
+def insert_manual_qr_income(
+    order_no: str,
+    peer: str,
+    note: str = "",
+    source_label: str = "manual",
+    sync_exports: bool = True,
+):
+    """
+    手动写入一条二维码收款记录。
+    返回 (status, detail)：
+      ok — 已写入；detail 为新行 dict
+      duplicate — 订单号已存在；detail 为已有行
+      invalid — 参数不合法；detail 为错误说明
+    """
+    order_no = normalize_order_no(order_no)
+    peer = (peer or "").strip()
+    note = (note or "").strip()
+    if note == "/":
+        note = ""
+
+    if not order_no:
+        return "invalid", "请填写订单号。"
+    if not is_valid_order_no(order_no):
+        return "invalid", "订单号格式无效（应为 10–40 位字母或数字）。"
+    if not peer:
+        return "invalid", "请填写用户名（交易对方）。"
+
+    conn = connect_wechat()
+    try:
+        existing = find_income_order(conn, order_no)
+        if existing is not None:
+            return "duplicate", row_from_db(existing)
+
+        imported_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            """
+            INSERT INTO wechat_qr_income
+                (order_no, peer, note, source_file, imported_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (order_no, peer, note, source_label, imported_at),
+        )
+        conn.commit()
+        row = row_from_db(find_income_order(conn, order_no))
+        all_rows = list_qr_income_rows(conn)
+    finally:
+        conn.close()
+
+    if sync_exports:
+        write_qr_income_exports(all_rows)
+    return "ok", row
+
+
 def import_qr_income_from_text(text: str, source_label: str = "web_paste"):
     """解析粘贴/文件文本并去重导入。返回统计 dict。"""
     rows = extract_qr_income_rows(text)

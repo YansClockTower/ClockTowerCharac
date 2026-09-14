@@ -10,11 +10,7 @@
 <body class="user-page import-bills-page">
   <div class="card card--wide">
     <h2>微信账单导入</h2>
-    <p class="hint">
-      将微信导出的账单 CSV <strong>全文</strong>粘贴到下方（含「微信支付账单明细列表」表头与数据行）。
-      系统仅提取「二维码收款」记录，按订单号去重入库；已存在的订单不会被覆盖。
-    </p>
-    <p class="hint">库中现有记录：{{ total_count }} 条</p>
+    <p class="hint">库中现有记录：{{ total_count }} 条。订单号全局唯一；重复导入会被拒绝或跳过。</p>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -28,15 +24,43 @@
       <div class="status error">{{ error }}</div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('users.import_wechat_bills') }}">
-      <label for="bill_csv">账单 CSV 全文</label>
-      <textarea id="bill_csv" name="bill_csv" rows="16" placeholder="在此粘贴微信账单 CSV…">{{ pasted }}</textarea>
-      <div class="btn-row">
-        <button type="submit">提取并导入</button>
-        <button type="button" onclick="location.href='/user/edit_user'">编辑用户权限</button>
-        <button type="button" onclick="location.href='/user/'">返回个人中心</button>
-      </div>
-    </form>
+    <section class="import-section">
+      <h3>手动导入一条</h3>
+      <p class="hint">填写支付单号与用户名（对应账单中的交易对方）。若订单号已存在则拒绝写入。</p>
+      <form method="post" action="{{ url_for('users.import_wechat_bills') }}" class="manual-import-form">
+        <input type="hidden" name="mode" value="manual">
+        <label for="order_no">订单号</label>
+        <input type="text" id="order_no" name="order_no" value="{{ manual_order|default('') }}"
+               autocomplete="off" placeholder="微信支付账单详情中的支付单号" required>
+        <label for="peer">用户名</label>
+        <input type="text" id="peer" name="peer" value="{{ manual_peer|default('') }}"
+               autocomplete="off" placeholder="交易对方 / 付款人备注名" required>
+        <label for="note">备注（可选）</label>
+        <input type="text" id="note" name="note" value="{{ manual_note|default('') }}"
+               autocomplete="off" placeholder="可选">
+        <div class="btn-row">
+          <button type="submit">手动导入</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="import-section">
+      <h3>批量导入（CSV）</h3>
+      <p class="hint">
+        将微信导出的账单 CSV <strong>全文</strong>粘贴到下方（含「微信支付账单明细列表」表头与数据行）。
+        系统仅提取「二维码收款」记录，按订单号去重入库；已存在的订单会跳过，不会覆盖。
+      </p>
+      <form method="post" action="{{ url_for('users.import_wechat_bills') }}">
+        <input type="hidden" name="mode" value="csv">
+        <label for="bill_csv">账单 CSV 全文</label>
+        <textarea id="bill_csv" name="bill_csv" rows="16" placeholder="在此粘贴微信账单 CSV…">{{ pasted }}</textarea>
+        <div class="btn-row">
+          <button type="submit">提取并导入</button>
+          <button type="button" onclick="location.href='/user/edit_user'">编辑用户权限</button>
+          <button type="button" onclick="location.href='/user/'">返回个人中心</button>
+        </div>
+      </form>
+    </section>
 
     {% if recent %}
     <h3>最近入库（最多 20 条）</h3>

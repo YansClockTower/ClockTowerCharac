@@ -62,7 +62,11 @@ from app.user.membership import (
 )
 
 from app.models.usericon import save_user_icon, user_icon_url
-from app.models.wechat_bills import import_qr_income_from_text, list_qr_income_rows
+from app.models.wechat_bills import (
+    import_qr_income_from_text,
+    insert_manual_qr_income,
+    list_qr_income_rows,
+)
 
 # 注意：db和app在主程序中初始化，然后注入
 users_bp = Blueprint(
@@ -590,7 +594,7 @@ def edit_user():
 
 @users_bp.route("/import_wechat_bills", methods=["GET", "POST"])
 def import_wechat_bills():
-    """管理员：粘贴微信账单原始 CSV，提取二维码收款并去重入库。"""
+    """管理员：批量粘贴 CSV，或手动录入单条订单。"""
     user = get_current_user(update_last_login=False)
     if not user:
         return redirect(url_for("users.user_page"))
@@ -599,26 +603,51 @@ def import_wechat_bills():
 
     error = None
     pasted = ""
+    manual_order = ""
+    manual_peer = ""
+    manual_note = ""
     if request.method == "POST":
-        pasted = (request.form.get("bill_csv") or "").strip()
-        if not pasted:
-            error = "请粘贴微信导出的账单 CSV 全文。"
-        else:
-            try:
-                stats = import_qr_income_from_text(
-                    pasted,
-                    source_label=f"web_paste:{user.get('name') or 'admin'}",
-                )
-                flash(
-                    f"解析 {stats['parsed']} 条，新写入 {stats['inserted']} 条，"
-                    f"跳过重复 {stats['skipped']} 条；库中现有 {stats['total']} 条。",
-                    "success",
-                )
+        mode = (request.form.get("mode") or "csv").strip()
+        if mode == "manual":
+            manual_order = (request.form.get("order_no") or "").strip()
+            manual_peer = (request.form.get("peer") or "").strip()
+            manual_note = (request.form.get("note") or "").strip()
+            status, detail = insert_manual_qr_income(
+                manual_order,
+                manual_peer,
+                note=manual_note,
+                source_label=f"manual:{user.get('name') or 'admin'}",
+            )
+            if status == "ok":
+                flash(f"已手动导入订单 {detail['订单号']}（用户名：{detail['交易对方']}）。", "success")
                 return redirect(url_for("users.import_wechat_bills"))
-            except ValueError as exc:
-                error = str(exc)
-            except Exception:
-                error = "导入失败，请检查粘贴内容是否为完整的微信账单 CSV。"
+            if status == "duplicate":
+                error = (
+                    f"订单号已存在，拒绝重复导入："
+                    f"{detail['订单号']}（已有用户名：{detail['交易对方']}，核销：{detail['核销']}）。"
+                )
+            else:
+                error = detail if isinstance(detail, str) else "手动导入失败。"
+        else:
+            pasted = (request.form.get("bill_csv") or "").strip()
+            if not pasted:
+                error = "请粘贴微信导出的账单 CSV 全文。"
+            else:
+                try:
+                    stats = import_qr_income_from_text(
+                        pasted,
+                        source_label=f"web_paste:{user.get('name') or 'admin'}",
+                    )
+                    flash(
+                        f"解析 {stats['parsed']} 条，新写入 {stats['inserted']} 条，"
+                        f"跳过重复 {stats['skipped']} 条；库中现有 {stats['total']} 条。",
+                        "success",
+                    )
+                    return redirect(url_for("users.import_wechat_bills"))
+                except ValueError as exc:
+                    error = str(exc)
+                except Exception:
+                    error = "导入失败，请检查粘贴内容是否为完整的微信账单 CSV。"
 
     all_rows = list_qr_income_rows()
     recent = list(reversed(all_rows))[:20]
@@ -627,6 +656,9 @@ def import_wechat_bills():
         current_user=user.get("name"),
         error=error,
         pasted=pasted,
+        manual_order=manual_order,
+        manual_peer=manual_peer,
+        manual_note=manual_note,
         recent=recent,
         total_count=len(all_rows),
     )
