@@ -26,7 +26,6 @@
       </h2>
       {% if event.description %}<p>{{ event.description }}</p>{% endif %}
       <p>
-        <strong>组织者:</strong> {{ event.inviter }}<br>
         <strong>开始:</strong> {{ event.starttime.replace("T", " ") }} ·
         <strong>锁名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
         <strong>地点:</strong> {{ event.location }}<br>
@@ -37,7 +36,6 @@
           {% if event.minplayer and event.maxplayer %} / {% endif %}
           {% if event.maxplayer %}最多 {{ event.maxplayer }}{% endif %}
         {% endif %}
-        · <strong>分桌:</strong> {{ event.table_count }}（有效 {{ event.valid_table_count }}）
       </p>
     </div>
   </div>
@@ -155,13 +153,6 @@
       <div class="event-meta-row">
         <div class="event-info table-card-fields">
           <p>
-            <strong>所选桌游:</strong>
-            {% if table.is_self_brought %}
-              {{ table.board_game_name }}
-              <span class="hint">（组局者自备，库中无对应桌游）</span>
-            {% else %}
-              {{ table.board_game_name }}
-            {% endif %}
             {% if table.note %}<br><strong>备注:</strong> {{ table.note }}{% endif %}
           </p>
           <p>
@@ -169,7 +160,7 @@
             <span class="player-list">
               {% for a in table.attendees %}
                 <span class="player-tag{% if a.player == current_user %} current-player-tag{% endif %}{% if event.starttime_obj < now() and a.signed == 0 %} unsigned-player-tag{% endif %}">
-                  {{ a.player }}{% if a.player == table.host %}（建桌）{% endif %}
+                  {{ a.player }}
                 </span>
               {% endfor %}
             </span>
@@ -186,7 +177,7 @@
             {% if table.owner_status == 1 %}已确认（{{ table.owner_name }}）
             {% elif table.owner_status == -1 %}已拒绝（{{ table.owner_name }}）
             {% else %}未确认（{{ table.owner_name }}）{% endif %}
-            <br>
+            ·
             <strong>持有者确认:</strong>
             {% if not table.holder_required %}
               无需单独确认（持有者与所有者相同或未填写）
@@ -200,7 +191,7 @@
           </p>
           {% else %}
           <p>
-            <strong>承诺确认:</strong> 无需（组局者自备）
+            <strong>（组局者承诺自备桌游）</strong> 
           </p>
           {% endif %}
         </div>

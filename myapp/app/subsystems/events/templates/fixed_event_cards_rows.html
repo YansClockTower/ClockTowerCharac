@@ -60,14 +60,14 @@
             <div class="event-meta-row">
                 <div class="event-info">
                     <p>
-                        <strong>活动模式:</strong> 布鸽桌游聚会（分桌报名）<br>
+                        <strong>活动模式:</strong> 布鸽桌游聚会 <br>
                         <strong>组织者:</strong> {{ event.inviter }}<br>
                         {% if current_user_is_member %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
                         <strong>活动地点:</strong> {{ event.location }}
                         {% else %}
-                        <span style="font-size:0.9em;color:#666;">（正式会员活动，验证会员后可查看分桌）</span>
+                        <span style="font-size:0.9em;color:#666;">（正式会员活动，验证会员后可参与报名）</span>
                         {% endif %}
                     </p>
                 </div>
@@ -119,9 +119,9 @@
                     <span class="status-tag status-min-not-met">(未生效)</span>
                     {% endif %}
                     <span class="fixed-table-group-count">
-                        {{ table.min_players if table.min_players is not none else '—' }}
-                        / {{ table.attendee_count }}
-                        / {{ table.max_players if table.max_players is not none else '—' }}
+                        最少 {{ table.min_players if table.min_players is not none else '—' }} 人
+                        / 当前 {{ table.attendee_count }} 人
+                        / 最多 {{ table.max_players if table.max_players is not none else '—' }} 人
                     </span>
                 </div>
                 <div class="fixed-table-group-players">
@@ -149,14 +149,14 @@
                     <span>来源：组局者自备 · 无需所有者/持有者确认</span>
                     {% else %}
                     <span>
-                        所有者 {{ table.owner_name }}：
+                        桌游所有者{{ table.owner_name }}：
                         {% if table.owner_status == 1 %}已确认
                         {% elif table.owner_status == -1 %}已拒绝
                         {% else %}待确认{% endif %}
                     </span>
                     {% if table.holder_required %}
                     <span>
-                        持有者 {{ table.holder_name }}：
+                        持有者{{ table.holder_name }}：
                         {% if table.holder_status == 1 %}已确认
                         {% elif table.holder_status == -1 %}已拒绝
                         {% else %}待确认{% endif %}

@@ -461,6 +461,7 @@ def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
 
 
 def leave_table(table_id, player) -> Tuple[bool, Optional[str]]:
+    """退出该桌。建桌者与其他玩家无区别；仅当桌内无人时自动删除该桌。"""
     db = get_db()
     table_row = db.execute("SELECT * FROM fixed_tables WHERE id = ?", (table_id,)).fetchone()
     if table_row is None:
@@ -481,12 +482,24 @@ def leave_table(table_id, player) -> Tuple[bool, Optional[str]]:
     if cursor.rowcount == 0:
         return False, "您未报名此桌。"
 
-    remaining = db.execute(
-        "SELECT COUNT(*) AS c FROM fixed_table_attend WHERE table_id = ?",
+    remaining_rows = db.execute(
+        """
+        SELECT player FROM fixed_table_attend
+        WHERE table_id = ?
+        ORDER BY id ASC
+        """,
         (table_id,),
-    ).fetchone()
-    if remaining and int(remaining["c"]) == 0:
+    ).fetchall()
+    if not remaining_rows:
         db.execute("DELETE FROM fixed_tables WHERE id = ?", (table_id,))
+    else:
+        # 若开桌记录人已离开，把 host 记为当前最早留在桌上的玩家（仅作审计，不区分展示）
+        first_player = remaining_rows[0]["player"]
+        if (table.get("host") or "") != first_player:
+            db.execute(
+                "UPDATE fixed_tables SET host = ? WHERE id = ?",
+                (first_player, table_id),
+            )
     db.commit()
     return True, None
 
