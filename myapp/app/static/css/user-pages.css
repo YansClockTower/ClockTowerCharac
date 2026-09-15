@@ -42,6 +42,18 @@ body.user-page .card .auth-links-sep {
   flex-shrink: 0;
 }
 
+body.user-page .field-label {
+  display: block;
+  margin: 10px 0 4px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text, #222);
+}
+
+body.user-page #register-panel .field-label:first-of-type {
+  margin-top: 0;
+}
+
 body.user-page #avatar-container {
   display: flex;
   flex-direction: column;
@@ -54,7 +66,7 @@ body.user-page #avatarInput {
 }
 
 body.user-page .card--wide {
-  max-width: 640px;
+  max-width: 780px;
 }
 
 .review-pending {
@@ -109,7 +121,7 @@ body.user-page .card--wide {
 
 .membership-qr-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -145,7 +157,7 @@ body.user-page .card--wide {
   font-size: 0.82rem;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 720px) {
   .membership-qr-grid {
     grid-template-columns: 1fr;
   }

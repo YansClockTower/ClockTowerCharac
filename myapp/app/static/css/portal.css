@@ -60,6 +60,114 @@ body.portal-home {
   box-shadow: 0 6px 16px rgba(168, 93, 69, 0.45);
 }
 
+.portal-home .recruit-group-cta {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  padding: 14px 12px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: linear-gradient(135deg, #5a8f7b 0%, #3f6f5c 100%);
+  border: 2px solid #345c4c;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(63, 111, 92, 0.35);
+  cursor: pointer;
+}
+
+.portal-home .recruit-group-cta:hover {
+  background: linear-gradient(135deg, #6aa08b 0%, #4a8070 100%);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(63, 111, 92, 0.45);
+}
+
+body.recruit-modal-open {
+  overflow: hidden;
+}
+
+.recruit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+.recruit-modal[hidden] {
+  display: none !important;
+}
+
+.recruit-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 30, 30, 0.45);
+}
+
+.recruit-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  padding: 16px 18px 20px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.recruit-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.recruit-modal-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  text-align: left;
+}
+
+.recruit-modal-close {
+  border: none;
+  background: transparent;
+  color: #444;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.recruit-modal-close:hover {
+  color: #111;
+  background: transparent;
+}
+
+.recruit-modal-hint {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #666);
+  line-height: 1.45;
+  text-align: left;
+}
+
+.recruit-modal-qr {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .portal-home .primary-nav > button {
   width: 100%;
   text-align: center;

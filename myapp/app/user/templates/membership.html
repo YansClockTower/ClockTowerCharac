@@ -62,8 +62,18 @@
     </div>
 
     <div class="membership-qr-block">
-      <p class="membership-qr-lead">也可直接用微信扫描下方二维码：添加社团官号好友，或扫码支付会费。</p>
+      <p class="membership-qr-lead">也可直接用微信扫描下方二维码：加入招新群、添加社团官号，或扫码支付会费。</p>
       <div class="membership-qr-grid">
+        <figure class="membership-qr-card">
+          <img src="{{ url_for('users.static', filename='img/wechatgroup.png') }}"
+               alt="招新群微信二维码"
+               width="220" height="220"
+               loading="lazy">
+          <figcaption>
+            <strong>加入招新群</strong>
+            <span>扫码进群了解招新与活动</span>
+          </figcaption>
+        </figure>
         <figure class="membership-qr-card">
           <img src="{{ url_for('users.static', filename='img/add_wechat.jpg') }}"
                alt="布鸽轻桌游协会官号微信二维码"

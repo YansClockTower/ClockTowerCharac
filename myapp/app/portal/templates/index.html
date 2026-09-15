@@ -16,6 +16,9 @@
     <h1>欢迎访问, <a href="{{ url_for('users.user_page') }}">{{ username }}</a></h1>
 
     <div class="primary-nav">
+        {% if show_join_recruit_group %}
+        <button type="button" class="recruit-group-cta" id="openRecruitGroupQr">加入招新群</button>
+        {% endif %}
         {% if show_become_member %}
         <a class="become-member-cta" href="{{ url_for('users.membership') }}">成为布鸽会员</a>
         {% endif %}
@@ -44,6 +47,23 @@
         桌游协会资料站 | 粤ICP备2025432638号
     </p>
 
+    {% if show_join_recruit_group %}
+    <div id="recruitGroupModal" class="recruit-modal" hidden>
+      <div class="recruit-modal-backdrop" data-close-recruit-modal></div>
+      <div class="recruit-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="recruitGroupTitle">
+        <div class="recruit-modal-header">
+          <h3 id="recruitGroupTitle">加入招新群</h3>
+          <button type="button" class="recruit-modal-close" data-close-recruit-modal aria-label="关闭">×</button>
+        </div>
+        <p class="recruit-modal-hint">使用微信扫描下方二维码，加入布鸽轻桌游协会招新群。</p>
+        <img class="recruit-modal-qr"
+             src="{{ url_for('users.static', filename='img/wechatgroup.png') }}"
+             alt="招新群微信二维码"
+             width="280" height="280">
+      </div>
+    </div>
+    {% endif %}
+
     <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
     <script src="{{ url_for('users.static', filename='js/email_bind_prompt.js') }}"></script>
     <script>
@@ -52,6 +72,29 @@
             if (!target) return;
             target.classList.toggle("active");
         }
+
+        (function initRecruitGroupModal() {
+            const modal = document.getElementById("recruitGroupModal");
+            const openBtn = document.getElementById("openRecruitGroupQr");
+            if (!modal || !openBtn) return;
+
+            function openModal() {
+                modal.hidden = false;
+                document.body.classList.add("recruit-modal-open");
+            }
+            function closeModal() {
+                modal.hidden = true;
+                document.body.classList.remove("recruit-modal-open");
+            }
+
+            openBtn.addEventListener("click", openModal);
+            modal.addEventListener("click", function (e) {
+                if (e.target.closest("[data-close-recruit-modal]")) closeModal();
+            });
+            document.addEventListener("keydown", function (e) {
+                if (e.key === "Escape" && !modal.hidden) closeModal();
+            });
+        })();
     </script>
 </body>
 </html>

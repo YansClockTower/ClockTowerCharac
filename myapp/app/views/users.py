@@ -244,7 +244,7 @@ def register():
     code = _req_val("code")
 
     if not username or not password:
-        return jsonify({"status": "failed", "reason": "Missing username or password"})
+        return jsonify({"status": "failed", "reason": "请填写用户昵称和密码"})
     if not email or not is_valid_email(email):
         return jsonify({"status": "failed", "reason": "请填写有效邮箱"})
     if not code:
@@ -264,7 +264,7 @@ def register():
 
     if existing_user and not _is_temporary_user(existing_user):
         user_db.close()
-        return jsonify({"status": "failed", "reason": "Username already exists"})
+        return jsonify({"status": "failed", "reason": "该用户昵称已被占用，请换一个显示名"})
 
     hashed_pw = hash_password(password)
     if existing_user and _is_temporary_user(existing_user):

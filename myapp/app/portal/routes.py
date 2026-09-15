@@ -26,17 +26,20 @@ def index():
         username = user["name"]
         userid = user["id"]
         order_no = (_row_get(user, MEMBER_ORDER_NO_COLUMN, "") or "").strip()
-        # 已登录普通玩家、尚未提交订单号 → 提示成为会员（游客/会员不显示）
+        # 已登录、非会员、尚未提交订单号 → 提示成为会员
         show_become_member = (not user_is_member(user)) and (not order_no)
+        show_join_recruit_group = False
     else:
         username = "游客"
         userid = "0"
         show_become_member = False
+        show_join_recruit_group = True
 
     return render_template(
         "index.html",
         username=username,
         userid=userid,
         show_become_member=show_become_member,
+        show_join_recruit_group=show_join_recruit_group,
     )
 
