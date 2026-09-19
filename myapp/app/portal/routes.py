@@ -1,3 +1,6 @@
+import csv
+from pathlib import Path
+
 from flask import Blueprint, render_template
 
 from app.identity import get_current_user
@@ -5,6 +8,27 @@ from app.identity.permissions import MEMBER_ORDER_NO_COLUMN
 from app.user.membership import user_is_member
 
 portal_bp = Blueprint("portal", __name__, template_folder="templates")
+
+CONTACT_ZONES_CSV = Path(__file__).with_name("contact_zones.csv")
+
+
+def load_contact_zones():
+    """读取 contact_zones.csv：专区,负责人昵称,负责人微信号。"""
+    if not CONTACT_ZONES_CSV.is_file():
+        return []
+    rows = []
+    with CONTACT_ZONES_CSV.open(encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            zone = (row.get("专区") or "").strip()
+            if not zone:
+                continue
+            rows.append({
+                "zone": zone,
+                "nickname": (row.get("负责人昵称") or "").strip(),
+                "wechat": (row.get("负责人微信号") or "").strip(),
+            })
+    return rows
 
 
 def _row_get(user, key, default=None):
@@ -41,5 +65,6 @@ def index():
         userid=userid,
         show_become_member=show_become_member,
         show_join_recruit_group=show_join_recruit_group,
+        contact_zones=load_contact_zones(),
     )
 

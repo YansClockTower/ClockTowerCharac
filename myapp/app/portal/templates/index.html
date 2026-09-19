@@ -19,13 +19,14 @@
         {% if show_join_recruit_group %}
         <button type="button" class="recruit-group-cta" id="openRecruitGroupQr">加入招新群 / 添加官号</button>
         {% endif %}
-        {% if show_become_member %}
-        <a class="become-member-cta" href="{{ url_for('users.membership') }}">成为布鸽会员</a>
-        {% endif %}
         <button type="button" onclick="toggleSection('club-section')">桌游协会事务</button>
         <div id="club-section" class="secondary-nav">
             <a href="{{ url_for('events.browse_events') }}">活动面板</a>
             <a href="{{ url_for('boardgames.browse') }}">桌游浏览/借用</a>
+            {% if show_become_member %}
+            <a href="{{ url_for('users.membership') }}">成为布鸽会员</a>
+            {% endif %}
+            <button type="button" class="contact-cta" id="openContactUs">联系我们</button>
         </div>
 
         <button type="button" onclick="toggleSection('botc-tools-section')">《血染钟楼》工具</button>
@@ -82,6 +83,37 @@
     </div>
     {% endif %}
 
+    <div id="contactUsModal" class="recruit-modal" hidden>
+      <div class="recruit-modal-backdrop" data-close-contact-modal></div>
+      <div class="recruit-modal-dialog recruit-modal-dialog--table" role="dialog" aria-modal="true" aria-labelledby="contactUsTitle">
+        <div class="recruit-modal-header">
+          <h3 id="contactUsTitle">联系我们</h3>
+          <button type="button" class="recruit-modal-close" data-close-contact-modal aria-label="关闭">×</button>
+        </div>
+        <p class="recruit-modal-hint">各专区事务可直接添加对应负责人微信。</p>
+        <div class="contact-table-wrap">
+          <table class="contact-table">
+            <thead>
+              <tr>
+                <th>专区</th>
+                <th>负责人昵称</th>
+                <th>负责人微信号</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in contact_zones %}
+              <tr>
+                <td>{{ row.zone }}</td>
+                <td>{{ row.nickname }}</td>
+                <td>{{ row.wechat }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
     <script src="{{ url_for('users.static', filename='js/email_bind_prompt.js') }}"></script>
     <script>
@@ -91,28 +123,39 @@
             target.classList.toggle("active");
         }
 
-        (function initRecruitGroupModal() {
-            const modal = document.getElementById("recruitGroupModal");
-            const openBtn = document.getElementById("openRecruitGroupQr");
-            if (!modal || !openBtn) return;
+        function bindPortalModal(modalId, openBtnId, closeAttr) {
+            const modal = document.getElementById(modalId);
+            const openBtn = document.getElementById(openBtnId);
+            if (!modal || !openBtn) return null;
 
-            function openModal() {
-                modal.hidden = false;
-                document.body.classList.add("recruit-modal-open");
-            }
             function closeModal() {
                 modal.hidden = true;
-                document.body.classList.remove("recruit-modal-open");
+                if (!document.querySelector(".recruit-modal:not([hidden])")) {
+                    document.body.classList.remove("recruit-modal-open");
+                }
+            }
+            function openModal() {
+                document.querySelectorAll(".recruit-modal").forEach(function (el) {
+                    el.hidden = true;
+                });
+                modal.hidden = false;
+                document.body.classList.add("recruit-modal-open");
             }
 
             openBtn.addEventListener("click", openModal);
             modal.addEventListener("click", function (e) {
-                if (e.target.closest("[data-close-recruit-modal]")) closeModal();
+                if (e.target.closest("[" + closeAttr + "]")) closeModal();
             });
-            document.addEventListener("keydown", function (e) {
-                if (e.key === "Escape" && !modal.hidden) closeModal();
-            });
-        })();
+            return closeModal;
+        }
+
+        const closeRecruit = bindPortalModal("recruitGroupModal", "openRecruitGroupQr", "data-close-recruit-modal");
+        const closeContact = bindPortalModal("contactUsModal", "openContactUs", "data-close-contact-modal");
+        document.addEventListener("keydown", function (e) {
+            if (e.key !== "Escape") return;
+            if (closeRecruit) closeRecruit();
+            if (closeContact) closeContact();
+        });
     </script>
 </body>
 </html>

@@ -83,6 +83,21 @@ body.portal-home {
   box-shadow: 0 6px 16px rgba(63, 111, 92, 0.45);
 }
 
+.portal-home .primary-nav > button.contact-cta {
+  background: linear-gradient(135deg, #6d7f96 0%, #556578 100%);
+  border: 2px solid #455566;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 14px 12px;
+  font-size: 1.05rem;
+}
+
+.portal-home .primary-nav > button.contact-cta:hover {
+  background: linear-gradient(135deg, #7d90a8 0%, #62748a 100%);
+  color: #fff;
+}
+
 body.recruit-modal-open {
   overflow: hidden;
 }
@@ -106,6 +121,36 @@ body.recruit-modal-open {
   position: absolute;
   inset: 0;
   background: rgba(20, 30, 30, 0.45);
+}
+
+.recruit-modal-dialog--table {
+  max-width: 640px;
+  text-align: left;
+}
+
+.contact-table-wrap {
+  overflow-x: auto;
+}
+
+.contact-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.contact-table th,
+.contact-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e6e1da;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-all;
+}
+
+.contact-table th {
+  color: #555;
+  font-weight: 600;
+  background: #f6f4f1;
 }
 
 .recruit-modal-dialog {
