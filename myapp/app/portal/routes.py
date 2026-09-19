@@ -13,22 +13,30 @@ CONTACT_ZONES_CSV = Path(__file__).with_name("contact_zones.csv")
 
 
 def load_contact_zones():
-    """读取 contact_zones.csv：专区,负责人昵称,负责人微信号。"""
+    """读取 contact_zones.csv。列名：负责专区、负责人、负责人微信号。"""
     if not CONTACT_ZONES_CSV.is_file():
         return []
     rows = []
     with CONTACT_ZONES_CSV.open(encoding="utf-8-sig", newline="") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
-            zone = (row.get("专区") or "").strip()
+            zone = _csv_cell(row, "负责专区", "专区")
             if not zone:
                 continue
             rows.append({
                 "zone": zone,
-                "nickname": (row.get("负责人昵称") or "").strip(),
-                "wechat": (row.get("负责人微信号") or "").strip(),
+                "nickname": _csv_cell(row, "负责人", "负责人昵称"),
+                "wechat": _csv_cell(row, "负责人微信号", "微信号"),
             })
     return rows
+
+
+def _csv_cell(row, *keys):
+    for key in keys:
+        value = (row.get(key) or "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _row_get(user, key, default=None):

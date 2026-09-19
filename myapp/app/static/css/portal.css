@@ -83,21 +83,6 @@ body.portal-home {
   box-shadow: 0 6px 16px rgba(63, 111, 92, 0.45);
 }
 
-.portal-home .primary-nav > button.contact-cta {
-  background: linear-gradient(135deg, #6d7f96 0%, #556578 100%);
-  border: 2px solid #455566;
-  color: #fff;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 14px 12px;
-  font-size: 1.05rem;
-}
-
-.portal-home .primary-nav > button.contact-cta:hover {
-  background: linear-gradient(135deg, #7d90a8 0%, #62748a 100%);
-  color: #fff;
-}
-
 body.recruit-modal-open {
   overflow: hidden;
 }
@@ -274,23 +259,33 @@ body.recruit-modal-open {
   display: block;
 }
 
-.portal-home .secondary-nav a {
+.portal-home .secondary-nav a,
+.portal-home .secondary-nav button {
   display: block;
+  width: 100%;
+  box-sizing: border-box;
   text-align: center;
   padding: 10px;
   background-color: var(--color-primary);
   color: #fff;
   text-decoration: none;
+  border: none;
   border-radius: var(--radius-md);
-  margin-bottom: 8px;
+  margin: 0 0 8px;
+  font: inherit;
+  letter-spacing: normal;
+  cursor: pointer;
 }
 
-.portal-home .secondary-nav a:last-child {
+.portal-home .secondary-nav a:last-child,
+.portal-home .secondary-nav button:last-child {
   margin-bottom: 0;
 }
 
-.portal-home .secondary-nav a:hover {
+.portal-home .secondary-nav a:hover,
+.portal-home .secondary-nav button:hover {
   background-color: var(--color-primary-hover);
+  color: #fff;
   text-decoration: none;
 }
 
