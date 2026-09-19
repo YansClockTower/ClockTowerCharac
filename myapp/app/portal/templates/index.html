@@ -17,7 +17,7 @@
 
     <div class="primary-nav">
         {% if show_join_recruit_group %}
-        <button type="button" class="recruit-group-cta" id="openRecruitGroupQr">加入招新群</button>
+        <button type="button" class="recruit-group-cta" id="openRecruitGroupQr">加入招新群 / 添加官号</button>
         {% endif %}
         {% if show_become_member %}
         <a class="become-member-cta" href="{{ url_for('users.membership') }}">成为布鸽会员</a>
@@ -55,11 +55,29 @@
           <h3 id="recruitGroupTitle">加入招新群</h3>
           <button type="button" class="recruit-modal-close" data-close-recruit-modal aria-label="关闭">×</button>
         </div>
-        <p class="recruit-modal-hint">使用微信扫描下方二维码，加入布鸽轻桌游协会招新群。</p>
-        <img class="recruit-modal-qr"
-             src="{{ url_for('users.static', filename='img/wechatgroup.png') }}"
-             alt="招新群微信二维码"
-             width="280" height="280">
+        <p class="recruit-modal-hint">使用微信扫描下方二维码加入招新群，群码失效可以加布鸽协会官号。</p>
+        <div class="recruit-modal-grid">
+          <figure class="recruit-modal-card">
+            <img class="recruit-modal-qr"
+                 src="{{ url_for('users.static', filename='img/wechatgroup.jpg') }}"
+                 alt="扫码加入招新群"
+                 width="220" height="220">
+            <figcaption>
+              <strong>加入招新群</strong>
+              <span>扫码进群了解招新与活动</span>
+            </figcaption>
+          </figure>
+          <figure class="recruit-modal-card">
+            <img class="recruit-modal-qr"
+                 src="{{ url_for('users.static', filename='img/add_wechat.jpg') }}"
+                 alt="布鸽轻桌游官号(备用)"
+                 width="220" height="220">
+            <figcaption>
+              <strong>添加官号好友</strong>
+              <span>微信号 SJTU_PartyBGA</span>
+            </figcaption>
+          </figure>
+        </div>
       </div>
     </div>
     {% endif %}
