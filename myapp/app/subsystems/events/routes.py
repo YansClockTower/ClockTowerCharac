@@ -173,16 +173,13 @@ def _browse_merged_page(current_user, browse_filters, limit, offset):
 
 
 def _redirect_after_fixed_table_action(event_id=None):
-    """开桌/报名/退桌/承诺后：列表操作回活动板，否则回详情。"""
+    """开桌、编辑、报名、退桌、承诺后回到活动列表。event_id 仅保留给调用处，不再打开详情页。"""
+    tab = (request.form.get("tab") or "").strip()
     if (request.form.get("next") or "").strip() == "browse":
-        tab = (request.form.get("tab") or "").strip()
         if tab:
             return redirect(url_for("events.browse_events", tab=tab))
         return redirect(url_for("events.browse_events"))
-    eid = event_id or request.form.get("event_id")
-    if eid:
-        return redirect(url_for("events.fixed_detail_route", event_id=int(eid)))
-    return redirect(url_for("events.browse_events"))
+    return redirect(url_for("events.browse_events", tab="pigeon"))
 
 
 @events_bp.route("/")
@@ -610,34 +607,8 @@ def fixed_add_route(user_info):
 @events_bp.route("/fixed/<int:event_id>")
 @login_required_template
 def fixed_detail_route(user_info, event_id):
-    deny = _require_fixed_member(user_info)
-    if deny:
-        flash(deny, "warning")
-        return redirect(url_for("users.membership"))
-    current_user = user_info["name"]
-    event = fixed.get_fixed_event_detail(event_id, current_user)
-    if event is None:
-        flash("布鸽桌游聚会不存在。", "error")
-        return redirect(url_for("events.browse_events"))
-    enrich_events_attendees_user_ids([event])
-    for table in event.get("tables") or []:
-        enrich_events_attendees_user_ids([{"attendee_notes": table.get("attendees") or []}])
-    games = boardgames_api.list_picker_rows()
-    can_end = _event_can_be_ended(event, event.get("attendee_count", 0))
-    return render_template(
-        "fixed_detail.html",
-        event=event,
-        games=games,
-        picker_owners=boardgames_api.PICKER_OWNER_FILTERS,
-        self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
-        self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
-        current_user=current_user,
-        current_user_is_admin=_is_admin(user_info),
-        now=datetime.now,
-        can_end_event=can_end,
-        fixed_label=FIXED_GATHERING_LABEL,
-        fixed_location=FIXED_GATHERING_LOCATION,
-    )
+    """旧的分桌详情页已并入活动列表，保留地址以免旧链接失效。"""
+    return redirect(url_for("events.browse_events", tab="pigeon"))
 
 
 @events_bp.route("/fixed/<int:event_id>/tables", methods=["POST"])
@@ -678,6 +649,39 @@ def fixed_create_table_route(user_info, event_id):
     else:
         flash(err or "开桌失败。", "error")
     return _redirect_after_fixed_table_action(event_id)
+
+
+@events_bp.route("/fixed/tables/<int:table_id>/edit", methods=["POST"])
+@login_required_template
+def fixed_update_table_route(user_info, table_id):
+    deny = _require_fixed_member(user_info)
+    if deny and not _is_admin(user_info):
+        flash(deny, "warning")
+        return redirect(url_for("users.membership"))
+    raw_id = (request.form.get("board_game_id") or "").strip()
+    if raw_id in ("", "0", "self"):
+        board_game_id = fixed.SELF_BROUGHT_GAME_ID
+    else:
+        try:
+            board_game_id = int(raw_id)
+        except ValueError:
+            flash("请选择有效的桌游。", "error")
+            return _redirect_after_fixed_table_action(fixed.get_table_event_id(table_id))
+    ok, err = fixed.update_table(
+        table_id,
+        user_info["name"],
+        is_admin=_is_admin(user_info),
+        board_game_id=board_game_id,
+        note=request.form.get("note") or "",
+        min_players=request.form.get("self_min_players"),
+        max_players=request.form.get("self_max_players"),
+        self_game_name=request.form.get("self_game_name") or "",
+    )
+    if ok:
+        flash("已保存对此桌的修改。", "success")
+    else:
+        flash(err or "编辑失败。", "error")
+    return _redirect_after_fixed_table_action(fixed.get_table_event_id(table_id))
 
 
 @events_bp.route("/fixed/tables/<int:table_id>/join", methods=["POST"])
@@ -755,7 +759,7 @@ def fixed_edit_route(user_info, event_id):
         return redirect(url_for("events.browse_events"))
     if is_event_archived(event):
         flash("该活动已归档，无法编辑。", "warning")
-        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+        return redirect(url_for("events.browse_events", tab="pigeon"))
 
     if request.method == "POST":
         data, err = _fixed_payload_from_form(request.form)
@@ -764,7 +768,7 @@ def fixed_edit_route(user_info, event_id):
             return _render_fixed_edit(event, user_info)
         fixed.update_fixed_event(event_id, data)
         flash("布鸽桌游聚会信息已更新。", "success")
-        return redirect(url_for("events.fixed_detail_route", event_id=event_id))
+        return redirect(url_for("events.browse_events", tab="pigeon"))
     return _render_fixed_edit(event, user_info)
 
 

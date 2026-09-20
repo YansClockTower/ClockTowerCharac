@@ -416,6 +416,155 @@ def create_table(
         return False, "开桌失败：您可能已报名其他桌。", None
 
 
+def _first_table_player(table_id, db):
+    row = db.execute(
+        """
+        SELECT player FROM fixed_table_attend
+        WHERE table_id = ?
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (table_id,),
+    ).fetchone()
+    return (row["player"] if row else "") or ""
+
+
+def _resolve_table_game(board_game_id, min_players, max_players, self_game_name):
+    """解析开桌/改桌时的桌游字段。返回 (ok, error, fields)。"""
+    try:
+        game_id = int(board_game_id) if board_game_id is not None else SELF_BROUGHT_GAME_ID
+    except (TypeError, ValueError):
+        return False, "请选择有效的桌游。", None
+
+    if game_id == SELF_BROUGHT_GAME_ID:
+        custom_name = (self_game_name or "").strip()
+        if not custom_name:
+            return False, "组局者自备请填写桌游名称。", None
+        if len(custom_name) > 80:
+            return False, "桌游名称过长（最多 80 字）。", None
+        try:
+            max_players_val = int(max_players) if max_players not in (None, "") else None
+            min_players_val = int(min_players) if min_players not in (None, "") else None
+        except (TypeError, ValueError):
+            return False, "请填写有效的人数上下限。", None
+        if max_players_val is None or max_players_val < 1:
+            return False, "请填写有效的最大人数。", None
+        if min_players_val is None or min_players_val < 1:
+            return False, "请填写有效的最小人数。", None
+        if min_players_val > max_players_val:
+            return False, "人数下限不能大于上限。", None
+        return True, None, {
+            "game_id": game_id,
+            "board_game_name": custom_name,
+            "min_players": min_players_val,
+            "max_players": max_players_val,
+            "owner_name": "",
+            "holder_name": None,
+            "owner_confirmed": 1,
+            "holder_confirmed": 1,
+        }
+
+    game = boardgames_api.get_game_by_id(game_id)
+    if not game:
+        return False, "所选桌游不存在。", None
+    max_players_val = game.get("max_players")
+    if max_players_val is None or int(max_players_val) < 1:
+        return False, "该桌游未设置有效的人数上限。", None
+    min_raw = game.get("min_players")
+    owner_name = (game.get("owner") or "").strip()
+    if not owner_name:
+        return False, "该桌游缺少所有者信息。", None
+    return True, None, {
+        "game_id": game_id,
+        "board_game_name": game.get("board_game_name") or f"游戏#{game_id}",
+        "min_players": int(min_raw) if min_raw is not None else None,
+        "max_players": int(max_players_val),
+        "owner_name": owner_name,
+        "holder_name": (game.get("current_holder") or "").strip() or None,
+        "owner_confirmed": 0,
+        "holder_confirmed": 0,
+    }
+
+
+def update_table(
+    table_id,
+    actor,
+    *,
+    is_admin,
+    board_game_id,
+    note="",
+    min_players=None,
+    max_players=None,
+    self_game_name="",
+) -> Tuple[bool, Optional[str]]:
+    db = get_db()
+    table_row = db.execute("SELECT * FROM fixed_tables WHERE id = ?", (table_id,)).fetchone()
+    if table_row is None:
+        return False, "桌不存在。"
+    table = dict(table_row)
+    event = get_fixed_event_by_id(table["fixed_event_id"])
+    if event is None:
+        return False, "活动不存在。"
+    if is_event_archived(event):
+        return False, "活动已结束，无法编辑此桌。"
+    first_player = _first_table_player(table_id, db)
+    if not is_admin and actor != first_player:
+        return False, "只有管理员和该桌当前第一位玩家可以编辑此桌。"
+
+    ok, err, fields = _resolve_table_game(board_game_id, min_players, max_players, self_game_name)
+    if not ok:
+        return False, err
+    seated = db.execute(
+        "SELECT COUNT(*) AS c FROM fixed_table_attend WHERE table_id = ?",
+        (table_id,),
+    ).fetchone()["c"]
+    if int(fields["max_players"]) < int(seated):
+        return False, f"当前已有 {int(seated)} 人，人数上限不能低于已报名人数。"
+
+    same_commitment = (
+        int(table.get("board_game_id") or 0) == int(fields["game_id"])
+        and (table.get("owner_name") or "") == (fields["owner_name"] or "")
+        and (table.get("holder_name") or "") == (fields["holder_name"] or "")
+        and (table.get("board_game_name") or "") == fields["board_game_name"]
+    )
+    if same_commitment:
+        fields["owner_confirmed"] = int(table.get("owner_confirmed") or 0)
+        fields["holder_confirmed"] = int(table.get("holder_confirmed") or 0)
+
+    db.execute(
+        """
+        UPDATE fixed_tables
+        SET board_game_id = ?, board_game_name = ?, min_players = ?, max_players = ?,
+            owner_name = ?, holder_name = ?, owner_confirmed = ?, holder_confirmed = ?,
+            note = ?
+        WHERE id = ?
+        """,
+        (
+            fields["game_id"],
+            fields["board_game_name"],
+            fields["min_players"],
+            fields["max_players"],
+            fields["owner_name"],
+            fields["holder_name"],
+            fields["owner_confirmed"],
+            fields["holder_confirmed"],
+            (note or "").strip(),
+            table_id,
+        ),
+    )
+    db.commit()
+    return True, None
+
+
+def get_table_event_id(table_id):
+    db = get_db()
+    row = db.execute(
+        "SELECT fixed_event_id FROM fixed_tables WHERE id = ?",
+        (table_id,),
+    ).fetchone()
+    return int(row["fixed_event_id"]) if row else None
+
+
 def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
     db = get_db()
     table_row = db.execute("SELECT * FROM fixed_tables WHERE id = ?", (table_id,)).fetchone()

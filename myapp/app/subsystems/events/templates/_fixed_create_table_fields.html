@@ -1,4 +1,4 @@
-{# 开桌表单字段（详情页 / 列表浮窗共用）；需传入 self_brought_*、picker_owners、games #}
+{# 开桌/编辑分桌浮窗字段；需传入 self_brought_*、picker_owners、games #}
 <p>
   <label>选择桌游 (必填):</label>
 </p>
@@ -50,7 +50,7 @@
   <label for="note">桌备注 (可选):</label>
   <input type="text" name="note" id="fixed_table_note" maxlength="120" style="width: 98%; max-width: 480px;" placeholder="例如：新手友好 / 需要自备扩展">
 </p>
-<p><button type="submit" class="base-btn join-btn">开桌并加入</button></p>
+<p><button type="submit" class="base-btn join-btn" id="fixedTableSubmitBtn">开桌并加入</button></p>
 {% if not games %}
 <p class="hint">桌游库暂无登记；仍可选择「{{ self_brought_name }}」开桌，或先到 <a href="{{ url_for('boardgames.browse') }}">桌游浏览</a> 登记游戏。</p>
 {% endif %}

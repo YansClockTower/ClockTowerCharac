@@ -304,28 +304,6 @@ a.player-tag:hover {
     color: #fff;
     background: #2a6f6f;
 }
-.fixed-detail .event-main p,
-.fixed-detail .event-main br {
-    display: revert;
-}
-.fixed-detail .event-info p {
-    margin: 0 0 8px;
-    line-height: 1.55;
-}
-.fixed-detail .event-info p:last-child {
-    margin-bottom: 0;
-}
-.fixed-detail .table-card-fields .player-list {
-    display: inline;
-    margin-left: 0;
-}
-.fixed-detail .fixed-table-card .event-meta-row {
-    align-items: flex-start;
-}
-.fixed-detail .fixed-table-card .action-buttons {
-    justify-content: flex-start;
-}
-.fixed-detail .hint,
 .event-form .hint {
     color: #666;
     font-size: 0.92rem;

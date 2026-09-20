@@ -140,6 +140,13 @@
     }
     setSelection(selfId, selfName);
   };
+  window.__fixedGamePickerSelect = function (id, text) {
+    if (search) search.value = "";
+    if (ownersBox) {
+      ownersBox.querySelectorAll(".game-picker-owner-cb").forEach(function (cb) { cb.checked = false; });
+    }
+    setSelection(String(id), text || selfName);
+  };
 
   setSelection(selfId, selfName);
 })();

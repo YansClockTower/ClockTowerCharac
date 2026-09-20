@@ -220,9 +220,41 @@
             const api = AppModal.bind(modal);
             const form = document.getElementById("fixedCreateTableForm");
             const blocked = document.getElementById("fixedCreateTableBlocked");
+            const titleEl = document.getElementById("fixedCreateTableTitle");
             const createUrlTpl = {{ url_for('events.fixed_create_table_route', event_id=7777)|tojson }};
 
+            function submitBtn() {
+                return document.getElementById("fixedTableSubmitBtn");
+            }
+            function fillTableEditor(btn) {
+                const gameId = btn.getAttribute("data-game-id") || "0";
+                const gameName = btn.getAttribute("data-game-name") || "";
+                if (typeof window.__fixedGamePickerSelect === "function") {
+                    window.__fixedGamePickerSelect(gameId, gameName);
+                }
+                const noteEl = document.getElementById("fixed_table_note");
+                if (noteEl) noteEl.value = btn.getAttribute("data-note") || "";
+                const selfName = document.getElementById("self_game_name");
+                if (selfName) selfName.value = gameId === "0" ? gameName : "";
+                const minEl = document.getElementById("self_min_players");
+                const maxEl = document.getElementById("self_max_players");
+                if (minEl) minEl.value = btn.getAttribute("data-min") || minEl.value;
+                if (maxEl) maxEl.value = btn.getAttribute("data-max") || maxEl.value;
+            }
+
             document.addEventListener("click", function (e) {
+                const editBtn = e.target.closest(".fixed-edit-table-btn");
+                if (editBtn && form) {
+                    blocked.hidden = true;
+                    form.hidden = false;
+                    form.action = editBtn.getAttribute("data-edit-url") || form.action;
+                    if (titleEl) titleEl.textContent = "编辑此桌";
+                    const submit = submitBtn();
+                    if (submit) submit.textContent = "保存修改";
+                    fillTableEditor(editBtn);
+                    api.open();
+                    return;
+                }
                 const btn = e.target.closest(".fixed-create-table-btn");
                 if (!btn) return;
                 const eventId = btn.getAttribute("data-event-id");
@@ -236,6 +268,9 @@
                 }
                 const noteEl = document.getElementById("fixed_table_note");
                 if (noteEl) noteEl.value = "";
+                if (titleEl) titleEl.textContent = "创建分桌";
+                const submit = submitBtn();
+                if (submit) submit.textContent = "开桌并加入";
 
                 if (locked) {
                     form.hidden = true;

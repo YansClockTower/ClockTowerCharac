@@ -171,8 +171,21 @@
                     </span>
                     {% endif %}
                     {% endif %}
-                    {% if not archived and (table.can_confirm or table.can_reject or not locked) %}
+                    {% set first_player = table.attendees[0].player if table.attendees else '' %}
+                    {% set can_edit_table = (not archived) and (current_user_is_admin or (first_player and first_player == current_user)) %}
+                    {% if not archived and (table.can_confirm or table.can_reject or (not locked) or can_edit_table) %}
                     <span class="fixed-table-group-actions">
+                        {% if can_edit_table %}
+                        <button type="button" class="base-btn edit-btn fixed-edit-table-btn"
+                                data-edit-url="{{ url_for('events.fixed_update_table_route', table_id=table.id) }}"
+                                data-game-id="{{ table.board_game_id }}"
+                                data-game-name="{{ table.board_game_name }}"
+                                data-note="{{ table.note or '' }}"
+                                data-min="{{ table.min_players if table.min_players is not none else '' }}"
+                                data-max="{{ table.max_players if table.max_players is not none else '' }}">
+                          编辑此桌
+                        </button>
+                        {% endif %}
                         {% if table.can_confirm %}
                         <form method="POST" action="{{ url_for('events.fixed_confirm_table_route', table_id=table.id) }}">
                             <input type="hidden" name="event_id" value="{{ event.id }}">

@@ -38,7 +38,7 @@
           {% endif %}
         </td></tr>
         <tr><td>社会身份</td><td id="currentSocialRole">{{ user_info.social_role or '保密' }}</td></tr>
-        <tr><td>联系方式</td><td id="currentContactInfo">{{ user_info.contact_info or '保密' }}</td></tr>
+        <tr><td>微信号</td><td id="currentContactInfo">{{ user_info.contact_info or '保密' }}</td></tr>
         <tr><td>组织活动次数</td><td>{{ user_info.activity_organized_count or 0 }}</td></tr>
         <tr><td>参与活动次数</td><td>{{ user_info.activity_joined_count or 0 }}</td></tr>
         <tr><td>缺席活动次数</td><td>{{ user_info.activity_absent_count or 0 }}</td></tr>
