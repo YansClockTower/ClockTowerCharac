@@ -37,9 +37,13 @@
   {% endif %}
 </p>
 
-<div id="borrowContactModal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="borrowContactTitle">
-  <div class="modal-content borrow-contact-modal">
-    <h3 id="borrowContactTitle">联系所有者借用</h3>
+<div id="borrowContactModal" class="app-modal" hidden role="dialog" aria-modal="true" aria-labelledby="borrowContactTitle">
+  <div class="app-modal-backdrop" data-app-modal-close></div>
+  <div class="app-modal-dialog borrow-contact-modal">
+    <div class="app-modal-header">
+      <h3 id="borrowContactTitle">联系所有者借用</h3>
+      <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
+    </div>
     <p class="borrow-contact-hint">在线借用流程尚未完善。请通过以下联系方式联系所有者 <strong>{{ owner_contact.owner_name }}</strong>，自行约定借用事宜。</p>
     {% if not owner_contact.owner_found %}
       <p class="muted">未在本站找到与所有者同名的账号，无法显示站内登记的联系方式。请尝试通过协会群等渠道联系「{{ owner_contact.owner_name }}」。</p>
@@ -47,7 +51,7 @@
       <p class="muted">该所有者尚未在个人中心填写可用的联系方式或邮箱。请尝试通过协会群等其他渠道联系。</p>
     {% else %}
       <dl class="borrow-contact-fields">
-        <dt>微信号 / 联系方式</dt>
+        <dt>微信号</dt>
         <dd>{% if owner_contact.contact_info %}{{ owner_contact.contact_info }}{% else %}<span class="muted">未填写</span>{% endif %}</dd>
         <dt>邮箱</dt>
         <dd>
@@ -61,7 +65,7 @@
       </dl>
     {% endif %}
     <p class="borrow-contact-actions">
-      <button type="button" class="btn btn-primary" id="borrowContactCloseBtn">知道了</button>
+      <button type="button" class="app-modal-btn app-modal-btn--primary" data-app-modal-close>知道了</button>
     </p>
   </div>
 </div>
@@ -70,21 +74,9 @@
 (function () {
   var openBtn = document.getElementById("borrowRequestBtn");
   var modal = document.getElementById("borrowContactModal");
-  var closeBtn = document.getElementById("borrowContactCloseBtn");
-  if (!openBtn || !modal) return;
-
-  function openModal() {
-    modal.style.display = "flex";
-  }
-  function closeModal() {
-    modal.style.display = "none";
-  }
-
-  openBtn.addEventListener("click", openModal);
-  if (closeBtn) closeBtn.addEventListener("click", closeModal);
-  modal.addEventListener("click", function (e) {
-    if (e.target === modal) closeModal();
-  });
+  if (!openBtn || !modal || !window.AppModal) return;
+  var api = AppModal.bind(modal);
+  openBtn.addEventListener("click", function () { api.open(); });
 })();
 </script>
 {% endblock %}

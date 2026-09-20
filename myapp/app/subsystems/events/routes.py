@@ -18,7 +18,10 @@ from app.identity.permissions import (
 )
 from app.models.database import get_user_db
 from app.subsystems.boardgames import api as boardgames_api
-from app.subsystems.events.attendee_ids import enrich_events_attendees_user_ids
+from app.subsystems.events.attendee_ids import (
+    enrich_events_attendees_user_ids,
+    enrich_events_inviter_contacts,
+)
 from app.subsystems.events.dbutil import (
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
     BROWSE_BOOKMARK_PIGEON_LABEL,
@@ -191,6 +194,7 @@ def browse_events(user_info):
     browse_tab, browse_filters = _browse_filters_from_request()
     events, events_total = _browse_merged_page(current_user, browse_filters, BROWSE_PAGE_SIZE, 0)
     enrich_events_attendees_user_ids(events)
+    enrich_events_inviter_contacts(events)
     events_loaded = len(events)
     has_more_browse = events_loaded < events_total
     browse_next_offset = events_loaded
@@ -237,6 +241,7 @@ def browse_events_more(user_info):
 
     events, total = _browse_merged_page(current_user, browse_filters, limit, offset)
     enrich_events_attendees_user_ids(events)
+    enrich_events_inviter_contacts(events)
     loaded_total = offset + len(events)
     html = render_template(
         "browse_cards_mixed.html",

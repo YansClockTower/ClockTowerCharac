@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/user-pages.css') }}">
   <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app_modal.js') }}"></script>
 </head>
 <body class="user-page">
   <div class="card">
@@ -61,9 +62,9 @@
           <option value="校外人员">校外人员</option>
           <option value="保密">保密</option>
         </select>
-        <label for="contactInfoInput" style="margin-top: 10px; display: block;">修改联系方式（推荐微信号/手机号）：</label>
-        <input type="text" id="contactInfoInput" maxlength="128" placeholder="例如：微信号 或 13800138000">
-        <button id="saveProfileBtn">保存社会身份与联系方式</button>
+        <label for="contactInfoInput" style="margin-top: 10px; display: block;">修改微信号：</label>
+        <input type="text" id="contactInfoInput" maxlength="128" placeholder="微信号">
+        <button id="saveProfileBtn">保存社会身份与微信号</button>
         <div id="profileStatus" class="status"></div>
       </div>
       {% if (user_info.association_rank | default(0)) == 4 %}
@@ -74,16 +75,22 @@
       <button onclick="handleLogout()">退出登录</button>
     </div>
 
-    <div id="avatarModal" class="modal-backdrop" style="display: none;">
-      <div class="modal-content">
-        <h3>上传头像</h3>
+    <div id="avatarModal" class="app-modal" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog">
+        <div class="app-modal-header">
+          <h3>上传头像</h3>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
+        </div>
         <input type="file" id="avatarInput" accept="image/*">
         <div id="image-preview-area" class="center" style="margin: 15px 0;">
           <img id="imageToCrop" style="max-width: 100%; max-height: 200px; display: none;" alt="待裁剪图片">
           <p id="preview-placeholder">请选择图片文件</p>
         </div>
-        <button id="uploadCropBtn" disabled>确认上传</button>
-        <button onclick="closeModal()">取消</button>
+        <div class="app-modal-actions">
+          <button type="button" class="app-modal-btn" data-app-modal-close>取消</button>
+          <button type="button" class="app-modal-btn app-modal-btn--primary" id="uploadCropBtn" disabled>确认上传</button>
+        </div>
       </div>
     </div>
     {% else %}
@@ -131,12 +138,13 @@
     }
 
     function closeModal() {
-      if (avatarModal) avatarModal.style.display = "none";
+      if (avatarModal && window.AppModal) AppModal.close(avatarModal);
     }
 
-    if (setAvatarBtn) {
+    if (setAvatarBtn && avatarModal && window.AppModal) {
+      AppModal.bind(avatarModal);
       setAvatarBtn.addEventListener("click", () => {
-        avatarModal.style.display = "flex";
+        AppModal.open(avatarModal);
         avatarInput.value = "";
         imageToCrop.style.display = "none";
         previewPlaceholder.style.display = "block";

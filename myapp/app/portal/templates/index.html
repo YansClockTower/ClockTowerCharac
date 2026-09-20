@@ -49,12 +49,12 @@
     </p>
 
     {% if show_join_recruit_group %}
-    <div id="recruitGroupModal" class="recruit-modal" hidden>
-      <div class="recruit-modal-backdrop" data-close-recruit-modal></div>
-      <div class="recruit-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="recruitGroupTitle">
-        <div class="recruit-modal-header">
+    <div id="recruitGroupModal" class="app-modal app-modal--medium" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="recruitGroupTitle">
+        <div class="app-modal-header">
           <h3 id="recruitGroupTitle">加入招新群</h3>
-          <button type="button" class="recruit-modal-close" data-close-recruit-modal aria-label="关闭">×</button>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
         </div>
         <p class="recruit-modal-hint">使用微信扫描下方二维码加入招新群，群码失效可以加布鸽协会官号。</p>
         <div class="recruit-modal-grid">
@@ -83,12 +83,12 @@
     </div>
     {% endif %}
 
-    <div id="contactUsModal" class="recruit-modal" hidden>
-      <div class="recruit-modal-backdrop" data-close-contact-modal></div>
-      <div class="recruit-modal-dialog recruit-modal-dialog--table" role="dialog" aria-modal="true" aria-labelledby="contactUsTitle">
-        <div class="recruit-modal-header">
+    <div id="contactUsModal" class="app-modal app-modal--wide" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="contactUsTitle">
+        <div class="app-modal-header">
           <h3 id="contactUsTitle">联系我们/成为干事</h3>
-          <button type="button" class="recruit-modal-close" data-close-contact-modal aria-label="关闭">×</button>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
         </div>
         <p class="recruit-modal-hint">各专区事务可直接添加对应负责人微信。希望成为干事管理请联系前三个负责人～</p>
         <div class="contact-table-wrap">
@@ -115,6 +115,7 @@
     </div>
 
     <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app_modal.js') }}"></script>
     <script src="{{ url_for('users.static', filename='js/email_bind_prompt.js') }}"></script>
     <script>
         function toggleSection(sectionId) {
@@ -123,39 +124,12 @@
             target.classList.toggle("active");
         }
 
-        function bindPortalModal(modalId, openBtnId, closeAttr) {
-            const modal = document.getElementById(modalId);
-            const openBtn = document.getElementById(openBtnId);
-            if (!modal || !openBtn) return null;
-
-            function closeModal() {
-                modal.hidden = true;
-                if (!document.querySelector(".recruit-modal:not([hidden])")) {
-                    document.body.classList.remove("recruit-modal-open");
-                }
-            }
-            function openModal() {
-                document.querySelectorAll(".recruit-modal").forEach(function (el) {
-                    el.hidden = true;
-                });
-                modal.hidden = false;
-                document.body.classList.add("recruit-modal-open");
-            }
-
-            openBtn.addEventListener("click", openModal);
-            modal.addEventListener("click", function (e) {
-                if (e.target.closest("[" + closeAttr + "]")) closeModal();
-            });
-            return closeModal;
-        }
-
-        const closeRecruit = bindPortalModal("recruitGroupModal", "openRecruitGroupQr", "data-close-recruit-modal");
-        const closeContact = bindPortalModal("contactUsModal", "openContactUs", "data-close-contact-modal");
-        document.addEventListener("keydown", function (e) {
-            if (e.key !== "Escape") return;
-            if (closeRecruit) closeRecruit();
-            if (closeContact) closeContact();
-        });
+        const recruitModal = AppModal.bind(document.getElementById("recruitGroupModal"));
+        const contactModal = AppModal.bind(document.getElementById("contactUsModal"));
+        const openRecruit = document.getElementById("openRecruitGroupQr");
+        const openContact = document.getElementById("openContactUs");
+        if (openRecruit && recruitModal) openRecruit.addEventListener("click", function () { recruitModal.open(); });
+        if (openContact && contactModal) openContact.addEventListener("click", function () { contactModal.open(); });
     </script>
 </body>
 </html>

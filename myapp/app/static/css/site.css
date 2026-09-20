@@ -526,6 +526,160 @@ th {
 }
 
 /* ===== Modal ===== */
+body.app-modal-open {
+  overflow: hidden;
+}
+
+.app-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+.app-modal[hidden] {
+  display: none !important;
+}
+
+.app-modal--sheet {
+  align-items: flex-start;
+  padding-top: 8vh;
+}
+
+.app-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(74, 70, 66, 0.45);
+}
+
+.app-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  max-height: 86vh;
+  overflow: auto;
+  background: var(--color-bg-surface, #fff);
+  border: 1px solid var(--color-border, #e4dfd8);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: var(--shadow-card, 0 16px 40px rgba(0, 0, 0, 0.2));
+  padding: 16px 18px 18px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.app-modal--wide .app-modal-dialog,
+.app-modal--medium .app-modal-dialog {
+  max-width: 560px;
+}
+
+.app-modal--wide .app-modal-dialog {
+  max-width: 680px;
+}
+
+.app-modal--sheet .app-modal-dialog {
+  max-width: 560px;
+  max-height: 84vh;
+}
+
+.app-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.app-modal-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--color-heading, #222);
+}
+
+.app-modal-close {
+  border: none;
+  background: transparent;
+  color: #444;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.app-modal-close:hover {
+  color: #111;
+  background: transparent;
+}
+
+.app-modal-body p {
+  margin: 0 0 12px;
+  color: var(--color-text-muted, #666);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.app-modal-label {
+  display: block;
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: var(--color-text, #222);
+}
+
+.app-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 8px;
+}
+
+.app-modal-error {
+  margin: 0;
+  color: var(--color-danger-hover, #a33);
+  font-size: 0.88rem;
+}
+
+.app-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.app-modal-btn {
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  background: var(--color-bg-muted, #f3f1ee);
+  color: var(--color-text, #222);
+}
+
+.app-modal-btn:hover {
+  background: var(--color-border-light, #e4dfd8);
+}
+
+.app-modal-btn--primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.app-modal-btn--primary:hover {
+  background: var(--color-primary-hover);
+  color: #fff;
+}
+
+.organizer-wechat-id {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text, #222);
+  word-break: break-all;
+}
+
 .modal-backdrop {
   position: fixed;
   z-index: 1000;

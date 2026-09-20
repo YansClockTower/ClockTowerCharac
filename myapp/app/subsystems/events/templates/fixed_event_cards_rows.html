@@ -63,7 +63,8 @@
                 <div class="event-info">
                     <p>
                         <strong>活动模式:</strong> 布鸽桌游聚会 <br>
-                        <strong>组织者:</strong> {{ event.inviter }}<br>
+                        <strong>组织者:</strong> {{ event.inviter }}
+                        {% with name=event.inviter, wechat=event.inviter_wechat %}{% include "_organizer_wechat_btn.html" %}{% endwith %}<br>
                         {% if current_user_is_member %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>

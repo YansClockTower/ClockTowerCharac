@@ -52,12 +52,12 @@
     </div>
 
     {% if current_user_is_member %}
-    <div id="fixedCreateTableModal" class="fixed-modal" hidden>
-      <div class="fixed-modal-backdrop" data-close-fixed-modal></div>
-      <div class="fixed-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="fixedCreateTableTitle">
-        <div class="fixed-modal-header">
+    <div id="fixedCreateTableModal" class="app-modal app-modal--sheet" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="fixedCreateTableTitle">
+        <div class="app-modal-header">
           <h3 id="fixedCreateTableTitle">创建分桌</h3>
-          <button type="button" class="fixed-modal-close" data-close-fixed-modal aria-label="关闭">×</button>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
         </div>
         <p id="fixedCreateTableBlocked" class="hint" hidden></p>
         <form method="POST" action="#" id="fixedCreateTableForm" hidden>
@@ -216,26 +216,13 @@
 
         (function initFixedCreateTableModal() {
             const modal = document.getElementById("fixedCreateTableModal");
-            if (!modal) return;
+            if (!modal || !window.AppModal) return;
+            const api = AppModal.bind(modal);
             const form = document.getElementById("fixedCreateTableForm");
             const blocked = document.getElementById("fixedCreateTableBlocked");
             const createUrlTpl = {{ url_for('events.fixed_create_table_route', event_id=7777)|tojson }};
 
-            function closeModal() {
-                modal.hidden = true;
-                document.body.classList.remove("fixed-modal-open");
-            }
-            function openModal() {
-                modal.hidden = false;
-                document.body.classList.add("fixed-modal-open");
-            }
-
             document.addEventListener("click", function (e) {
-                const closer = e.target.closest("[data-close-fixed-modal]");
-                if (closer) {
-                    closeModal();
-                    return;
-                }
                 const btn = e.target.closest(".fixed-create-table-btn");
                 if (!btn) return;
                 const eventId = btn.getAttribute("data-event-id");
@@ -267,11 +254,7 @@
                     form.hidden = false;
                     form.action = createUrlTpl.replace("7777", eventId);
                 }
-                openModal();
-            });
-
-            document.addEventListener("keydown", function (e) {
-                if (e.key === "Escape" && !modal.hidden) closeModal();
+                api.open();
             });
         })();
     </script>
