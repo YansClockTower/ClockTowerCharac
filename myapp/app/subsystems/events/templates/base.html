@@ -33,26 +33,6 @@
           ClockTowerAuth.establishSessionFromStoredToken();
         }
       });
-
-      async function logoutUser(event) {
-        event.preventDefault();
-        try {
-          await (window.ClockTowerAuth
-            ? ClockTowerAuth.authFetch("/user/logout", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-              })
-            : fetch("/user/logout", {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-              }));
-        } catch (e) {}
-        if (window.ClockTowerAuth) {
-          ClockTowerAuth.clearStoredAuthToken();
-        }
-        window.location.href = "/user/login";
-      }
     </script>
 </body>
 </html>

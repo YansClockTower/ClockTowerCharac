@@ -1,6 +1,7 @@
-<button type="button" class="wechat-icon-btn" data-organizer-wechat
-        data-name="{{ name }}" data-wechat="{{ wechat or '' }}"
-        {% if chat_event_id %}data-chat-url="{{ url_for('events.chat_room_route', kind=chat_kind, event_id=chat_event_id) }}"{% endif %}
-        title="查看微信号" aria-label="查看{{ name }}的微信号">
-  <img src="{{ url_for('events.static', filename='img/wechat.png') }}" alt="" width="18" height="18">
-</button>
+<a class="event-chat-link" href="{{ url_for('events.chat_room_route', kind=chat_kind, event_id=chat_event_id) }}"
+   title="进入聊天室" aria-label="进入聊天室">
+  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+    <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+    <path d="M3 7l9 7 9-7"></path>
+  </svg>
+</a>

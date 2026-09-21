@@ -1,9 +1,8 @@
 /**
- * 发布活动前若未留微信号，用共用浮窗建议填写；活动卡片上查看组局者微信。
+ * 发布活动前若未留微信号，用共用浮窗建议填写。
  */
 (function (global) {
   const BLANK = { "": true, "保密": true, "未填写": true, "无": true, "-": true, "—": true };
-  const ADMIN_WECHAT = "YJQ2364728692";
 
   function isBlank(value) {
     return !!BLANK[(value || "").trim()];
@@ -92,36 +91,6 @@
     });
   }
 
-  function showOrganizerWechat(name, wechat, chatUrl) {
-    const who = name || "组局者";
-    let html;
-    if (wechat) {
-      html = '<p class="organizer-wechat-line"></p><p class="organizer-wechat-id"></p>';
-    } else {
-      html = "<p>组局者未留微信号。如果有问题，可以联系管理员（" + ADMIN_WECHAT + "）。</p>";
-    }
-    const modal = global.AppModal.create({
-      title: "组局者微信号",
-      html: html,
-    });
-    if (wechat) {
-      const line = modal.body.querySelector(".organizer-wechat-line");
-      line.textContent = "组局者「" + who + "」的微信号：";
-      modal.body.querySelector(".organizer-wechat-id").textContent = wechat;
-    }
-    if (chatUrl) {
-      const jump = document.createElement("p");
-      jump.className = "organizer-chat-jump";
-      const link = document.createElement("a");
-      link.className = "base-btn join-btn";
-      link.href = chatUrl;
-      link.textContent = "进入聊天室";
-      jump.appendChild(link);
-      modal.body.appendChild(jump);
-    }
-    modal.open();
-  }
-
   document.addEventListener("submit", async function (e) {
     const form = e.target;
     if (!form || !form.hasAttribute("data-require-wechat")) return;
@@ -137,15 +106,4 @@
       else form.submit();
     }, 0);
   }, true);
-
-  document.addEventListener("click", function (e) {
-    const btn = e.target.closest("[data-organizer-wechat]");
-    if (!btn || !global.AppModal) return;
-    e.preventDefault();
-    showOrganizerWechat(
-      btn.getAttribute("data-name") || "",
-      (btn.getAttribute("data-wechat") || "").trim(),
-      (btn.getAttribute("data-chat-url") || "").trim()
-    );
-  });
 })(window);

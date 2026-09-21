@@ -247,6 +247,10 @@ body.user-page:has(.site-header) {
   color: var(--color-link-hover);
 }
 
+.site-header-logout {
+  margin-left: auto;
+}
+
 .site-header-mail {
   display: none;
   margin-left: 4px;

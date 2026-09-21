@@ -20,6 +20,9 @@
        data-poll-url="{{ url_for('events.chat_poll_route', kind=room.event_kind, event_id=room.event_id) }}"
        data-send-url="{{ url_for('events.chat_send_route', kind=room.event_kind, event_id=room.event_id) }}">
     {% for message in messages %}
+    {% if message.sender == '系统' %}
+    <div class="chat-system">{{ message.body }}</div>
+    {% else %}
     <div class="chat-row{% if message.mine %} is-mine{% endif %}">
       <div class="chat-bubble">
         {% if not message.mine %}
@@ -29,6 +32,7 @@
         <div class="chat-time">{{ message.time_label }}</div>
       </div>
     </div>
+    {% endif %}
     {% endfor %}
   </div>
   <form class="chat-compose" id="chatForm">
@@ -54,6 +58,14 @@
 
   function appendMessage(msg) {
     if (!msg || msg.id <= lastId) return;
+    if (msg.sender === "系统") {
+      const line = document.createElement("div");
+      line.className = "chat-system";
+      line.textContent = msg.body || "";
+      log.appendChild(line);
+      lastId = msg.id;
+      return;
+    }
     const row = document.createElement("div");
     row.className = "chat-row" + (msg.mine ? " is-mine" : "");
     const bubble = document.createElement("div");

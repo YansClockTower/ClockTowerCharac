@@ -6,6 +6,9 @@ KIND_FREE = "free"
 KIND_FIXED = "fixed"
 CHAT_KINDS = (KIND_FREE, KIND_FIXED)
 MAX_BODY_LEN = 500
+SYSTEM_SENDER = "系统"
+_CONTACT_PATH = "“主页->桌游协会事务->联系我们”"
+_BLANK_CONTACTS = {"", "保密", "未填写", "无", "-", "—"}
 
 
 def ensure_chat_schema(db):
@@ -49,10 +52,11 @@ def ensure_chat_schema(db):
         """
     )
     _backfill_rooms(db)
+    _seed_system_notices(db)
 
 
 def open_room(db, kind, event_id, inviter):
-    """创建聊天室，并把组织者记为参与者（已读游标停在当前最后一条）。"""
+    """创建聊天室。新房间由系统发一句联系说明，并把组织者记为参与者。"""
     db.execute(
         """
         INSERT OR IGNORE INTO event_chat_rooms (event_kind, event_id)
@@ -61,7 +65,10 @@ def open_room(db, kind, event_id, inviter):
         (kind, int(event_id)),
     )
     room_id = _room_id(db, kind, event_id)
-    if room_id and (inviter or "").strip():
+    if room_id is None:
+        return None
+    _insert_system_notice(db, room_id, inviter)
+    if (inviter or "").strip():
         _ensure_participant(db, room_id, inviter.strip())
     return room_id
 
@@ -300,6 +307,77 @@ def format_chat_time(value):
     if dt.year == now.year:
         return dt.strftime("%m-%d %H:%M")
     return dt.strftime("%Y-%m-%d %H:%M")
+
+
+def _insert_system_notice(db, room_id, inviter):
+    if _latest_message_id(db, room_id) > 0:
+        return
+    wechat = _organizer_wechat(inviter)
+    if wechat:
+        body = (
+            f"如有问题可联系组局者（微信）：{wechat}，"
+            f"或前往{_CONTACT_PATH}寻找管理员。"
+        )
+    else:
+        body = f"如有问题可前往{_CONTACT_PATH}寻找管理员。"
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db.execute(
+        """
+        INSERT INTO event_chat_messages (room_id, sender, body, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (int(room_id), SYSTEM_SENDER, body, created_at),
+    )
+    tip = _latest_message_id(db, room_id)
+    db.execute(
+        """
+        UPDATE event_chat_reads
+        SET last_read_message_id = ?
+        WHERE room_id = ? AND last_read_message_id < ?
+        """,
+        (tip, int(room_id), tip),
+    )
+
+
+def _seed_system_notices(db):
+    """给还没有任何消息的聊天室补上系统说明（只补一次）。"""
+    rows = db.execute(
+        """
+        SELECT r.id AS room_id, r.event_kind AS event_kind, r.event_id AS event_id
+        FROM event_chat_rooms r
+        WHERE NOT EXISTS (
+            SELECT 1 FROM event_chat_messages m WHERE m.room_id = r.id
+        )
+        """
+    ).fetchall()
+    for row in rows:
+        inviter = _inviter(db, row["event_kind"], row["event_id"])
+        _insert_system_notice(db, row["room_id"], inviter)
+
+
+def _organizer_wechat(inviter):
+    name = (inviter or "").strip()
+    if not name:
+        return ""
+    try:
+        from app.identity.permissions import ensure_user_permission_schema
+        from app.models.database import get_user_db
+
+        ensure_user_permission_schema()
+        user_db = get_user_db()
+    except Exception:
+        return ""
+    try:
+        row = user_db.execute(
+            "SELECT contact_info FROM user_info WHERE name = ?",
+            (name,),
+        ).fetchone()
+    finally:
+        user_db.close()
+    if row is None:
+        return ""
+    raw = (row["contact_info"] or "").strip()
+    return "" if raw in _BLANK_CONTACTS else raw
 
 
 def _snippet(body):

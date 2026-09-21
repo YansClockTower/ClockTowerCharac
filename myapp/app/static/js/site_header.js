@@ -17,6 +17,7 @@
 
   global.logoutUser = async function logoutUser(event) {
     if (event) event.preventDefault();
+    if (!global.confirm("确定要登出吗？")) return;
     try {
       await (global.ClockTowerAuth
         ? global.ClockTowerAuth.authFetch("/user/logout", {
