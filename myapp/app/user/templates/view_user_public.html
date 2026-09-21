@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/user-pages.css') }}">
 </head>
 <body class="user-page">
+  {% include "_site_header.html" %}
   <div class="card">
     <h2>用户资料</h2>
     <p class="center">用户 <b>{{ profile.name or '用户' }}</b></p>

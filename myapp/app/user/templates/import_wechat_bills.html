@@ -8,6 +8,7 @@
   <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
 </head>
 <body class="user-page import-bills-page">
+  {% include "_site_header.html" %}
   <div class="card card--wide">
     <h2>微信账单导入</h2>
     <p class="hint">库中现有记录：{{ total_count }} 条。订单号全局唯一；重复导入会被拒绝或跳过。</p>

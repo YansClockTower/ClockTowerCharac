@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}{{ room.name }} - 消息{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('events.static', filename='chat.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="chat-app">
+  <div class="chat-top">
+    <a class="chat-back" href="{{ url_for('events.chat_list_route') }}">返回</a>
+    <h1 class="chat-title">{{ room.name }}</h1>
+  </div>
+  {% if not allowed %}
+  <p class="chat-empty">请先报名后再进入聊天室。</p>
+  {% else %}
+  <div class="chat-log" id="chatLog"
+       data-last-id="{{ messages[-1].id if messages else 0 }}"
+       data-poll-url="{{ url_for('events.chat_poll_route', kind=room.event_kind, event_id=room.event_id) }}"
+       data-send-url="{{ url_for('events.chat_send_route', kind=room.event_kind, event_id=room.event_id) }}">
+    {% for message in messages %}
+    <div class="chat-row{% if message.mine %} is-mine{% endif %}">
+      <div class="chat-bubble">
+        {% if not message.mine %}
+        <div class="chat-sender">{{ message.sender }}</div>
+        {% endif %}
+        <div class="chat-body">{{ message.body }}</div>
+        <div class="chat-time">{{ message.time_label }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <form class="chat-compose" id="chatForm">
+    <textarea id="chatInput" rows="1" maxlength="500" placeholder="发消息" required></textarea>
+    <button type="submit" class="base-btn join-btn">发送</button>
+  </form>
+  {% endif %}
+</div>
+{% if allowed %}
+<script>
+(function () {
+  const log = document.getElementById("chatLog");
+  const form = document.getElementById("chatForm");
+  const input = document.getElementById("chatInput");
+  if (!log || !form || !input) return;
+  let lastId = Number(log.getAttribute("data-last-id") || 0);
+  const pollUrl = log.getAttribute("data-poll-url");
+  const sendUrl = log.getAttribute("data-send-url");
+
+  function scrollBottom() {
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function appendMessage(msg) {
+    if (!msg || msg.id <= lastId) return;
+    const row = document.createElement("div");
+    row.className = "chat-row" + (msg.mine ? " is-mine" : "");
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble";
+    if (!msg.mine) {
+      const name = document.createElement("div");
+      name.className = "chat-sender";
+      name.textContent = msg.sender || "";
+      bubble.appendChild(name);
+    }
+    const body = document.createElement("div");
+    body.className = "chat-body";
+    body.textContent = msg.body || "";
+    const time = document.createElement("div");
+    time.className = "chat-time";
+    time.textContent = msg.time_label || "";
+    bubble.appendChild(body);
+    bubble.appendChild(time);
+    row.appendChild(bubble);
+    log.appendChild(row);
+    lastId = msg.id;
+  }
+
+  async function poll() {
+    try {
+      const res = await ClockTowerAuth.authFetch(pollUrl + "?after=" + lastId);
+      const data = await res.json().catch(function () { return {}; });
+      (data.messages || []).forEach(appendMessage);
+      if (data.messages && data.messages.length) scrollBottom();
+    } catch (e) {}
+  }
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const text = input.value;
+    if (!text.trim()) return;
+    try {
+      const res = await ClockTowerAuth.authFetch(sendUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: text }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok || !data.ok) {
+        alert(data.message || "发送失败");
+        return;
+      }
+      input.value = "";
+      appendMessage(data.message);
+      scrollBottom();
+    } catch (err) {
+      alert("发送失败，请稍后再试。");
+    }
+  });
+
+  scrollBottom();
+  setInterval(poll, 3000);
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -10,6 +10,7 @@
   <script src="{{ url_for('static', filename='js/app_modal.js') }}"></script>
 </head>
 <body class="user-page">
+  {% include "_site_header.html" %}
   <div class="card">
     <h2>用户中心</h2>
     {% if user_info %}

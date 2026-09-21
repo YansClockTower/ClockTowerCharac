@@ -8,6 +8,7 @@
 </head>
 
 <body>
+{% include "_site_header.html" %}
 <form method="post" action="{{ url_for('character.edit_submit', char_id=character.id) }}">
     <div class="sticky-header">
         <div class="sticky-fields">

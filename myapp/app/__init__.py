@@ -53,6 +53,7 @@ def create_app():
         ):
             return
         user = get_current_user(update_last_login=False)
+        g.site_user = user
         if not user:
             return
         result = silent_verify_membership(user["name"])
@@ -62,5 +63,9 @@ def create_app():
 
     app.teardown_appcontext(close_events_db)
     app.teardown_appcontext(close_boardgames_db)
+
+    @app.context_processor
+    def inject_site_user():
+        return {"site_user": getattr(g, "site_user", None)}
 
     return app

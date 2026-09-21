@@ -47,6 +47,17 @@ from app.subsystems.events.dbutil import (
     update_event,
 )
 from app.subsystems.events import fixed_dbutil as fixed
+from app.subsystems.events.chat import (
+    CHAT_KINDS,
+    format_chat_time,
+    get_open_room,
+    has_unread,
+    is_participant,
+    list_messages,
+    list_rooms_for,
+    mark_read,
+    post_message,
+)
 from app.user.membership import user_is_member
 
 events_bp = Blueprint(
@@ -830,3 +841,94 @@ def fixed_archive_route(user_info, event_id):
         flash("固定聚会及分桌报名已删除。", "success")
 
     return redirect(url_for("events.browse_events"))
+
+
+def _chat_message_payload(message, current_user):
+    return {
+        "id": message["id"],
+        "sender": message["sender"],
+        "body": message["body"],
+        "time_label": format_chat_time(message.get("created_at") or ""),
+        "mine": message["sender"] == current_user,
+    }
+
+
+@events_bp.route("/messages")
+@login_required_template
+def chat_list_route(user_info):
+    rooms = list_rooms_for(user_info["name"])
+    return render_template(
+        "chat_list.html",
+        rooms=rooms,
+        current_user=user_info["name"],
+    )
+
+
+@events_bp.route("/messages/unread")
+@login_required_template
+def chat_unread_route(user_info):
+    return jsonify({"unread": has_unread(user_info["name"])})
+
+
+@events_bp.route("/messages/<kind>/<int:event_id>")
+@login_required_template
+def chat_room_route(user_info, kind, event_id):
+    if kind not in CHAT_KINDS:
+        flash("聊天室不存在。", "error")
+        return redirect(url_for("events.chat_list_route"))
+    room = get_open_room(kind, event_id)
+    if room is None:
+        flash("聊天室已关闭。", "info")
+        return redirect(url_for("events.chat_list_route"))
+    player = user_info["name"]
+    allowed = is_participant(room["id"], player)
+    messages = []
+    if allowed:
+        messages = [_chat_message_payload(m, player) for m in list_messages(room["id"])]
+        mark_read(room["id"], player)
+    return render_template(
+        "chat_room.html",
+        room=room,
+        messages=messages,
+        allowed=allowed,
+        current_user=player,
+    )
+
+
+@events_bp.route("/messages/<kind>/<int:event_id>/poll")
+@login_required_template
+def chat_poll_route(user_info, kind, event_id):
+    room = get_open_room(kind, event_id) if kind in CHAT_KINDS else None
+    if room is None:
+        return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
+    player = user_info["name"]
+    if not is_participant(room["id"], player):
+        return jsonify({"ok": False, "message": "请先报名后再进入聊天室。"}), 403
+    try:
+        after_id = int(request.args.get("after", 0))
+    except (TypeError, ValueError):
+        after_id = 0
+    messages = [
+        _chat_message_payload(m, player) for m in list_messages(room["id"], after_id=after_id)
+    ]
+    mark_read(room["id"], player)
+    return jsonify({"ok": True, "messages": messages})
+
+
+@events_bp.route("/messages/<kind>/<int:event_id>/send", methods=["POST"])
+@login_required_template
+def chat_send_route(user_info, kind, event_id):
+    room = get_open_room(kind, event_id) if kind in CHAT_KINDS else None
+    if room is None:
+        return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
+    player = user_info["name"]
+    if not is_participant(room["id"], player):
+        return jsonify({"ok": False, "message": "请先报名后再发言。"}), 403
+    payload = request.get_json(silent=True) or {}
+    body = payload.get("body")
+    if body is None:
+        body = request.form.get("body")
+    ok, err, message = post_message(room["id"], player, body or "")
+    if not ok:
+        return jsonify({"ok": False, "message": err or "发送失败。"}), 400
+    return jsonify({"ok": True, "message": _chat_message_payload(message, player)})

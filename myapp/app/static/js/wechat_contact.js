@@ -92,7 +92,7 @@
     });
   }
 
-  function showOrganizerWechat(name, wechat) {
+  function showOrganizerWechat(name, wechat, chatUrl) {
     const who = name || "组局者";
     let html;
     if (wechat) {
@@ -108,6 +108,16 @@
       const line = modal.body.querySelector(".organizer-wechat-line");
       line.textContent = "组局者「" + who + "」的微信号：";
       modal.body.querySelector(".organizer-wechat-id").textContent = wechat;
+    }
+    if (chatUrl) {
+      const jump = document.createElement("p");
+      jump.className = "organizer-chat-jump";
+      const link = document.createElement("a");
+      link.className = "base-btn join-btn";
+      link.href = chatUrl;
+      link.textContent = "进入聊天室";
+      jump.appendChild(link);
+      modal.body.appendChild(jump);
     }
     modal.open();
   }
@@ -132,6 +142,10 @@
     const btn = e.target.closest("[data-organizer-wechat]");
     if (!btn || !global.AppModal) return;
     e.preventDefault();
-    showOrganizerWechat(btn.getAttribute("data-name") || "", (btn.getAttribute("data-wechat") || "").trim());
+    showOrganizerWechat(
+      btn.getAttribute("data-name") || "",
+      (btn.getAttribute("data-wechat") || "").trim(),
+      (btn.getAttribute("data-chat-url") || "").trim()
+    );
   });
 })(window);

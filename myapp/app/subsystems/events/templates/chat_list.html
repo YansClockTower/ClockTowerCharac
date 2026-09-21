@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}消息 - 活动信息板{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('events.static', filename='chat.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="chat-app">
+  <div class="chat-top">
+    <h1 class="chat-title">消息</h1>
+  </div>
+  {% if not rooms %}
+  <p class="chat-empty">你还没有参与中的活动聊天室。报名活动后会显示在这里。</p>
+  {% else %}
+  <div class="chat-list">
+    {% for room in rooms %}
+    <a class="chat-list-row" href="{{ url_for('events.chat_room_route', kind=room.event_kind, event_id=room.event_id) }}">
+      <span class="chat-list-main">
+        <span class="chat-list-name">{{ room.event_name }}</span>
+        <span class="chat-list-preview">{{ room.preview }}</span>
+      </span>
+      <span class="chat-list-side">
+        {% if room.time_label %}<span class="chat-list-time">{{ room.time_label }}</span>{% endif %}
+        {% if room.unread %}<span class="chat-dot" aria-label="有未读消息"></span>{% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

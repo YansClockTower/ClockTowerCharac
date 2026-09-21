@@ -6,6 +6,14 @@ from datetime import datetime
 from flask import g
 
 from app.models.config import get_config
+from app.subsystems.events.chat import (
+    KIND_FREE,
+    close_room,
+    ensure_chat_schema,
+    note_joined,
+    note_left,
+    open_room,
+)
 
 # 含历史「布鸽桌游活动」以便旧自由聚会记录归一化；新建自由聚会勿再用该类型
 EVENT_TYPE_VALUES = ("轻桌游聚会", "布鸽桌游活动", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "其他")
@@ -69,9 +77,10 @@ def is_event_archived(event) -> bool:
 
 
 def archive_event(event_id):
-    """将活动标记为已归档（不删除记录与报名）。"""
+    """将活动标记为已归档（不删除记录与报名），并关闭临时聊天室。"""
     db = get_db()
     db.execute("UPDATE events SET signcode = ? WHERE id = ?", (ARCHIVED_SIGNCODE, event_id))
+    close_room(db, KIND_FREE, event_id)
     db.commit()
 
 
@@ -160,6 +169,7 @@ def _ensure_events_schema(db):
         )
         """
     )
+    ensure_chat_schema(db)
     db.commit()
 
 
@@ -344,7 +354,7 @@ def get_event_attendance_records(event_id):
 
 def create_event(data):
     db = get_db()
-    db.execute(
+    cur = db.execute(
         """
         INSERT INTO events
             (name, inviter, location, starttime, locktime, description, minplayer, maxplayer, signcode, event_type)
@@ -364,7 +374,10 @@ def create_event(data):
             data["event_type"],
         ),
     )
+    event_id = int(cur.lastrowid)
+    open_room(db, KIND_FREE, event_id, data["inviter"])
     db.commit()
+    return event_id
 
 
 def update_event(event_id, data):
@@ -392,6 +405,7 @@ def update_event(event_id, data):
 
 def delete_event(event_id):
     db = get_db()
+    close_room(db, KIND_FREE, event_id)
     db.execute("DELETE FROM events WHERE id = ?", (event_id,))
     db.commit()
 
@@ -405,6 +419,7 @@ def join_event(event_id, player):
         return False, "活动已归档，无法报名。"
     try:
         db.execute("INSERT INTO attendinfo (eventid, player) VALUES (?, ?)", (event_id, player))
+        note_joined(db, KIND_FREE, event_id, player)
         db.commit()
         return True, None
     except sqlite3.IntegrityError:
@@ -484,5 +499,7 @@ def leave_event(event_id, player):
     if row is None or is_event_archived(dict(row)):
         return False
     cursor = db.execute("DELETE FROM attendinfo WHERE eventid = ? AND player = ?", (event_id, player))
+    if cursor.rowcount:
+        note_left(db, KIND_FREE, event_id, player)
     db.commit()
     return cursor.rowcount > 0

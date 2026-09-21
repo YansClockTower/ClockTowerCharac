@@ -207,6 +207,76 @@ summary {
   text-decoration: none;
 }
 
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.95rem;
+}
+
+body:has(.site-header) {
+  padding-top: 46px;
+}
+
+body.user-page:has(.site-header) {
+  margin-top: 0;
+}
+
+.site-header-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.site-header-nav a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.site-header-nav a:hover {
+  color: var(--color-link-hover);
+}
+
+.site-header-mail {
+  display: none;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e23d3d;
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  box-shadow: 0 0 0 2px #ffd0d0;
+}
+
+.site-header-messages.is-unread {
+  color: #c42323;
+  font-weight: 700;
+}
+
+.site-header-messages.is-unread .site-header-mail {
+  display: inline-block;
+}
+
+.organizer-chat-jump {
+  margin-top: 14px;
+}
+
+.organizer-chat-jump a {
+  display: inline-block;
+  text-decoration: none;
+}
+
 /* ===== Flash messages ===== */
 .flashes {
   list-style: none;

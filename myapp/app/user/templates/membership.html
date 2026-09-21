@@ -9,6 +9,7 @@
   <script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
 </head>
 <body class="user-page">
+  {% include "_site_header.html" %}
   <div class="card card--wide">
     <h2>验证会员资质</h2>
     {% with messages = get_flashed_messages(with_categories=true) %}

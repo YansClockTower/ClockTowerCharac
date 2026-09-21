@@ -13,11 +13,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body class="page-shell page-shell--narrow">
-    <div class="header-status">
-        <span class="welcome-msg">欢迎, {{ current_user if current_user else '用户' }}</span>
-        <a href="{{ url_for('users.user_page') }}" class="user-center-link">用户中心</a>
-        <a href="#" class="logout-btn" onclick="logoutUser(event)">登出</a>
-    </div>
+    {% include "_site_header.html" %}
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}

@@ -1,0 +1,18 @@
+{% if site_user %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+<header class="site-header">
+  <span class="welcome-msg">欢迎，{{ site_user.name }}</span>
+  <nav class="site-header-nav" aria-label="站点">
+    <a href="{{ url_for('portal.index') }}">主页</a>
+    <a href="{{ url_for('events.chat_list_route') }}" class="site-header-messages" id="siteHeaderMessages"
+       data-unread-url="{{ url_for('events.chat_unread_route') }}">
+      消息
+      <span class="site-header-mail" aria-hidden="true">✉</span>
+    </a>
+    <a href="{{ url_for('users.user_page') }}">资料</a>
+    <a href="#" class="logout-btn" onclick="logoutUser(event)">登出</a>
+  </nav>
+</header>
+<script src="{{ url_for('users.static', filename='js/auth_client.js') }}"></script>
+<script src="{{ url_for('static', filename='js/site_header.js') }}"></script>
+{% endif %}

@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional, Tuple
 
 from app.subsystems.boardgames import api as boardgames_api
+from app.subsystems.events.chat import KIND_FIXED, close_room, note_joined, note_left, open_room
 from app.subsystems.events.dbutil import (
     ARCHIVED_SIGNCODE,
     FIXED_GATHERING_LABEL,
@@ -97,8 +98,10 @@ def create_fixed_event(data) -> int:
             str(random.randint(0, 9999)).zfill(4),
         ),
     )
+    event_id = int(cur.lastrowid)
+    open_room(db, KIND_FIXED, event_id, data["inviter"])
     db.commit()
-    return int(cur.lastrowid)
+    return event_id
 
 
 def update_fixed_event(event_id, data):
@@ -126,6 +129,7 @@ def update_fixed_event(event_id, data):
 
 def delete_fixed_event(event_id):
     db = get_db()
+    close_room(db, KIND_FIXED, event_id)
     db.execute("DELETE FROM fixed_events WHERE id = ?", (event_id,))
     db.commit()
 
@@ -136,6 +140,7 @@ def archive_fixed_event(event_id):
         "UPDATE fixed_events SET signcode = ? WHERE id = ?",
         (ARCHIVED_SIGNCODE, event_id),
     )
+    close_room(db, KIND_FIXED, event_id)
     db.commit()
 
 
@@ -409,6 +414,7 @@ def create_table(
             """,
             (table_id, event_id, host),
         )
+        note_joined(db, KIND_FIXED, event_id, host)
         db.commit()
         return True, None, table_id
     except sqlite3.IntegrityError:
@@ -602,6 +608,7 @@ def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
             """,
             (table_id, event["id"], player),
         )
+        note_joined(db, KIND_FIXED, event["id"], player)
         db.commit()
         return True, None
     except sqlite3.IntegrityError:
@@ -630,6 +637,7 @@ def leave_table(table_id, player) -> Tuple[bool, Optional[str]]:
     )
     if cursor.rowcount == 0:
         return False, "您未报名此桌。"
+    note_left(db, KIND_FIXED, event["id"], player)
 
     remaining_rows = db.execute(
         """

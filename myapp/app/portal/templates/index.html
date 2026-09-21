@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css') }}">
 </head>
 <body class="portal-home">
+    {% include "_site_header.html" %}
     <img
         id="user-avatar"
         src="{{ url_for('users.read_icon', id=userid) }}"
