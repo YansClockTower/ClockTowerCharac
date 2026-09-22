@@ -64,7 +64,10 @@
                     <p>
                         <strong>活动模式:</strong> 布鸽桌游聚会 <br>
                         <strong>组织者:</strong> {{ event.inviter }}
-                        {% with name=event.inviter, wechat=event.inviter_wechat, chat_kind='fixed', chat_event_id=event.id %}{% include "_organizer_wechat_btn.html" %}{% endwith %}<br>
+                        {% set can_see_chat = (not archived) and (current_user_is_admin or event.is_attending or event.inviter == current_user) %}
+                        {% if can_see_chat %}
+                        {% with name=event.inviter, wechat=event.inviter_wechat, chat_kind='fixed', chat_event_id=event.id %}{% include "_organizer_wechat_btn.html" %}{% endwith %}
+                        {% endif %}<br>
                         {% if current_user_is_member %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>

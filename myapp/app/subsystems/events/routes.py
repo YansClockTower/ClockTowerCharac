@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
 
 from app.identity import login_required_template, token_required
 from app.identity.permissions import (
@@ -49,13 +49,21 @@ from app.subsystems.events.dbutil import (
 from app.subsystems.events import fixed_dbutil as fixed
 from app.subsystems.events.chat import (
     CHAT_KINDS,
+    MSG_GAME,
+    MSG_IMAGE,
+    can_access_room,
+    ensure_viewer,
     format_chat_time,
+    get_message,
     get_open_room,
     has_unread,
+    image_file_path,
     is_participant,
     list_messages,
     list_rooms_for,
     mark_read,
+    post_game,
+    post_image,
     post_message,
 )
 from app.user.membership import user_is_member
@@ -843,20 +851,86 @@ def fixed_archive_route(user_info, event_id):
     return redirect(url_for("events.browse_events"))
 
 
-def _chat_message_payload(message, current_user):
+def _chat_game_image_url(image_path):
+    path = (image_path or "").strip()
+    if not path:
+        return None
+    if path.startswith("http://") or path.startswith("https://") or path.startswith("/"):
+        return path
+    return url_for("static", filename=path)
+
+
+def _chat_game_card(game_id):
+    try:
+        gid = int(game_id)
+    except (TypeError, ValueError):
+        return {
+            "game_id": None,
+            "game_name": "桌游已失效",
+            "game_meta": "",
+            "game_image_url": None,
+            "game_url": None,
+            "game_missing": True,
+        }
+    game = boardgames_api.get_game_by_id(gid)
+    if not game:
+        return {
+            "game_id": gid,
+            "game_name": "桌游已下架",
+            "game_meta": "",
+            "game_image_url": None,
+            "game_url": None,
+            "game_missing": True,
+        }
+    min_p = game.get("min_players")
+    max_p = game.get("max_players")
+    if min_p is not None and max_p is not None:
+        meta = f"{min_p}–{max_p} 人"
+    elif min_p is not None:
+        meta = f"最少 {min_p} 人"
+    elif max_p is not None:
+        meta = f"最多 {max_p} 人"
+    else:
+        meta = ""
+    owner = (game.get("owner") or "").strip()
+    if owner:
+        meta = f"{meta} · {owner}" if meta else owner
     return {
+        "game_id": gid,
+        "game_name": game.get("board_game_name") or f"桌游 #{gid}",
+        "game_meta": meta,
+        "game_image_url": _chat_game_image_url(game.get("image_path")),
+        "game_url": url_for("boardgames.game_detail", game_id=gid),
+        "game_missing": False,
+    }
+
+
+def _chat_message_payload(message, current_user):
+    msg_type = message.get("msg_type") or "text"
+    payload = {
         "id": message["id"],
         "sender": message["sender"],
         "body": message["body"],
+        "msg_type": msg_type,
         "time_label": format_chat_time(message.get("created_at") or ""),
         "mine": message["sender"] == current_user,
+        "image_url": None,
+        "game": None,
     }
+    if msg_type == MSG_IMAGE:
+        payload["body"] = "[图片]"
+        payload["image_url"] = url_for("events.chat_image_route", message_id=message["id"])
+    elif msg_type == MSG_GAME:
+        card = _chat_game_card(message.get("body"))
+        payload["body"] = f"[桌游] {card['game_name']}"
+        payload["game"] = card
+    return payload
 
 
 @events_bp.route("/messages")
 @login_required_template
 def chat_list_route(user_info):
-    rooms = list_rooms_for(user_info["name"])
+    rooms = list_rooms_for(user_info["name"], is_admin=_is_admin(user_info))
     return render_template(
         "chat_list.html",
         rooms=rooms,
@@ -870,6 +944,20 @@ def chat_unread_route(user_info):
     return jsonify({"unread": has_unread(user_info["name"])})
 
 
+@events_bp.route("/messages/image/<int:message_id>")
+@login_required_template
+def chat_image_route(user_info, message_id):
+    message = get_message(message_id)
+    if message is None or (message.get("msg_type") or "text") != MSG_IMAGE:
+        return "图片不存在", 404
+    if not can_access_room(message["room_id"], user_info["name"], is_admin=_is_admin(user_info)):
+        return "无权查看", 403
+    path = image_file_path(message)
+    if not path:
+        return "图片不存在", 404
+    return send_file(path)
+
+
 @events_bp.route("/messages/<kind>/<int:event_id>")
 @login_required_template
 def chat_room_route(user_info, kind, event_id):
@@ -881,17 +969,33 @@ def chat_room_route(user_info, kind, event_id):
         flash("聊天室已关闭。", "info")
         return redirect(url_for("events.chat_list_route"))
     player = user_info["name"]
-    allowed = is_participant(room["id"], player)
+    is_admin = _is_admin(user_info)
+    allowed = can_access_room(room["id"], player, is_admin=is_admin)
     messages = []
+    games = []
     if allowed:
+        if not is_participant(room["id"], player):
+            ensure_viewer(room["id"], player)
         messages = [_chat_message_payload(m, player) for m in list_messages(room["id"])]
         mark_read(room["id"], player)
+        for row in boardgames_api.list_picker_rows():
+            games.append(
+                {
+                    "id": row["id"],
+                    "name": row.get("board_game_name") or "",
+                    "owner": row.get("owner") or "",
+                    "min_players": row.get("min_players"),
+                    "max_players": row.get("max_players"),
+                    "image_url": _chat_game_image_url(row.get("image_path")),
+                }
+            )
     return render_template(
         "chat_room.html",
         room=room,
         messages=messages,
         allowed=allowed,
         current_user=player,
+        chat_games=games,
     )
 
 
@@ -902,8 +1006,11 @@ def chat_poll_route(user_info, kind, event_id):
     if room is None:
         return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
     player = user_info["name"]
-    if not is_participant(room["id"], player):
+    is_admin = _is_admin(user_info)
+    if not can_access_room(room["id"], player, is_admin=is_admin):
         return jsonify({"ok": False, "message": "请先报名后再进入聊天室。"}), 403
+    if not is_participant(room["id"], player):
+        ensure_viewer(room["id"], player)
     try:
         after_id = int(request.args.get("after", 0))
     except (TypeError, ValueError):
@@ -922,13 +1029,26 @@ def chat_send_route(user_info, kind, event_id):
     if room is None:
         return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
     player = user_info["name"]
-    if not is_participant(room["id"], player):
+    is_admin = _is_admin(user_info)
+    if not can_access_room(room["id"], player, is_admin=is_admin):
         return jsonify({"ok": False, "message": "请先报名后再发言。"}), 403
-    payload = request.get_json(silent=True) or {}
-    body = payload.get("body")
-    if body is None:
-        body = request.form.get("body")
-    ok, err, message = post_message(room["id"], player, body or "")
+    if not is_participant(room["id"], player):
+        ensure_viewer(room["id"], player)
+    image = request.files.get("image")
+    if image and (image.filename or "").strip():
+        ok, err, message = post_image(room["id"], player, image)
+    else:
+        payload = request.get_json(silent=True) or {}
+        game_id = payload.get("game_id")
+        if game_id is None:
+            game_id = request.form.get("game_id")
+        if game_id not in (None, ""):
+            ok, err, message = post_game(room["id"], player, game_id)
+        else:
+            body = payload.get("body")
+            if body is None:
+                body = request.form.get("body")
+            ok, err, message = post_message(room["id"], player, body or "")
     if not ok:
         return jsonify({"ok": False, "message": err or "发送失败。"}), 400
     return jsonify({"ok": True, "message": _chat_message_payload(message, player)})

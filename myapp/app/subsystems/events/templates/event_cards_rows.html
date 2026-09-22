@@ -64,7 +64,10 @@
                     <p>
                         <strong>活动类型:</strong> {{ event.event_type or '其他' }}{% if member_only %} <span style="font-size:0.85em;color:#856404;">（会员专属）</span>{% endif %}<br>
                         <strong>组织者:</strong> {{ event.inviter }}
-                        {% with name=event.inviter, wechat=event.inviter_wechat, chat_kind='free', chat_event_id=event.id %}{% include "_organizer_wechat_btn.html" %}{% endwith %}<br>
+                        {% set can_see_chat = (not archived) and (current_user_is_admin or event.is_attending or event.inviter == current_user) %}
+                        {% if can_see_chat %}
+                        {% with name=event.inviter, wechat=event.inviter_wechat, chat_kind='free', chat_event_id=event.id %}{% include "_organizer_wechat_btn.html" %}{% endwith %}
+                        {% endif %}<br>
                         {% if show_schedule %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>

@@ -24,36 +24,195 @@
     <div class="chat-system">{{ message.body }}</div>
     {% else %}
     <div class="chat-row{% if message.mine %} is-mine{% endif %}">
-      <div class="chat-bubble">
+      <div class="chat-bubble{% if message.msg_type == 'image' %} is-image{% elif message.msg_type == 'game' %} is-game{% endif %}">
         {% if not message.mine %}
         <div class="chat-sender">{{ message.sender }}</div>
         {% endif %}
+        {% if message.msg_type == 'image' and message.image_url %}
+        <button type="button" class="chat-image-btn" data-full-src="{{ message.image_url }}">
+          <img class="chat-image" src="{{ message.image_url }}" alt="图片">
+        </button>
+        {% elif message.msg_type == 'game' and message.game %}
+          {% if message.game.game_url %}
+          <a class="chat-game-card" href="{{ message.game.game_url }}">
+            <span class="chat-game-thumb">
+              {% if message.game.game_image_url %}
+              <img src="{{ message.game.game_image_url }}" alt="">
+              {% else %}
+              <span class="chat-game-noimg">桌游</span>
+              {% endif %}
+            </span>
+            <span class="chat-game-info">
+              <span class="chat-game-name">{{ message.game.game_name }}</span>
+              {% if message.game.game_meta %}<span class="chat-game-meta">{{ message.game.game_meta }}</span>{% endif %}
+              <span class="chat-game-hint">查看详情</span>
+            </span>
+          </a>
+          {% else %}
+          <div class="chat-game-card is-missing">
+            <span class="chat-game-thumb"><span class="chat-game-noimg">桌游</span></span>
+            <span class="chat-game-info">
+              <span class="chat-game-name">{{ message.game.game_name }}</span>
+              <span class="chat-game-hint">无法打开</span>
+            </span>
+          </div>
+          {% endif %}
+        {% else %}
         <div class="chat-body">{{ message.body }}</div>
+        {% endif %}
         <div class="chat-time">{{ message.time_label }}</div>
       </div>
     </div>
     {% endif %}
     {% endfor %}
   </div>
-  <form class="chat-compose" id="chatForm">
-    <textarea id="chatInput" rows="1" maxlength="500" placeholder="发消息" required></textarea>
-    <button type="submit" class="base-btn join-btn">发送</button>
-  </form>
+
+  <div class="chat-dock">
+    <form class="chat-compose" id="chatForm">
+      <textarea id="chatInput" rows="1" maxlength="500" placeholder="发消息"></textarea>
+      <button type="button" class="chat-tool-btn" id="chatEmojiBtn" title="表情" aria-label="表情">😊</button>
+      <button type="button" class="chat-tool-btn chat-plus-btn" id="chatPlusBtn" title="更多" aria-label="更多">+</button>
+      <button type="submit" class="chat-send-btn" id="chatSendBtn" hidden>发送</button>
+    </form>
+
+    <div class="chat-panel chat-emoji-panel" id="chatEmojiPanel" hidden>
+      <div class="chat-emoji-grid" id="chatEmojiGrid"></div>
+    </div>
+    <div class="chat-panel chat-plus-panel" id="chatPlusPanel" hidden>
+      <button type="button" class="chat-plus-action" id="chatPickImageBtn">
+        <span class="chat-plus-icon" aria-hidden="true">🖼</span>
+        <span>图片</span>
+      </button>
+      <button type="button" class="chat-plus-action" id="chatPickGameBtn">
+        <span class="chat-plus-icon" aria-hidden="true">🎲</span>
+        <span>桌游</span>
+      </button>
+      <input type="file" id="chatImageInput" accept="image/*" hidden>
+    </div>
+    <div class="chat-panel chat-game-panel" id="chatGamePanel" hidden>
+      <div class="chat-game-toolbar">
+        <input type="search" id="chatGameSearch" class="chat-game-search" placeholder="搜索桌游…" autocomplete="off">
+        <button type="button" class="chat-game-close" id="chatGameClose">关闭</button>
+      </div>
+      <div class="chat-game-list" id="chatGameList"></div>
+    </div>
+  </div>
+  <div class="chat-lightbox" id="chatLightbox" hidden>
+    <button type="button" class="chat-lightbox-close" id="chatLightboxClose" aria-label="关闭">×</button>
+    <img id="chatLightboxImg" alt="全屏图片">
+  </div>
+  <script type="application/json" id="chatGamesData">{{ chat_games|tojson }}</script>
   {% endif %}
 </div>
 {% if allowed %}
 <script>
 (function () {
+  const EMOJIS = [
+    "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😜",
+    "🤔", "😅", "😢", "😭", "😡", "👍", "👎", "👏",
+    "🙏", "🎉", "❤️", "🔥", "✨", "😴", "🤝", "💪"
+  ];
   const log = document.getElementById("chatLog");
   const form = document.getElementById("chatForm");
   const input = document.getElementById("chatInput");
+  const emojiBtn = document.getElementById("chatEmojiBtn");
+  const plusBtn = document.getElementById("chatPlusBtn");
+  const sendBtn = document.getElementById("chatSendBtn");
+  const emojiPanel = document.getElementById("chatEmojiPanel");
+  const plusPanel = document.getElementById("chatPlusPanel");
+  const gamePanel = document.getElementById("chatGamePanel");
+  const emojiGrid = document.getElementById("chatEmojiGrid");
+  const pickImageBtn = document.getElementById("chatPickImageBtn");
+  const pickGameBtn = document.getElementById("chatPickGameBtn");
+  const imageInput = document.getElementById("chatImageInput");
+  const gameSearch = document.getElementById("chatGameSearch");
+  const gameList = document.getElementById("chatGameList");
+  const gameClose = document.getElementById("chatGameClose");
+  const lightbox = document.getElementById("chatLightbox");
+  const lightboxImg = document.getElementById("chatLightboxImg");
+  const lightboxClose = document.getElementById("chatLightboxClose");
   if (!log || !form || !input) return;
+
   let lastId = Number(log.getAttribute("data-last-id") || 0);
   const pollUrl = log.getAttribute("data-poll-url");
   const sendUrl = log.getAttribute("data-send-url");
+  let games = [];
+  try {
+    games = JSON.parse(document.getElementById("chatGamesData").textContent || "[]");
+  } catch (e) {
+    games = [];
+  }
 
   function scrollBottom() {
     log.scrollTop = log.scrollHeight;
+  }
+
+  function hasText() {
+    return !!(input.value || "").trim();
+  }
+
+  function syncActions() {
+    const typing = hasText();
+    if (sendBtn) sendBtn.hidden = !typing;
+    if (plusBtn) plusBtn.hidden = typing;
+    if (typing) {
+      if (plusPanel) plusPanel.hidden = true;
+      if (gamePanel) gamePanel.hidden = true;
+    }
+  }
+
+  function closePanels() {
+    if (emojiPanel) emojiPanel.hidden = true;
+    if (plusPanel) plusPanel.hidden = true;
+    if (gamePanel) gamePanel.hidden = true;
+  }
+
+  function openLightbox(src) {
+    if (!lightbox || !lightboxImg || !src) return;
+    lightboxImg.src = src;
+    lightbox.hidden = false;
+    document.body.classList.add("chat-lightbox-open");
+  }
+
+  function closeLightbox() {
+    if (!lightbox || !lightboxImg) return;
+    lightbox.hidden = true;
+    lightboxImg.removeAttribute("src");
+    document.body.classList.remove("chat-lightbox-open");
+  }
+
+  function fillGameCard(container, game) {
+    const thumb = document.createElement("span");
+    thumb.className = "chat-game-thumb";
+    if (game.game_image_url) {
+      const img = document.createElement("img");
+      img.src = game.game_image_url;
+      img.alt = "";
+      thumb.appendChild(img);
+    } else {
+      const empty = document.createElement("span");
+      empty.className = "chat-game-noimg";
+      empty.textContent = "桌游";
+      thumb.appendChild(empty);
+    }
+    const info = document.createElement("span");
+    info.className = "chat-game-info";
+    const name = document.createElement("span");
+    name.className = "chat-game-name";
+    name.textContent = game.game_name || "桌游";
+    info.appendChild(name);
+    if (game.game_meta) {
+      const meta = document.createElement("span");
+      meta.className = "chat-game-meta";
+      meta.textContent = game.game_meta;
+      info.appendChild(meta);
+    }
+    const hint = document.createElement("span");
+    hint.className = "chat-game-hint";
+    hint.textContent = game.game_url ? "查看详情" : "无法打开";
+    info.appendChild(hint);
+    container.appendChild(thumb);
+    container.appendChild(info);
   }
 
   function appendMessage(msg) {
@@ -69,24 +228,107 @@
     const row = document.createElement("div");
     row.className = "chat-row" + (msg.mine ? " is-mine" : "");
     const bubble = document.createElement("div");
-    bubble.className = "chat-bubble";
+    let extra = "";
+    if (msg.msg_type === "image") extra = " is-image";
+    else if (msg.msg_type === "game") extra = " is-game";
+    bubble.className = "chat-bubble" + extra;
     if (!msg.mine) {
       const name = document.createElement("div");
       name.className = "chat-sender";
       name.textContent = msg.sender || "";
       bubble.appendChild(name);
     }
-    const body = document.createElement("div");
-    body.className = "chat-body";
-    body.textContent = msg.body || "";
+    if (msg.msg_type === "image" && msg.image_url) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chat-image-btn";
+      btn.setAttribute("data-full-src", msg.image_url);
+      const img = document.createElement("img");
+      img.className = "chat-image";
+      img.src = msg.image_url;
+      img.alt = "图片";
+      btn.appendChild(img);
+      bubble.appendChild(btn);
+    } else if (msg.msg_type === "game" && msg.game) {
+      const game = msg.game;
+      if (game.game_url) {
+        const link = document.createElement("a");
+        link.className = "chat-game-card";
+        link.href = game.game_url;
+        fillGameCard(link, game);
+        bubble.appendChild(link);
+      } else {
+        const card = document.createElement("div");
+        card.className = "chat-game-card is-missing";
+        fillGameCard(card, game);
+        bubble.appendChild(card);
+      }
+    } else {
+      const body = document.createElement("div");
+      body.className = "chat-body";
+      body.textContent = msg.body || "";
+      bubble.appendChild(body);
+    }
     const time = document.createElement("div");
     time.className = "chat-time";
     time.textContent = msg.time_label || "";
-    bubble.appendChild(body);
     bubble.appendChild(time);
     row.appendChild(bubble);
     log.appendChild(row);
     lastId = msg.id;
+  }
+
+  function renderGamePicker(query) {
+    const q = (query || "").trim().toLowerCase();
+    gameList.innerHTML = "";
+    const matched = games.filter(function (g) {
+      if (!q) return true;
+      return String(g.name || "").toLowerCase().indexOf(q) >= 0
+        || String(g.owner || "").toLowerCase().indexOf(q) >= 0;
+    });
+    if (!matched.length) {
+      const empty = document.createElement("p");
+      empty.className = "chat-game-empty";
+      empty.textContent = games.length ? "没有匹配的桌游" : "桌游库暂无登记";
+      gameList.appendChild(empty);
+      return;
+    }
+    matched.forEach(function (g) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chat-game-pick";
+      const thumb = document.createElement("span");
+      thumb.className = "chat-game-pick-thumb";
+      if (g.image_url) {
+        const img = document.createElement("img");
+        img.src = g.image_url;
+        img.alt = "";
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = "桌游";
+      }
+      const info = document.createElement("span");
+      info.className = "chat-game-pick-info";
+      const name = document.createElement("span");
+      name.className = "chat-game-pick-name";
+      name.textContent = g.name || ("#" + g.id);
+      info.appendChild(name);
+      const metaParts = [];
+      if (g.min_players != null && g.max_players != null) metaParts.push(g.min_players + "–" + g.max_players + " 人");
+      if (g.owner) metaParts.push(g.owner);
+      if (metaParts.length) {
+        const meta = document.createElement("span");
+        meta.className = "chat-game-pick-meta";
+        meta.textContent = metaParts.join(" · ");
+        info.appendChild(meta);
+      }
+      btn.appendChild(thumb);
+      btn.appendChild(info);
+      btn.addEventListener("click", function () {
+        sendGame(g.id);
+      });
+      gameList.appendChild(btn);
+    });
   }
 
   async function poll() {
@@ -98,8 +340,7 @@
     } catch (e) {}
   }
 
-  form.addEventListener("submit", async function (e) {
-    e.preventDefault();
+  async function sendText() {
     const text = input.value;
     if (!text.trim()) return;
     try {
@@ -114,13 +355,147 @@
         return;
       }
       input.value = "";
+      syncActions();
+      closePanels();
       appendMessage(data.message);
       scrollBottom();
     } catch (err) {
       alert("发送失败，请稍后再试。");
     }
+  }
+
+  async function sendImage(file) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      const res = await ClockTowerAuth.authFetch(sendUrl, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok || !data.ok) {
+        alert(data.message || "发送失败");
+        return;
+      }
+      closePanels();
+      appendMessage(data.message);
+      scrollBottom();
+    } catch (err) {
+      alert("发送失败，请稍后再试。");
+    }
+  }
+
+  async function sendGame(gameId) {
+    try {
+      const res = await ClockTowerAuth.authFetch(sendUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: gameId }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok || !data.ok) {
+        alert(data.message || "发送失败");
+        return;
+      }
+      closePanels();
+      appendMessage(data.message);
+      scrollBottom();
+    } catch (err) {
+      alert("发送失败，请稍后再试。");
+    }
+  }
+
+  EMOJIS.forEach(function (emoji) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chat-emoji-item";
+    btn.textContent = emoji;
+    btn.addEventListener("click", function () {
+      const start = input.selectionStart || input.value.length;
+      const end = input.selectionEnd || input.value.length;
+      input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+      const pos = start + emoji.length;
+      input.focus();
+      try {
+        input.setSelectionRange(pos, pos);
+      } catch (e) {}
+      syncActions();
+    });
+    emojiGrid.appendChild(btn);
   });
 
+  input.addEventListener("input", syncActions);
+  input.addEventListener("focus", function () {
+    closePanels();
+  });
+
+  emojiBtn.addEventListener("click", function () {
+    const open = emojiPanel.hidden;
+    closePanels();
+    emojiPanel.hidden = !open;
+  });
+
+  plusBtn.addEventListener("click", function () {
+    const open = plusPanel.hidden;
+    closePanels();
+    plusPanel.hidden = !open;
+  });
+
+  pickImageBtn.addEventListener("click", function () {
+    imageInput.click();
+  });
+
+  pickGameBtn.addEventListener("click", function () {
+    plusPanel.hidden = true;
+    emojiPanel.hidden = true;
+    gamePanel.hidden = false;
+    if (gameSearch) {
+      gameSearch.value = "";
+      gameSearch.focus();
+    }
+    renderGamePicker("");
+  });
+
+  if (gameClose) {
+    gameClose.addEventListener("click", function () {
+      gamePanel.hidden = true;
+    });
+  }
+  if (gameSearch) {
+    gameSearch.addEventListener("input", function () {
+      renderGamePicker(gameSearch.value);
+    });
+  }
+
+  imageInput.addEventListener("change", function () {
+    const file = imageInput.files && imageInput.files[0];
+    imageInput.value = "";
+    if (file) sendImage(file);
+  });
+
+  log.addEventListener("click", function (e) {
+    const btn = e.target.closest(".chat-image-btn");
+    if (!btn) return;
+    e.preventDefault();
+    openLightbox(btn.getAttribute("data-full-src"));
+  });
+
+  if (lightbox) {
+    lightbox.addEventListener("click", function (e) {
+      if (e.target === lightbox || e.target === lightboxClose) closeLightbox();
+    });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeLightbox();
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    sendText();
+  });
+
+  syncActions();
   scrollBottom();
   setInterval(poll, 3000);
 })();

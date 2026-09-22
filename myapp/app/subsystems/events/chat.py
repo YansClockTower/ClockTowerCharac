@@ -1,11 +1,21 @@
 """活动临时聊天室。自由聚会与固定聚会各一间，用 event_kind 区分撞号的 id。"""
 
+import os
+import shutil
+import uuid
 from datetime import datetime
+
+from app.models.config import get_config
 
 KIND_FREE = "free"
 KIND_FIXED = "fixed"
 CHAT_KINDS = (KIND_FREE, KIND_FIXED)
+MSG_TEXT = "text"
+MSG_IMAGE = "image"
+MSG_GAME = "game"
 MAX_BODY_LEN = 500
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "gif", "webp"}
 SYSTEM_SENDER = "系统"
 _CONTACT_PATH = "“主页->桌游协会事务->联系我们”"
 _BLANK_CONTACTS = {"", "保密", "未填写", "无", "-", "—"}
@@ -30,10 +40,16 @@ def ensure_chat_schema(db):
             sender TEXT NOT NULL,
             body TEXT NOT NULL,
             created_at TEXT NOT NULL,
+            msg_type TEXT NOT NULL DEFAULT 'text',
             FOREIGN KEY(room_id) REFERENCES event_chat_rooms(id) ON DELETE CASCADE
         )
         """
     )
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(event_chat_messages)").fetchall()}
+    if "msg_type" not in columns:
+        db.execute(
+            "ALTER TABLE event_chat_messages ADD COLUMN msg_type TEXT NOT NULL DEFAULT 'text'"
+        )
     db.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_event_chat_messages_room
@@ -74,10 +90,13 @@ def open_room(db, kind, event_id, inviter):
 
 
 def close_room(db, kind, event_id):
+    room_id = _room_id(db, kind, event_id)
     db.execute(
         "DELETE FROM event_chat_rooms WHERE event_kind = ? AND event_id = ?",
         (kind, int(event_id)),
     )
+    if room_id is not None:
+        _delete_room_images(room_id)
 
 
 def note_joined(db, kind, event_id, player):
@@ -107,7 +126,8 @@ def note_left(db, kind, event_id, player):
     )
 
 
-def list_rooms_for(player):
+def list_rooms_for(player, *, is_admin=False):
+    """参与者看到自己的聊天室；管理员额外看到所有未归档活动的聊天室。"""
     db = _db()
     rows = db.execute(
         """
@@ -119,7 +139,12 @@ def list_rooms_for(player):
             CASE r.event_kind WHEN ? THEN e.starttime ELSE f.starttime END AS starttime,
             rd.last_read_message_id AS last_read_message_id,
             (
-                SELECT m.body FROM event_chat_messages m
+                SELECT CASE
+                    WHEN COALESCE(m.msg_type, 'text') = 'image' THEN '[图片]'
+                    WHEN COALESCE(m.msg_type, 'text') = 'game' THEN '[桌游]'
+                    ELSE m.body
+                END
+                FROM event_chat_messages m
                 WHERE m.room_id = r.id ORDER BY m.id DESC LIMIT 1
             ) AS last_body,
             (
@@ -130,35 +155,41 @@ def list_rooms_for(player):
                 SELECT COALESCE(MAX(m.id), 0) FROM event_chat_messages m
                 WHERE m.room_id = r.id
             ) AS last_id
-        FROM event_chat_reads rd
-        JOIN event_chat_rooms r ON r.id = rd.room_id
+        FROM event_chat_rooms r
+        LEFT JOIN event_chat_reads rd
+            ON rd.room_id = r.id AND rd.player = ?
         LEFT JOIN events e
             ON r.event_kind = ? AND e.id = r.event_id
             AND TRIM(COALESCE(e.signcode, '')) != '0'
         LEFT JOIN fixed_events f
             ON r.event_kind = ? AND f.id = r.event_id
             AND TRIM(COALESCE(f.signcode, '')) != '0'
-        WHERE rd.player = ?
-          AND (
+        WHERE (
             (r.event_kind = ? AND e.id IS NOT NULL)
             OR (r.event_kind = ? AND f.id IS NOT NULL)
           )
+          AND (? OR rd.player IS NOT NULL)
         """,
         (
             KIND_FREE,
             KIND_FREE,
-            KIND_FREE,
-            KIND_FIXED,
             player,
             KIND_FREE,
             KIND_FIXED,
+            KIND_FREE,
+            KIND_FIXED,
+            1 if is_admin else 0,
         ),
     ).fetchall()
     rooms = []
     for row in rows:
         item = dict(row)
         last_id = int(item["last_id"] or 0)
-        last_read = int(item["last_read_message_id"] or 0)
+        # 管理员尚未进入过的房间不计入未读，避免顶栏信件图标被刷爆
+        if item["last_read_message_id"] is None:
+            last_read = last_id
+        else:
+            last_read = int(item["last_read_message_id"] or 0)
         item["unread"] = last_id > last_read
         item["preview"] = _snippet(item.get("last_body"))
         item["time_label"] = format_chat_time(item.get("last_at") or "")
@@ -168,7 +199,9 @@ def list_rooms_for(player):
     return rooms
 
 
-def has_unread(player):
+def has_unread(player, *, is_admin=False):
+    """未读只统计本人已在聊天室名单里的房间（管理员也一样）。"""
+    del is_admin
     db = _db()
     row = db.execute(
         """
@@ -226,12 +259,35 @@ def is_participant(room_id, player):
     return row is not None
 
 
+def can_access_room(room_id, player, *, is_admin=False):
+    """报名者、组织者（已有读游标）或管理员可进入未关闭聊天室。"""
+    if is_participant(room_id, player):
+        return True
+    if not is_admin:
+        return False
+    db = _db()
+    row = db.execute(
+        "SELECT event_kind, event_id FROM event_chat_rooms WHERE id = ?",
+        (int(room_id),),
+    ).fetchone()
+    if row is None:
+        return False
+    return get_open_room(row["event_kind"], row["event_id"]) is not None
+
+
+def ensure_viewer(room_id, player):
+    """管理员首次进入时写入读游标，便于列表与已读统计。"""
+    db = _db()
+    _ensure_participant(db, room_id, player)
+    db.commit()
+
+
 def list_messages(room_id, after_id=0, limit=500):
     db = _db()
     after_id = max(0, int(after_id or 0))
     rows = db.execute(
         """
-        SELECT id, sender, body, created_at
+        SELECT id, room_id, sender, body, created_at, COALESCE(msg_type, 'text') AS msg_type
         FROM event_chat_messages
         WHERE room_id = ? AND id > ?
         ORDER BY id ASC
@@ -240,6 +296,19 @@ def list_messages(room_id, after_id=0, limit=500):
         (int(room_id), after_id, int(limit)),
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_message(message_id):
+    db = _db()
+    row = db.execute(
+        """
+        SELECT id, room_id, sender, body, created_at, COALESCE(msg_type, 'text') AS msg_type
+        FROM event_chat_messages
+        WHERE id = ?
+        """,
+        (int(message_id),),
+    ).fetchone()
+    return dict(row) if row else None
 
 
 def latest_message_id(room_id):
@@ -268,24 +337,53 @@ def post_message(room_id, sender, body):
         return False, "请输入消息。", None
     if len(text) > MAX_BODY_LEN:
         return False, f"消息过长（最多 {MAX_BODY_LEN} 字）。", None
-    db = _db()
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = db.execute(
-        """
-        INSERT INTO event_chat_messages (room_id, sender, body, created_at)
-        VALUES (?, ?, ?, ?)
-        """,
-        (int(room_id), sender, text, created_at),
-    )
-    db.commit()
-    message = {
-        "id": int(cur.lastrowid),
-        "sender": sender,
-        "body": text,
-        "created_at": created_at,
-    }
-    mark_read(room_id, sender)
-    return True, None, message
+    return _insert_message(room_id, sender, text, MSG_TEXT)
+
+
+def post_image(room_id, sender, file_storage):
+    if file_storage is None or not getattr(file_storage, "filename", None):
+        return False, "请选择图片。", None
+    filename = (file_storage.filename or "").strip()
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ALLOWED_IMAGE_EXT:
+        return False, "仅支持 jpg / png / gif / webp。", None
+    data = file_storage.read(MAX_IMAGE_BYTES + 1)
+    if not data:
+        return False, "图片为空。", None
+    if len(data) > MAX_IMAGE_BYTES:
+        return False, "图片过大（最多 5MB）。", None
+    stored_name = f"{uuid.uuid4().hex}.{ext}"
+    dest_dir = _room_image_dir(room_id)
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_path = os.path.join(dest_dir, stored_name)
+    with open(dest_path, "wb") as fh:
+        fh.write(data)
+    return _insert_message(room_id, sender, stored_name, MSG_IMAGE)
+
+
+def post_game(room_id, sender, game_id):
+    from app.subsystems.boardgames import api as boardgames_api
+
+    try:
+        gid = int(game_id)
+    except (TypeError, ValueError):
+        return False, "请选择有效的桌游。", None
+    game = boardgames_api.get_game_by_id(gid)
+    if not game:
+        return False, "桌游不存在。", None
+    return _insert_message(room_id, sender, str(gid), MSG_GAME)
+
+
+def image_file_path(message):
+    if not message or (message.get("msg_type") or MSG_TEXT) != MSG_IMAGE:
+        return None
+    name = os.path.basename((message.get("body") or "").strip())
+    if not name or name != (message.get("body") or "").strip():
+        return None
+    path = os.path.join(_room_image_dir(message["room_id"]), name)
+    if not os.path.isfile(path):
+        return None
+    return path
 
 
 def format_chat_time(value):
@@ -309,6 +407,29 @@ def format_chat_time(value):
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
+def _insert_message(room_id, sender, body, msg_type):
+    db = _db()
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cur = db.execute(
+        """
+        INSERT INTO event_chat_messages (room_id, sender, body, created_at, msg_type)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (int(room_id), sender, body, created_at, msg_type),
+    )
+    db.commit()
+    message = {
+        "id": int(cur.lastrowid),
+        "room_id": int(room_id),
+        "sender": sender,
+        "body": body,
+        "created_at": created_at,
+        "msg_type": msg_type,
+    }
+    mark_read(room_id, sender)
+    return True, None, message
+
+
 def _insert_system_notice(db, room_id, inviter):
     if _latest_message_id(db, room_id) > 0:
         return
@@ -323,10 +444,10 @@ def _insert_system_notice(db, room_id, inviter):
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db.execute(
         """
-        INSERT INTO event_chat_messages (room_id, sender, body, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO event_chat_messages (room_id, sender, body, created_at, msg_type)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (int(room_id), SYSTEM_SENDER, body, created_at),
+        (int(room_id), SYSTEM_SENDER, body, created_at, MSG_TEXT),
     )
     tip = _latest_message_id(db, room_id)
     db.execute(
@@ -393,6 +514,24 @@ def _db():
     from app.subsystems.events.dbutil import get_db
 
     return get_db()
+
+
+def _chat_root():
+    if get_config("development"):
+        base_path = get_config("database_path_dev")
+    else:
+        base_path = get_config("database_path")
+    return os.path.join(base_path, "chat_images")
+
+
+def _room_image_dir(room_id):
+    return os.path.join(_chat_root(), str(int(room_id)))
+
+
+def _delete_room_images(room_id):
+    path = _room_image_dir(room_id)
+    if os.path.isdir(path):
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def _table_exists(db, name):
