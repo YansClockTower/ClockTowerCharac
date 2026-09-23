@@ -4,7 +4,8 @@
 </p>
 <div class="game-picker" id="gamePicker"
      data-self-id="{{ self_brought_id }}"
-     data-self-name="{{ self_brought_name }}">
+     data-self-name="{{ self_brought_name }}"
+     data-current-user="{{ current_user or '' }}">
   <input type="hidden" name="board_game_id" id="board_game_id" value="{{ self_brought_id }}" required>
   <button type="button" class="game-picker-trigger" id="gamePickerTrigger" aria-haspopup="listbox" aria-expanded="false">
     <span class="game-picker-label" id="gamePickerLabel">{{ self_brought_name }}</span>
@@ -28,7 +29,7 @@
 <script type="application/json" id="gamePickerData">{{ games|tojson }}</script>
 
 <div id="selfBroughtFields" class="self-brought-fields">
-  <p class="hint">组局者自备：不占用库内桌游，无需所有者/持有者确认。请填写临时桌游名与本桌人数上下限。</p>
+  <p class="hint">组局者自备：不占用库内桌游，无需所有者确认。请填写临时桌游名与本桌人数上下限。借用中的库内桌游只有借用者本人可以开桌。</p>
   <p style="margin: 0 0 8px;">
     <label for="self_game_name">桌游名称 (必填):</label>
     <input type="text" name="self_game_name" id="self_game_name" maxlength="80" required

@@ -9,6 +9,7 @@
 
   const selfId = String(root.dataset.selfId || "0");
   const selfName = root.dataset.selfName || "组局者自备";
+  const currentUser = (root.dataset.currentUser || "").trim();
   const hidden = document.getElementById("board_game_id");
   const trigger = document.getElementById("gamePickerTrigger");
   const label = document.getElementById("gamePickerLabel");
@@ -29,6 +30,15 @@
     const selected = selectedOwners();
     if (!selected.length) return true;
     return selected.indexOf((g.owner || "").trim()) >= 0;
+  }
+
+  function borrowerOf(g) {
+    return (g.borrower || "").trim();
+  }
+
+  function blockedForCurrentUser(g) {
+    const borrower = borrowerOf(g);
+    return !!borrower && borrower !== currentUser;
   }
 
   function optionLabel(g) {
@@ -78,9 +88,13 @@
       const name = (g.board_game_name || "").toLowerCase();
       const owner = (g.owner || "").toLowerCase();
       if (q && name.indexOf(q) < 0 && owner.indexOf(q) < 0 && String(g.id).indexOf(q) < 0) return;
+      const blocked = blockedForCurrentUser(g);
       const li = document.createElement("li");
-      li.className = "game-picker-option" + (String(hidden.value) === String(g.id) ? " is-selected" : "");
+      li.className = "game-picker-option"
+        + (String(hidden.value) === String(g.id) ? " is-selected" : "")
+        + (blocked ? " is-disabled" : "");
       li.setAttribute("role", "option");
+      if (blocked) li.setAttribute("aria-disabled", "true");
       li.dataset.id = String(g.id);
       li.dataset.label = optionLabel(g);
       li.innerHTML = "<span class='gp-name'></span><span class='gp-meta'></span>";
@@ -90,6 +104,8 @@
       if (g.min_players != null || g.max_players != null) {
         metaBits.push((g.min_players != null ? g.min_players : "?") + "-" + (g.max_players != null ? g.max_players : "?") + "人");
       }
+      if (blocked) metaBits.push("借用中：" + borrowerOf(g) + "，无法选择");
+      else if (borrowerOf(g)) metaBits.push("借用中（你）");
       li.querySelector(".gp-meta").textContent = metaBits.join(" · ");
       list.appendChild(li);
       shown += 1;
@@ -125,7 +141,7 @@
   }
   list.addEventListener("click", function (e) {
     const li = e.target.closest(".game-picker-option");
-    if (!li || !li.dataset.id) return;
+    if (!li || !li.dataset.id || li.classList.contains("is-disabled")) return;
     const id = li.dataset.id;
     setSelection(id, id === selfId ? selfName : li.querySelector(".gp-name").textContent);
   });

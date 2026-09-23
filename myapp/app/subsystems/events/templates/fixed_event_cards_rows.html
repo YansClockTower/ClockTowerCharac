@@ -157,7 +157,7 @@
                 </div>
                 <div class="fixed-table-group-commit">
                     {% if table.is_self_brought %}
-                    <span>组局者自备·无需所有/持有者确认</span>
+                    <span>组局者自备·无需所有者确认</span>
                     {% else %}
                     <span>
                         桌游所有者({{ table.owner_name }})：
@@ -165,14 +165,6 @@
                         {% elif table.owner_status == -1 %}已拒绝
                         {% else %}待确认{% endif %}
                     </span>
-                    {% if table.holder_required %}
-                    <span>
-                        持有者({{ table.holder_name }})：
-                        {% if table.holder_status == 1 %}已确认
-                        {% elif table.holder_status == -1 %}已拒绝
-                        {% else %}待确认{% endif %}
-                    </span>
-                    {% endif %}
                     {% endif %}
                     {% set first_player = table.attendees[0].player if table.attendees else '' %}
                     {% set can_edit_table = (not archived) and (current_user_is_admin or (first_player and first_player == current_user)) %}

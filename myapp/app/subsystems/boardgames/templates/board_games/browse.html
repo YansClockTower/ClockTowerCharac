@@ -27,6 +27,15 @@
           {% endif %}
         </div>
         <span class="game-card-name">{{ game.board_game_name }}</span>
+        <span class="game-card-meta">所有者：{{ game.owner }}</span>
+        {% if game.borrower %}
+          <span class="game-card-meta is-borrowed">借用者：{{ game.borrower }}</span>
+        {% else %}
+          <span class="game-card-meta">未借用</span>
+        {% endif %}
+        {% if game.show_storage %}
+          <span class="game-card-meta">存放：{{ game.current_storage_location or '未填写' }}</span>
+        {% endif %}
       </a>
     </li>
     {% endfor %}

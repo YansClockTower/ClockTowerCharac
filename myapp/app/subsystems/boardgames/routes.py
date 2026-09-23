@@ -95,7 +95,17 @@ def _optional_str(form, key):
     return s if s else None
 
 
+def _viewer_is_owner(viewer_name, game) -> bool:
+    owner = (game.get("owner") or "").strip()
+    viewer = (viewer_name or "").strip()
+    return bool(owner) and owner == viewer
+
+
 def _game_form_payload(form):
+    owner = (form.get("owner") or "").strip()
+    raw_holder = _optional_str(form, "current_holder")
+    # 借用者与所有者相同表示没人借，存空而不是再抄一遍所有者。
+    holder_same_as_owner = bool(raw_holder) and raw_holder == owner
     return {
         "board_game_name": (form.get("board_game_name") or "").strip(),
         "game_type": _optional_str(form, "game_type"),
@@ -105,9 +115,10 @@ def _game_form_payload(form):
         "playing_time": _optional_int(form, "playing_time"),
         "description": _optional_str(form, "description"),
         "image_path": _optional_str(form, "image_path"),
-        "owner": (form.get("owner") or "").strip(),
-        "current_holder": _optional_str(form, "current_holder"),
+        "owner": owner,
+        "current_holder": None if holder_same_as_owner else raw_holder,
         "current_storage_location": _optional_str(form, "current_storage_location"),
+        "holder_same_as_owner": holder_same_as_owner,
     }
 
 
@@ -124,9 +135,29 @@ def _game_to_form_data(game):
         "description": game.get("description") or "",
         "image_path": game.get("image_path") or "",
         "owner": game.get("owner") or "",
-        "current_holder": game.get("current_holder") or "",
+        "current_holder": game.get("borrower") or "",
         "current_storage_location": game.get("current_storage_location") or "",
     }
+
+
+def _keep_existing_custody(payload, game):
+    """非管理员不能改所有者与借用者。"""
+    payload["owner"] = (game.get("owner") or "").strip()
+    payload["current_holder"] = game.get("borrower") or None
+    payload["holder_same_as_owner"] = False
+
+
+def _custody_form_data(form_data, game):
+    form_data["owner"] = game.get("owner") or ""
+    form_data["current_holder"] = game.get("borrower") or ""
+    return form_data
+
+
+def _pop_holder_note(payload) -> str:
+    if payload.pop("holder_same_as_owner", False):
+        return "借用者与所有者相同，已按未借出留空。"
+    payload.pop("holder_same_as_owner", None)
+    return ""
 
 
 @boardgames_bp.route("/api/gstone_fetch", methods=("POST",))
@@ -197,11 +228,14 @@ def gstone_fetch(current_user):
 @boardgames_bp.route("/")
 @boardgames_bp.route("/browse")
 def browse():
+    viewer = _template_user_name()
     games = boardgames_api.list_browse_rows()
+    for game in games:
+        game["show_storage"] = _viewer_is_owner(viewer, game)
     return render_template(
         "board_games/browse.html",
         games=games,
-        current_user=_template_user_name(),
+        current_user=viewer,
     )
 
 
@@ -217,6 +251,7 @@ def register(current_user):
                 current_user=current_user["name"],
                 form_data=request.form.to_dict(flat=True),
             )
+        holder_note = _pop_holder_note(payload)
         try:
             new_id = boardgames_api.create_registered_game(**payload)
         except sqlite3.Error:
@@ -227,7 +262,7 @@ def register(current_user):
                 current_user=current_user["name"],
                 form_data=request.form.to_dict(flat=True),
             )
-        flash("登记成功。", "success")
+        flash("登记成功。" + holder_note, "success")
         return redirect(url_for("boardgames.game_detail", game_id=new_id))
 
     return render_template(
@@ -248,6 +283,7 @@ def game_detail(game_id):
         game=game,
         current_user=user["name"] if user else None,
         can_edit=_can_edit_game(user, game),
+        can_see_storage=_viewer_is_owner(user["name"] if user else None, game),
         owner_contact=_owner_contact_for_borrow(game),
     )
 
@@ -262,31 +298,45 @@ def game_edit(current_user, game_id):
         flash("仅管理员或桌游所有者可编辑信息。", "error")
         return redirect(url_for("boardgames.game_detail", game_id=game_id))
 
+    can_edit_custody = user_is_admin(current_user)
     if request.method == "POST":
         payload = _game_form_payload(request.form)
+        if not can_edit_custody:
+            _keep_existing_custody(payload, game)
         if not payload["board_game_name"] or not payload["owner"]:
             flash("桌游名称与所有者为必填项。", "error")
+            form_data = request.form.to_dict(flat=True)
+            if not can_edit_custody:
+                _custody_form_data(form_data, game)
             return render_template(
                 "board_games/edit.html",
                 current_user=current_user["name"],
                 game=game,
-                form_data=request.form.to_dict(flat=True),
+                form_data=form_data,
+                can_edit_custody=can_edit_custody,
             )
+        holder_note = "" if not can_edit_custody else _pop_holder_note(payload)
+        if not can_edit_custody:
+            payload.pop("holder_same_as_owner", None)
         try:
             ok = boardgames_api.update_registered_game(game_id, **payload)
         except sqlite3.Error:
             current_app.logger.exception("boardgames update failed")
             flash("保存失败，请稍后重试。", "error")
+            form_data = request.form.to_dict(flat=True)
+            if not can_edit_custody:
+                _custody_form_data(form_data, game)
             return render_template(
                 "board_games/edit.html",
                 current_user=current_user["name"],
                 game=game,
-                form_data=request.form.to_dict(flat=True),
+                form_data=form_data,
+                can_edit_custody=can_edit_custody,
             )
         if not ok:
             flash("保存失败：记录不存在。", "error")
             return redirect(url_for("boardgames.browse"))
-        flash("桌游信息已更新。", "success")
+        flash("桌游信息已更新。" + holder_note, "success")
         return redirect(url_for("boardgames.game_detail", game_id=game_id))
 
     return render_template(
@@ -294,4 +344,28 @@ def game_edit(current_user, game_id):
         current_user=current_user["name"],
         game=game,
         form_data=_game_to_form_data(game),
+        can_edit_custody=can_edit_custody,
     )
+
+
+@boardgames_bp.route("/<int:game_id>/delete", methods=("POST",))
+@login_required_template
+def game_delete(current_user, game_id):
+    game = boardgames_api.get_game_by_id(game_id)
+    if game is None:
+        abort(404)
+    if not _can_edit_game(current_user, game):
+        flash("仅管理员或桌游所有者可删除登记。", "error")
+        return redirect(url_for("boardgames.game_detail", game_id=game_id))
+    name = game.get("board_game_name") or "该桌游"
+    try:
+        ok = boardgames_api.delete_registered_game(game_id)
+    except sqlite3.Error:
+        current_app.logger.exception("boardgames delete failed")
+        flash("删除失败，请稍后重试。", "error")
+        return redirect(url_for("boardgames.game_detail", game_id=game_id))
+    if not ok:
+        flash("删除失败：记录不存在。", "error")
+        return redirect(url_for("boardgames.browse"))
+    flash(f"已删除「{name}」的登记。", "success")
+    return redirect(url_for("boardgames.browse"))

@@ -664,7 +664,7 @@ def fixed_create_table_route(user_info, event_id):
         if board_game_id == fixed.SELF_BROUGHT_GAME_ID:
             flash("开桌成功（组局者自备）！您已自动加入该桌。", "success")
         else:
-            flash("开桌成功！您已自动加入该桌。请催促桌游所有者/持有者确认承诺。", "success")
+            flash("开桌成功！您已自动加入该桌。请催促桌游所有者确认承诺。", "success")
     else:
         flash(err or "开桌失败。", "error")
     return _redirect_after_fixed_table_action(event_id)

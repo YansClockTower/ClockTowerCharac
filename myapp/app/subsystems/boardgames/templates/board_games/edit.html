@@ -33,18 +33,35 @@
   <label>图片路径或 URL
     <input type="text" name="image_path" placeholder="https://... 或 static 下相对路径" value="{{ form_data.get('image_path', '') }}">
   </label>
+  {% if can_edit_custody %}
   <label>所有者 <span class="req">*</span>
     <input type="text" name="owner" required value="{{ form_data.get('owner', '') }}">
+    <span class="field-hint">仅管理员可修改所有者与借用者。</span>
   </label>
-  <label>目前使用者
-    <input type="text" name="current_holder" value="{{ form_data.get('current_holder', '') }}">
+  <label>借用者
+    <input type="text" name="current_holder" placeholder="留空表示未借出" value="{{ form_data.get('current_holder', '') }}">
+    <span class="field-hint">有填写时表示该桌游正在被借用。未借用请留空，不要填所有者本人。</span>
   </label>
-  <label>目前存放地点
-    <input type="text" name="current_storage_location" value="{{ form_data.get('current_storage_location', '') }}">
+  {% else %}
+  <label>所有者
+    <input type="text" value="{{ form_data.get('owner', '') }}" readonly>
+    <span class="field-hint">仅管理员可修改所有者与借用者。</span>
   </label>
-  <p>
+  <label>借用者
+    <input type="text" value="{{ form_data.get('current_holder', '') or '未借用' }}" readonly>
+  </label>
+  {% endif %}
+  <label>存放地点
+    <input type="text" name="current_storage_location" placeholder="仅自己可见，例如：家里书柜" value="{{ form_data.get('current_storage_location', '') }}">
+    <span class="field-hint">列表和详情里只给所有者看，方便记得东西放在哪里。管理员和所有者都可以在这里修改。</span>
+  </label>
+  <p class="form-actions">
     <button type="submit" class="btn btn-primary">保存修改</button>
     <a class="btn btn-secondary" href="{{ url_for('boardgames.game_detail', game_id=game.id) }}">取消</a>
   </p>
+</form>
+<form method="post" class="delete-registration" action="{{ url_for('boardgames.game_delete', game_id=game.id) }}"
+      onsubmit="return confirm('确定删除桌游登记「' + {{ game.board_game_name|tojson }} + '」吗？删除后不可恢复。');">
+  <button type="submit" class="btn btn-danger">删除登记</button>
 </form>
 {% endblock %}

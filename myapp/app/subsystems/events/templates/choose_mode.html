@@ -18,7 +18,7 @@
     {% if current_user_is_staff %}
     <a class="mode-card mode-card-fixed" href="{{ url_for('events.fixed_add_route') }}">
       <h3>{{ fixed_label }}</h3>
-      <p>固定聚会：地点锁定「{{ fixed_location }}」，须安排在周六晚。会员分桌选桌游报名；由桌游所有者/持有者确认承诺。</p>
+      <p>固定聚会：地点锁定「{{ fixed_location }}」，须安排在周六晚。会员分桌选桌游报名；由桌游所有者确认承诺。</p>
     </a>
     {% else %}
     <div class="mode-card mode-card-fixed" style="opacity: 0.72;">

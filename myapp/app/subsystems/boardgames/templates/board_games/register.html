@@ -50,11 +50,13 @@
   <label>所有者 <span class="req">*</span>
     <input type="text" name="owner" required value="{{ form_data.get('owner', '') }}">
   </label>
-  <label>目前使用者
-    <input type="text" name="current_holder" value="{{ form_data.get('current_holder', '') }}">
+  <label>借用者
+    <input type="text" name="current_holder" placeholder="留空表示未借出" value="{{ form_data.get('current_holder', '') }}">
+    <span class="field-hint">有填写时表示该桌游正在被借用。未借用请留空，不要填所有者本人。</span>
   </label>
-  <label>目前存放地点
-    <input type="text" name="current_storage_location" value="{{ form_data.get('current_storage_location', '') }}">
+  <label>存放地点
+    <input type="text" name="current_storage_location" placeholder="仅自己可见，例如：家里书柜" value="{{ form_data.get('current_storage_location', '') }}">
+    <span class="field-hint">列表和详情里只给所有者看，方便记得东西放在哪里。</span>
   </label>
   <p><button type="submit" class="btn btn-primary">确认登记</button></p>
 </form>

@@ -442,6 +442,13 @@ a.player-tag:hover {
 .game-picker-option.is-selected {
     background: #eef7f7;
 }
+.game-picker-option.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+.game-picker-option.is-disabled:hover {
+    background: transparent;
+}
 .game-picker-option .gp-name {
     font-weight: 600;
     color: #222;

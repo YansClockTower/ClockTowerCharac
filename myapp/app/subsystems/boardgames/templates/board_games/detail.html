@@ -24,8 +24,10 @@
     <dt>人数(最少/推荐/最多)</dt><dd>{{ game.min_players if game.min_players is not none else '—' }} / {{ game.recommended_players if game.recommended_players is not none else '—' }} / {{ game.max_players if game.max_players is not none else '—' }}</dd>
     <dt>游戏时长（分钟）</dt><dd>{{ game.playing_time if game.playing_time is not none else '—' }}</dd>
     <dt>所有者</dt><dd>{{ game.owner }}</dd>
-    <dt>目前使用者</dt><dd>{{ game.current_holder or '—' }}</dd>
-    <dt>目前存放地点</dt><dd>{{ game.current_storage_location or '—' }}</dd>
+    <dt>借用者</dt><dd>{% if game.borrower %}{{ game.borrower }}{% else %}未借用{% endif %}</dd>
+    {% if can_see_storage %}
+    <dt>存放地点</dt><dd>{{ game.current_storage_location or '未填写' }}</dd>
+    {% endif %}
   </dl>
 </div>
 <br/>
@@ -34,6 +36,10 @@
   <button type="button" class="btn btn-secondary" id="borrowRequestBtn">申请借用</button>
   {% if can_edit %}
   <a class="btn btn-primary" href="{{ url_for('boardgames.game_edit', game_id=game.id) }}">编辑信息</a>
+  <form method="post" class="delete-registration" action="{{ url_for('boardgames.game_delete', game_id=game.id) }}"
+        onsubmit="return confirm('确定删除桌游登记「' + {{ game.board_game_name|tojson }} + '」吗？删除后不可恢复。');">
+    <button type="submit" class="btn btn-danger">删除登记</button>
+  </form>
   {% endif %}
 </p>
 
