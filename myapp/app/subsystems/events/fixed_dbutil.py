@@ -314,6 +314,10 @@ def create_table(
         return False, "活动不存在。", None
     if is_event_archived(event):
         return False, "活动已归档，无法开桌。", None
+    from app.user.blacklist import JOIN_BLOCKED_REASON, organizer_blocks_player
+
+    if organizer_blocks_player(event.get("inviter"), host):
+        return False, JOIN_BLOCKED_REASON, None
     if event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法开桌。", None
 
@@ -582,6 +586,10 @@ def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
         return False, "活动不存在。"
     if is_event_archived(event):
         return False, "活动已归档，无法报名。"
+    from app.user.blacklist import JOIN_BLOCKED_REASON, organizer_blocks_player
+
+    if organizer_blocks_player(event.get("inviter"), player):
+        return False, JOIN_BLOCKED_REASON
     if event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法报名。"
 
@@ -616,8 +624,11 @@ def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
         return False, "报名失败：您可能已报名其他桌。"
 
 
-def leave_table(table_id, player) -> Tuple[bool, Optional[str]]:
-    """退出该桌。建桌者与其他玩家无区别；仅当桌内无人时自动删除该桌。"""
+def leave_table(table_id, player, *, force=False) -> Tuple[bool, Optional[str]]:
+    """退出该桌。建桌者与其他玩家无区别；仅当桌内无人时自动删除该桌。
+
+    force=True 用于组织者拉黑后移出报名，不因名单锁定而留下。
+    """
     db = get_db()
     table_row = db.execute("SELECT * FROM fixed_tables WHERE id = ?", (table_id,)).fetchone()
     if table_row is None:
@@ -628,7 +639,7 @@ def leave_table(table_id, player) -> Tuple[bool, Optional[str]]:
         return False, "活动不存在。"
     if is_event_archived(event):
         return False, "活动已归档，无法退桌。"
-    if event["locktime_obj"] < datetime.now():
+    if not force and event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法退桌。"
 
     cursor = db.execute(

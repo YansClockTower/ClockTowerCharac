@@ -10,6 +10,15 @@
 <body class="user-page">
   {% include "_site_header.html" %}
   <div class="card">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
     <h2>用户资料</h2>
     <p class="center">用户 <b>{{ profile.name or '用户' }}</b></p>
     <div id="avatar-container" class="center">
@@ -34,6 +43,19 @@
         <tr><td>跑团模组作者</td><td>{{ '✅ 是' if profile.permission_trpg_module_author else '❌ 否' }}</td></tr>
       </table>
     </details>
+    <form method="post" class="blacklist-form" action="{{ url_for('users.toggle_blacklist', user_id=profile.id) }}">
+      {% if blacklisted %}
+        <input type="hidden" name="action" value="remove">
+        <button type="submit" class="btn btn-secondary"
+                onclick='return confirm("确定将「" + {{ profile.name|tojson }} + "」移出黑名单吗？");'>解除黑名单</button>
+        <p class="hint">对方目前无法报名你组织的活动。</p>
+      {% else %}
+        <input type="hidden" name="action" value="add">
+        <button type="submit" class="btn btn-danger"
+                onclick='return confirm("确定将「" + {{ profile.name|tojson }} + "」加入黑名单吗？对方将无法报名你组织的活动；若其已报名，会被移出。");'>加入黑名单</button>
+        <p class="hint">拉黑后，对方不能报名你发布的活动。</p>
+      {% endif %}
+    </form>
     <div class="nav-row">
       <a href="{{ url_for('events.browse_events') }}">返回活动板</a>
       <a href="{{ url_for('users.user_page') }}">我的用户中心</a>

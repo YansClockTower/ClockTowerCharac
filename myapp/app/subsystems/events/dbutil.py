@@ -417,6 +417,11 @@ def join_event(event_id, player):
         return False, "活动不存在。"
     if is_event_archived(dict(row)):
         return False, "活动已归档，无法报名。"
+    from app.user.blacklist import JOIN_BLOCKED_REASON, organizer_blocks_player
+
+    inviter = db.execute("SELECT inviter FROM events WHERE id = ?", (event_id,)).fetchone()
+    if inviter and organizer_blocks_player(inviter["inviter"], player):
+        return False, JOIN_BLOCKED_REASON
     try:
         db.execute("INSERT INTO attendinfo (eventid, player) VALUES (?, ?)", (event_id, player))
         note_joined(db, KIND_FREE, event_id, player)

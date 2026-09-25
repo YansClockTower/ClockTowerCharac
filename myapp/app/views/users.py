@@ -42,6 +42,7 @@ from app.identity.permissions import (
     permission_bitmap_descriptions,
     user_is_admin,
 )
+from app.user.blacklist import add_to_blacklist, is_blocked, remove_from_blacklist
 from app.user.email_codes import (
     CONFIRM_RESEND_MESSAGE,
     bind_user_email,
@@ -225,7 +226,42 @@ def view_user_profile(user_info, user_id):
 
     profile = enrich_user_permissions(dict(row))
     profile.pop("password_hash", None)
-    return render_template("view_user_public.html", profile=profile)
+    return render_template(
+        "view_user_public.html",
+        profile=profile,
+        blacklisted=is_blocked(user_info["id"], profile["id"]),
+    )
+
+
+@users_bp.route("/profile/<int:user_id>/blacklist", methods=["POST"])
+@login_required_template
+def toggle_blacklist(user_info, user_id):
+    if int(user_id) == int(user_info["id"]):
+        flash("不能把自己加入黑名单。", "error")
+        return redirect(url_for("users.user_page"))
+
+    ensure_user_permission_schema()
+    user_db = get_user_db()
+    row = user_db.execute("SELECT id, name FROM user_info WHERE id=?", (user_id,)).fetchone()
+    user_db.close()
+    if not row:
+        flash("未找到该用户。", "error")
+        return redirect(url_for("events.browse_events"))
+
+    action = (request.form.get("action") or "").strip()
+    if action == "add":
+        ok, message = add_to_blacklist(
+            user_info["id"],
+            row["id"],
+            user_info["name"],
+            row["name"],
+        )
+    elif action == "remove":
+        ok, message = remove_from_blacklist(user_info["id"], row["id"])
+    else:
+        ok, message = False, "无效的黑名单操作。"
+    flash(message, "success" if ok else "error")
+    return redirect(url_for("users.view_user_profile", user_id=user_id))
 
 
 @users_bp.route("/login")
