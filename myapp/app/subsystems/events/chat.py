@@ -241,12 +241,16 @@ def get_open_room(kind, event_id):
     event = _event_row(db, kind, event_id)
     if event is None or _is_archived_signcode(event["signcode"]):
         return None
+    start = (event.get("starttime") or "").replace("T", " ").strip()
+    location = (event.get("location") or "").strip()
     return {
         "id": room_id,
         "event_kind": kind,
         "event_id": int(event_id),
         "name": event["name"],
         "inviter": event["inviter"],
+        "starttime": start,
+        "location": location,
     }
 
 
@@ -581,14 +585,14 @@ def _event_row(db, kind, event_id):
         if not _table_exists(db, "events"):
             return None
         row = db.execute(
-            "SELECT id, name, inviter, signcode FROM events WHERE id = ?",
+            "SELECT id, name, inviter, signcode, starttime, location FROM events WHERE id = ?",
             (int(event_id),),
         ).fetchone()
     elif kind == KIND_FIXED:
         if not _table_exists(db, "fixed_events"):
             return None
         row = db.execute(
-            "SELECT id, name, inviter, signcode FROM fixed_events WHERE id = ?",
+            "SELECT id, name, inviter, signcode, starttime, location FROM fixed_events WHERE id = ?",
             (int(event_id),),
         ).fetchone()
     else:

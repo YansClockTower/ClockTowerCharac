@@ -9,8 +9,15 @@
 {% block content %}
 <div class="chat-app">
   <div class="chat-top">
-    <a class="chat-back" href="{{ url_for('events.chat_list_route') }}">返回</a>
-    <h1 class="chat-title">{{ room.name }}</h1>
+    <a class="chat-back" href="{{ url_for('events.chat_list_route') }}" aria-label="返回">
+      <img src="{{ url_for('events.static', filename='chat-back.png') }}" alt="">
+    </a>
+    <div class="chat-heading">
+      <h1 class="chat-title">{{ room.name }}</h1>
+      {% if room.starttime or room.location %}
+      <p class="chat-subtitle">{{ room.starttime }}{% if room.starttime and room.location %} · {% endif %}{{ room.location }}</p>
+      {% endif %}
+    </div>
   </div>
   {% if not allowed %}
   <p class="chat-empty">请先报名后再进入聊天室。</p>
@@ -24,6 +31,7 @@
     <div class="chat-system">{{ message.body }}</div>
     {% else %}
     <div class="chat-row{% if message.mine %} is-mine{% endif %}">
+      <div class="chat-stack">
       <div class="chat-bubble{% if message.msg_type == 'image' %} is-image{% elif message.msg_type == 'game' %} is-game{% endif %}">
         {% if not message.mine %}
         <div class="chat-sender">{{ message.sender }}</div>
@@ -60,7 +68,8 @@
         {% else %}
         <div class="chat-body">{{ message.body }}</div>
         {% endif %}
-        <div class="chat-time">{{ message.time_label }}</div>
+      </div>
+      <div class="chat-time">{{ message.time_label }}</div>
       </div>
     </div>
     {% endif %}
@@ -227,6 +236,8 @@
     }
     const row = document.createElement("div");
     row.className = "chat-row" + (msg.mine ? " is-mine" : "");
+    const stack = document.createElement("div");
+    stack.className = "chat-stack";
     const bubble = document.createElement("div");
     let extra = "";
     if (msg.msg_type === "image") extra = " is-image";
@@ -272,8 +283,9 @@
     const time = document.createElement("div");
     time.className = "chat-time";
     time.textContent = msg.time_label || "";
-    bubble.appendChild(time);
-    row.appendChild(bubble);
+    stack.appendChild(bubble);
+    stack.appendChild(time);
+    row.appendChild(stack);
     log.appendChild(row);
     lastId = msg.id;
   }
@@ -362,6 +374,84 @@
     } catch (err) {
       alert("发送失败，请稍后再试。");
     }
+  }
+
+  const CHAT_IMAGE_MAX_EDGE = 1600;
+  const CHAT_IMAGE_MAX_BYTES = 1200 * 1024;
+
+  function loadImageSource(file) {
+    if (window.createImageBitmap) {
+      return createImageBitmap(file, { imageOrientation: "from-image" }).catch(function () {
+        return createImageBitmap(file);
+      });
+    }
+    return new Promise(function (resolve, reject) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("无法读取这张图片。"));
+      };
+      img.src = url;
+    });
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (!blob) reject(new Error("图片压缩失败。"));
+        else resolve(blob);
+      }, type, quality);
+    });
+  }
+
+  async function compressChatImage(file) {
+    if (!file || (file.type && file.type.indexOf("image/") !== 0)) {
+      throw new Error("请选择图片。");
+    }
+    const source = await loadImageSource(file);
+    const srcW = source.width || source.naturalWidth || 0;
+    const srcH = source.height || source.naturalHeight || 0;
+    if (!srcW || !srcH) {
+      if (source.close) source.close();
+      throw new Error("无法读取这张图片。");
+    }
+    const alreadySmall = file.size > 0
+      && file.size <= CHAT_IMAGE_MAX_BYTES
+      && Math.max(srcW, srcH) <= CHAT_IMAGE_MAX_EDGE;
+    if (alreadySmall) {
+      if (source.close) source.close();
+      return file;
+    }
+    let edge = CHAT_IMAGE_MAX_EDGE;
+    let quality = 0.82;
+    let blob = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const scale = Math.min(1, edge / Math.max(srcW, srcH));
+      const w = Math.max(1, Math.round(srcW * scale));
+      const h = Math.max(1, Math.round(srcH * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(source, 0, 0, w, h);
+      blob = await canvasToBlob(canvas, "image/jpeg", quality);
+      if (blob.size <= CHAT_IMAGE_MAX_BYTES) break;
+      if (quality > 0.5) quality = Math.round((quality - 0.12) * 100) / 100;
+      else edge = Math.round(edge * 0.75);
+    }
+    if (source.close) source.close();
+    if (!blob || blob.size > CHAT_IMAGE_MAX_BYTES) {
+      throw new Error("图片仍然过大，请换一张较小的图片。");
+    }
+    const base = (file.name || "image").replace(/\.[^.]+$/, "") || "image";
+    return new File([blob], base + ".jpg", { type: "image/jpeg", lastModified: Date.now() });
   }
 
   async function sendImage(file) {
@@ -468,10 +558,23 @@
     });
   }
 
-  imageInput.addEventListener("change", function () {
+  imageInput.addEventListener("change", async function () {
     const file = imageInput.files && imageInput.files[0];
     imageInput.value = "";
-    if (file) sendImage(file);
+    if (!file) return;
+    const label = pickImageBtn.querySelector("span:last-child");
+    const oldLabel = label ? label.textContent : "";
+    pickImageBtn.disabled = true;
+    if (label) label.textContent = "压缩中…";
+    try {
+      const compressed = await compressChatImage(file);
+      await sendImage(compressed);
+    } catch (err) {
+      alert((err && err.message) || "图片处理失败。");
+    } finally {
+      pickImageBtn.disabled = false;
+      if (label) label.textContent = oldLabel;
+    }
   });
 
   log.addEventListener("click", function (e) {

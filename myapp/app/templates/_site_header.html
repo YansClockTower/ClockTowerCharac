@@ -1,15 +1,15 @@
 {% if site_user %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
 <header class="site-header">
-  <span class="welcome-msg">欢迎，{{ site_user.name }}</span>
+  <a class="welcome-msg" href="{{ url_for('users.user_page') }}">{{ site_user.name }}</a>
   <nav class="site-header-nav" aria-label="站点">
     <a href="{{ url_for('portal.index') }}">主页</a>
+    <a href="{{ url_for('events.browse_events') }}">活动</a>
     <a href="{{ url_for('events.chat_list_route') }}" class="site-header-messages" id="siteHeaderMessages"
        data-unread-url="{{ url_for('events.chat_unread_route') }}">
       消息
       <span class="site-header-mail" aria-hidden="true">✉</span>
     </a>
-    <a href="{{ url_for('users.user_page') }}">资料</a>
   </nav>
   <a href="#" class="logout-btn site-header-logout" onclick="logoutUser(event)">登出</a>
 </header>
