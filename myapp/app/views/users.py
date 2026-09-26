@@ -42,7 +42,14 @@ from app.identity.permissions import (
     permission_bitmap_descriptions,
     user_is_admin,
 )
-from app.user.blacklist import add_to_blacklist, is_blocked, remove_from_blacklist
+from app.user.blacklist import (
+    add_to_blacklist,
+    add_to_global_blacklist,
+    is_blocked,
+    is_globally_blocked,
+    remove_from_blacklist,
+    remove_from_global_blacklist,
+)
 from app.user.email_codes import (
     CONFIRM_RESEND_MESSAGE,
     bind_user_email,
@@ -230,6 +237,8 @@ def view_user_profile(user_info, user_id):
         "view_user_public.html",
         profile=profile,
         blacklisted=is_blocked(user_info["id"], profile["id"]),
+        viewer_is_admin=user_is_admin(user_info),
+        globally_blacklisted=is_globally_blocked(profile["id"]),
     )
 
 
@@ -249,7 +258,9 @@ def toggle_blacklist(user_info, user_id):
         return redirect(url_for("events.browse_events"))
 
     action = (request.form.get("action") or "").strip()
-    if action == "add":
+    if action in ("add_global", "remove_global") and not user_is_admin(user_info):
+        ok, message = False, "只有管理员可以操作全局黑名单。"
+    elif action == "add":
         ok, message = add_to_blacklist(
             user_info["id"],
             row["id"],
@@ -258,6 +269,10 @@ def toggle_blacklist(user_info, user_id):
         )
     elif action == "remove":
         ok, message = remove_from_blacklist(user_info["id"], row["id"])
+    elif action == "add_global":
+        ok, message = add_to_global_blacklist(user_info["id"], row["id"], row["name"])
+    elif action == "remove_global":
+        ok, message = remove_from_global_blacklist(row["id"])
     else:
         ok, message = False, "无效的黑名单操作。"
     flash(message, "success" if ok else "error")

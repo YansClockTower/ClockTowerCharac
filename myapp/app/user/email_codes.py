@@ -11,7 +11,7 @@ from app.identity.permissions import ensure_user_permission_schema
 from app.models.database import get_user_db
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-CODE_TTL_MINUTES = 10
+CODE_TTL_MINUTES = 30
 CODE_COOLDOWN_SECONDS = 60
 CODE_HOURLY_LIMIT = 5
 CONFIRM_RESEND_MESSAGE = "监测到您当前有一个有效的验证码可以直接填写。确认重发吗？"

@@ -66,7 +66,7 @@
   }
 
   /**
-   * 发送邮箱验证码；若后端仍有 10 分钟内有效码且未 confirm_resend，会弹出二次确认后重发同一码。
+   * 发送邮箱验证码；若后端仍有 30 分钟内有效码且未 confirm_resend，会弹出二次确认后重发同一码。
    * @returns {{ cancelled: boolean, data?: object }}
    */
   async function requestVerificationCode(url, body, fetchFn) {

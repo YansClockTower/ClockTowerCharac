@@ -56,6 +56,21 @@
         <p class="hint">拉黑后，对方不能报名你发布的活动。</p>
       {% endif %}
     </form>
+    {% if viewer_is_admin %}
+    <form method="post" class="blacklist-form" action="{{ url_for('users.toggle_blacklist', user_id=profile.id) }}">
+      {% if globally_blacklisted %}
+        <input type="hidden" name="action" value="remove_global">
+        <button type="submit" class="btn btn-secondary"
+                onclick='return confirm("确定将「" + {{ profile.name|tojson }} + "」移出全局黑名单吗？已退出的报名不会恢复。");'>解除全局黑名单</button>
+        <p class="hint">对方目前无法报名任何活动。</p>
+      {% else %}
+        <input type="hidden" name="action" value="add_global">
+        <button type="submit" class="btn btn-danger"
+                onclick='return confirm("确定将「" + {{ profile.name|tojson }} + "」加入全局黑名单吗？对方将无法报名任何活动；若其已报名未归档活动，会被移出。");'>加入全局黑名单</button>
+        <p class="hint">全局黑名单对所有活动生效。</p>
+      {% endif %}
+    </form>
+    {% endif %}
     <div class="nav-row">
       <a href="{{ url_for('events.browse_events') }}">返回活动板</a>
       <a href="{{ url_for('users.user_page') }}">我的用户中心</a>

@@ -314,10 +314,11 @@ def create_table(
         return False, "活动不存在。", None
     if is_event_archived(event):
         return False, "活动已归档，无法开桌。", None
-    from app.user.blacklist import JOIN_BLOCKED_REASON, organizer_blocks_player
+    from app.user.blacklist import signup_block_reason
 
-    if organizer_blocks_player(event.get("inviter"), host):
-        return False, JOIN_BLOCKED_REASON, None
+    blocked = signup_block_reason(event.get("inviter"), host)
+    if blocked:
+        return False, blocked, None
     if event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法开桌。", None
 
@@ -586,10 +587,11 @@ def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
         return False, "活动不存在。"
     if is_event_archived(event):
         return False, "活动已归档，无法报名。"
-    from app.user.blacklist import JOIN_BLOCKED_REASON, organizer_blocks_player
+    from app.user.blacklist import signup_block_reason
 
-    if organizer_blocks_player(event.get("inviter"), player):
-        return False, JOIN_BLOCKED_REASON
+    blocked = signup_block_reason(event.get("inviter"), player)
+    if blocked:
+        return False, blocked
     if event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法报名。"
 
