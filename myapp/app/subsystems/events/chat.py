@@ -100,7 +100,7 @@ def close_room(db, kind, event_id):
 
 
 def note_joined(db, kind, event_id, player):
-    """报名时写入已读行。已有行不改游标，避免把未读清掉。"""
+    """报名时写入已读行。开头的系统提示视为已读，其余已有消息算未读。已有行不改游标。"""
     player = (player or "").strip()
     if not player:
         return
@@ -562,8 +562,23 @@ def _latest_message_id(db, room_id):
     return int(row["m"]) if row else 0
 
 
+def _opening_notice_id(db, room_id):
+    """开头系统提示的消息 id。没有这条提示时返回 0。"""
+    row = db.execute(
+        """
+        SELECT MIN(id) AS m FROM event_chat_messages
+        WHERE room_id = ? AND sender = ?
+        """,
+        (int(room_id), SYSTEM_SENDER),
+    ).fetchone()
+    if row is None or row["m"] is None:
+        return 0
+    return int(row["m"])
+
+
 def _ensure_participant(db, room_id, player):
-    tip = _latest_message_id(db, room_id)
+    """新参与者只把开头的系统提示记为已读。"""
+    tip = _opening_notice_id(db, room_id)
     db.execute(
         """
         INSERT OR IGNORE INTO event_chat_reads (room_id, player, last_read_message_id)
