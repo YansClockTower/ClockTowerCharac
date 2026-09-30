@@ -17,7 +17,8 @@ SOURCE_UPDATED = "event_updated"
 SOURCE_ORGANIZER = "organizer"
 EVENT_SOURCES = (SOURCE_CREATED, SOURCE_UPDATED)
 COOLDOWN_SECONDS = 60 * 60
-SIGNUP_URL = "https://yanice.online/lightboard"
+PANEL_URL = "https://yanice.online/"
+_FOOTER = f"——————\n详情前往管理面板查看\n{PANEL_URL}"
 _TIME_FMT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -245,20 +246,13 @@ def _event_text(event, event_kind, source):
     description = (event.get("description") or "").strip()
     if description:
         lines.append(f"说明：{description}")
-    lines.append(f"报名：{SIGNUP_URL}")
+    lines.append(_FOOTER)
     return "\n".join(lines)
 
 
 def _organizer_text(event, note):
-    lines = [f"【公告】{(event.get('name') or '').strip()}"]
-    start = _display_time(event.get("starttime"))
-    if start:
-        lines.append(f"时间：{start}")
-    location = (event.get("location") or "").strip()
-    if location:
-        lines.append(f"地点：{location}")
-    lines.append(note.strip())
-    return "\n".join(lines)
+    name = (event.get("name") or "").strip()
+    return f"来自活动[{name}]的公告：\n{note.strip()}\n{_FOOTER}"
 
 
 def _organizer_line(event):
