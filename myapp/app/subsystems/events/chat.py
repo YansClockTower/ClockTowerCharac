@@ -344,6 +344,16 @@ def post_message(room_id, sender, body):
     return _insert_message(room_id, sender, text, MSG_TEXT)
 
 
+def post_announcement_message(room_id, sender, note):
+    """组织者公告：正文前加「【公告】」，字数按用户原文计算。"""
+    text = (note or "").strip()
+    if not text:
+        return False, "请输入公告内容。", None
+    if len(text) > MAX_BODY_LEN:
+        return False, f"公告过长（最多 {MAX_BODY_LEN} 字）。", None
+    return _insert_message(room_id, sender, f"【公告】{text}", MSG_TEXT)
+
+
 def post_image(room_id, sender, file_storage):
     if file_storage is None or not getattr(file_storage, "filename", None):
         return False, "请选择图片。", None

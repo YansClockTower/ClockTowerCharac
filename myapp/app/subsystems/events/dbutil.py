@@ -169,6 +169,9 @@ def _ensure_events_schema(db):
         )
         """
     )
+    from app.subsystems.events.announcements import ensure_announcement_schema
+
+    ensure_announcement_schema(db)
     ensure_chat_schema(db)
     db.commit()
 

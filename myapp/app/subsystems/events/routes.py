@@ -47,8 +47,20 @@ from app.subsystems.events.dbutil import (
     update_event,
 )
 from app.subsystems.events import fixed_dbutil as fixed
+from app.subsystems.events.announcements import (
+    clear_pending_announcements,
+    cooldown_remaining_seconds,
+    enqueue_event_created,
+    enqueue_event_updated,
+    list_pending_announcements,
+    publish_organizer_announcement,
+    remove_sent_announcement,
+    robot_authorized,
+)
 from app.subsystems.events.chat import (
     CHAT_KINDS,
+    KIND_FIXED,
+    KIND_FREE,
     MSG_GAME,
     MSG_IMAGE,
     can_access_room,
@@ -420,7 +432,8 @@ def add_event_route(user_info):
             "event_type": event_type,
         }
         if data["name"] and data["location"] and data["starttime"]:
-            create_event(data)
+            event_id = create_event(data)
+            enqueue_event_created(KIND_FREE, event_id)
             flash("活动添加成功！", "success")
             return redirect(url_for("events.browse_events"))
     return _render_add_event(user_info)
@@ -472,6 +485,7 @@ def edit_event_route(user_info, event_id):
         }
         if data["name"] and data["location"] and data["starttime"]:
             update_event(event_id, data)
+            enqueue_event_updated(KIND_FREE, event_id)
             flash("活动更新成功！", "success")
             return redirect(url_for("events.browse_events"))
         else:
@@ -536,10 +550,12 @@ def archive_event_route(user_info, event_id):
         user_db.commit()
         user_db.close()
         archive_event(event_id)
+        clear_pending_announcements(KIND_FREE, event_id)
         flash("活动已结束，参与记录已归档。", "success")
     else:
         # 如果活动无法结束（可能根本没组起来），就直接删除即可，不需要归档。
         delete_event(event_id)
+        clear_pending_announcements(KIND_FREE, event_id)
         flash("活动和所有相关报名记录已成功删除！", "success")
 
     return redirect(url_for("events.browse_events"))
@@ -618,6 +634,7 @@ def fixed_add_route(user_info):
             return _render_fixed_add(user_info)
         data["inviter"] = user_info["name"]
         event_id = fixed.create_fixed_event(data)
+        enqueue_event_created(KIND_FIXED, event_id)
         flash("布鸽桌游聚会已发布！会员可在活动面板创建分桌与报名。", "success")
         return redirect(url_for("events.browse_events", tab="pigeon"))
     return _render_fixed_add(user_info)
@@ -786,6 +803,7 @@ def fixed_edit_route(user_info, event_id):
             flash(err, "error")
             return _render_fixed_edit(event, user_info)
         fixed.update_fixed_event(event_id, data)
+        enqueue_event_updated(KIND_FIXED, event_id)
         flash("布鸽桌游聚会信息已更新。", "success")
         return redirect(url_for("events.browse_events", tab="pigeon"))
     return _render_fixed_edit(event, user_info)
@@ -843,9 +861,11 @@ def fixed_archive_route(user_info, event_id):
         user_db.commit()
         user_db.close()
         fixed.archive_fixed_event(event_id)
+        clear_pending_announcements(KIND_FIXED, event_id)
         flash("固定聚会已结束，参与记录已归档。", "success")
     else:
         fixed.delete_fixed_event(event_id)
+        clear_pending_announcements(KIND_FIXED, event_id)
         flash("固定聚会及分桌报名已删除。", "success")
 
     return redirect(url_for("events.browse_events"))
@@ -989,6 +1009,8 @@ def chat_room_route(user_info, kind, event_id):
                     "image_url": _chat_game_image_url(row.get("image_path")),
                 }
             )
+    is_organizer = bool(allowed and player == (room.get("inviter") or ""))
+    announce_cooldown = cooldown_remaining_seconds(kind, event_id) if is_organizer else 0
     return render_template(
         "chat_room.html",
         room=room,
@@ -996,6 +1018,8 @@ def chat_room_route(user_info, kind, event_id):
         allowed=allowed,
         current_user=player,
         chat_games=games,
+        is_organizer=is_organizer,
+        announce_cooldown=announce_cooldown,
     )
 
 
@@ -1052,3 +1076,47 @@ def chat_send_route(user_info, kind, event_id):
     if not ok:
         return jsonify({"ok": False, "message": err or "发送失败。"}), 400
     return jsonify({"ok": True, "message": _chat_message_payload(message, player)})
+
+
+@events_bp.route("/messages/<kind>/<int:event_id>/announce", methods=["POST"])
+@login_required_template
+def chat_announce_route(user_info, kind, event_id):
+    room = get_open_room(kind, event_id) if kind in CHAT_KINDS else None
+    if room is None:
+        return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
+    player = user_info["name"]
+    if player != (room.get("inviter") or ""):
+        return jsonify({"ok": False, "message": "只有活动组织者可以发公告。"}), 403
+    if not can_access_room(room["id"], player, is_admin=_is_admin(user_info)):
+        return jsonify({"ok": False, "message": "请先报名后再发言。"}), 403
+    payload = request.get_json(silent=True) or {}
+    body = payload.get("body")
+    if body is None:
+        body = request.form.get("body")
+    ok, err, message, remain = publish_organizer_announcement(
+        kind, event_id, room["id"], player, body or ""
+    )
+    if not ok:
+        status = 429 if remain > 0 else 400
+        return jsonify({"ok": False, "message": err or "发送失败。", "cooldown_seconds": remain}), status
+    return jsonify({
+        "ok": True,
+        "message": _chat_message_payload(message, player),
+        "cooldown_seconds": remain,
+    })
+
+
+@events_bp.route("/api/wechat/announcements", methods=["GET"])
+def wechat_announcements_route():
+    if not robot_authorized(request.headers.get("Authorization")):
+        return jsonify({"ok": False, "message": "未授权"}), 401
+    return jsonify({"announcements": list_pending_announcements()})
+
+
+@events_bp.route("/api/wechat/announcements/<int:announcement_id>/sent", methods=["POST"])
+def wechat_announcement_sent_route(announcement_id):
+    if not robot_authorized(request.headers.get("Authorization")):
+        return jsonify({"ok": False, "message": "未授权"}), 401
+    if not remove_sent_announcement(announcement_id):
+        return jsonify({"ok": False, "message": "公告不存在或已移除"}), 404
+    return jsonify({"ok": True})

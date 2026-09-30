@@ -25,7 +25,9 @@
   <div class="chat-log" id="chatLog"
        data-last-id="{{ messages[-1].id if messages else 0 }}"
        data-poll-url="{{ url_for('events.chat_poll_route', kind=room.event_kind, event_id=room.event_id) }}"
-       data-send-url="{{ url_for('events.chat_send_route', kind=room.event_kind, event_id=room.event_id) }}">
+       data-send-url="{{ url_for('events.chat_send_route', kind=room.event_kind, event_id=room.event_id) }}"
+       data-announce-url="{% if is_organizer %}{{ url_for('events.chat_announce_route', kind=room.event_kind, event_id=room.event_id) }}{% endif %}"
+       data-announce-cooldown="{{ announce_cooldown|default(0) }}">
     {% for message in messages %}
     {% if message.sender == '系统' %}
     <div class="chat-system">{{ message.body }}</div>
@@ -96,6 +98,12 @@
         <span class="chat-plus-icon" aria-hidden="true">🎲</span>
         <span>桌游</span>
       </button>
+      {% if is_organizer %}
+      <button type="button" class="chat-plus-action" id="chatAnnounceBtn"{% if announce_cooldown > 0 %} disabled{% endif %}>
+        <span class="chat-plus-icon" aria-hidden="true">📢</span>
+        <span id="chatAnnounceLabel">{% if announce_cooldown > 0 %}还需{{ ((announce_cooldown + 59) // 60) }}分钟{% else %}公告{% endif %}</span>
+      </button>
+      {% endif %}
       <input type="file" id="chatImageInput" accept="image/*" hidden>
     </div>
     <div class="chat-panel chat-game-panel" id="chatGamePanel" hidden>
@@ -105,6 +113,15 @@
       </div>
       <div class="chat-game-list" id="chatGameList"></div>
     </div>
+    {% if is_organizer %}
+    <div class="chat-panel chat-announce-panel" id="chatAnnouncePanel" hidden>
+      <textarea id="chatAnnounceInput" rows="3" maxlength="500" placeholder="写一条公告，发到聊天室并进入微信待发队列"></textarea>
+      <div class="chat-announce-actions">
+        <button type="button" class="chat-announce-cancel" id="chatAnnounceCancel">取消</button>
+        <button type="button" class="chat-announce-send" id="chatAnnounceSend">发送公告</button>
+      </div>
+    </div>
+    {% endif %}
   </div>
   <div class="chat-lightbox" id="chatLightbox" hidden>
     <button type="button" class="chat-lightbox-close" id="chatLightboxClose" aria-label="关闭">×</button>
@@ -137,6 +154,13 @@
   const gameSearch = document.getElementById("chatGameSearch");
   const gameList = document.getElementById("chatGameList");
   const gameClose = document.getElementById("chatGameClose");
+  const announceBtn = document.getElementById("chatAnnounceBtn");
+  const announceLabel = document.getElementById("chatAnnounceLabel");
+  const announcePanel = document.getElementById("chatAnnouncePanel");
+  const announceInput = document.getElementById("chatAnnounceInput");
+  const announceCancel = document.getElementById("chatAnnounceCancel");
+  const announceSend = document.getElementById("chatAnnounceSend");
+  const announceUrl = log.getAttribute("data-announce-url") || "";
   const lightbox = document.getElementById("chatLightbox");
   const lightboxImg = document.getElementById("chatLightboxImg");
   const lightboxClose = document.getElementById("chatLightboxClose");
@@ -167,6 +191,7 @@
     if (typing) {
       if (plusPanel) plusPanel.hidden = true;
       if (gamePanel) gamePanel.hidden = true;
+      if (announcePanel) announcePanel.hidden = true;
     }
   }
 
@@ -174,6 +199,21 @@
     if (emojiPanel) emojiPanel.hidden = true;
     if (plusPanel) plusPanel.hidden = true;
     if (gamePanel) gamePanel.hidden = true;
+    if (announcePanel) announcePanel.hidden = true;
+  }
+
+  function applyAnnounceCooldown(seconds) {
+    if (!announceBtn || !announceLabel) return;
+    const remain = Number(seconds) || 0;
+    if (remain <= 0) {
+      announceBtn.disabled = false;
+      announceLabel.textContent = "公告";
+      return;
+    }
+    announceBtn.disabled = true;
+    const mins = Math.max(1, Math.ceil(remain / 60));
+    announceLabel.textContent = "还需" + mins + "分钟";
+    if (announcePanel) announcePanel.hidden = true;
   }
 
   function openLightbox(src) {
@@ -535,6 +575,56 @@
   pickImageBtn.addEventListener("click", function () {
     imageInput.click();
   });
+
+  if (announceBtn) {
+    announceBtn.addEventListener("click", function () {
+      if (announceBtn.disabled) return;
+      const open = announcePanel && announcePanel.hidden;
+      closePanels();
+      if (announcePanel && open) {
+        announcePanel.hidden = false;
+        if (announceInput) announceInput.focus();
+      }
+    });
+  }
+  if (announceCancel) {
+    announceCancel.addEventListener("click", function () {
+      if (announcePanel) announcePanel.hidden = true;
+    });
+  }
+  if (announceSend) {
+    announceSend.addEventListener("click", function () {
+      sendAnnouncement();
+    });
+  }
+
+  async function sendAnnouncement() {
+    const text = announceInput ? announceInput.value : "";
+    if (!text.trim() || !announceUrl) return;
+    announceSend.disabled = true;
+    try {
+      const res = await ClockTowerAuth.authFetch(announceUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: text }),
+      });
+      const data = await res.json().catch(function () { return {}; });
+      if (!res.ok || !data.ok) {
+        if (data.cooldown_seconds) applyAnnounceCooldown(data.cooldown_seconds);
+        alert(data.message || "发送失败");
+        return;
+      }
+      if (announceInput) announceInput.value = "";
+      closePanels();
+      appendMessage(data.message);
+      scrollBottom();
+      applyAnnounceCooldown(data.cooldown_seconds || 3600);
+    } catch (err) {
+      alert("发送失败，请稍后再试。");
+    } finally {
+      announceSend.disabled = false;
+    }
+  }
 
   pickGameBtn.addEventListener("click", function () {
     plusPanel.hidden = true;
