@@ -19,8 +19,6 @@
         <nav class="browse-tabs" aria-label="活动列表视图">
             <a class="browse-tab {% if browse_tab == 'all' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events') }}">全部</a>
-            <a class="browse-tab {% if browse_tab == 'light' %}is-active{% endif %}"
-               href="{{ url_for('events.browse_events', tab='light') }}">轻桌游聚会</a>
             <a class="browse-tab {% if browse_tab == 'pigeon' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events', tab='pigeon') }}">{{ pigeon_tab_label|default('布鸽桌游聚会') }}</a>
             <a class="browse-tab {% if browse_tab == 'my' %}is-active{% endif %}"

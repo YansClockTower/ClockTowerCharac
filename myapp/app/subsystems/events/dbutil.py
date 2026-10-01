@@ -16,9 +16,28 @@ from app.subsystems.events.chat import (
 )
 
 # 含历史「布鸽桌游活动」以便旧自由聚会记录归一化；新建自由聚会勿再用该类型
-EVENT_TYPE_VALUES = ("轻桌游聚会", "布鸽桌游活动", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "TRPG(跑团)", "其他")
+EVENT_TYPE_VALUES = (
+    "轻桌游聚会",
+    "布鸽桌游活动",
+    "德州扑克",
+    "德式桌游",
+    "狼人杀",
+    "阿瓦隆",
+    "血染钟楼",
+    "TRPG(跑团)",
+    "其他",
+)
 # 自由聚会可选类型（布鸽改为固定聚会模式）
-FREE_EVENT_TYPE_VALUES = ("轻桌游聚会", "德州扑克", "德式桌游", "狼人杀", "血染钟楼", "TRPG(跑团)", "其他")
+FREE_EVENT_TYPE_VALUES = (
+    "轻桌游聚会",
+    "德州扑克",
+    "德式桌游",
+    "狼人杀",
+    "阿瓦隆",
+    "血染钟楼",
+    "TRPG(跑团)",
+    "其他",
+)
 
 BROWSE_BOOKMARK_LIGHT_EVENT_TYPE = "轻桌游聚会"
 # 面板「布鸽」书签：固定聚会（布鸽桌游聚会）
@@ -102,21 +121,94 @@ def get_db():
     return db
 
 
+def _event_type_check_clause():
+    allowed = ", ".join("'" + value.replace("'", "''") + "'" for value in EVENT_TYPE_VALUES)
+    return f"CHECK(event_type IN ({allowed}))"
+
+
+def _ensure_event_type_check(db):
+    """旧库的 event_type CHECK 不含新类型时，重建 events 表以放行这些取值。"""
+    row = db.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'events'"
+    ).fetchone()
+    if row is None:
+        return
+    create_sql = row["sql"] or ""
+    if "CHECK" not in create_sql.upper():
+        return
+    if all(value in create_sql for value in EVENT_TYPE_VALUES):
+        return
+
+    columns = db.execute("PRAGMA table_info(events)").fetchall()
+    if not columns:
+        return
+    definitions = []
+    names = []
+    for column in columns:
+        name = column["name"]
+        names.append(name)
+        quoted = '"' + name.replace('"', '""') + '"'
+        if column["pk"] == 1 and name == "id":
+            definitions.append(f"{quoted} INTEGER PRIMARY KEY AUTOINCREMENT")
+            continue
+        parts = [quoted, column["type"] or "TEXT"]
+        if column["notnull"]:
+            parts.append("NOT NULL")
+        if column["dflt_value"] is not None:
+            parts.append(f"DEFAULT {column['dflt_value']}")
+        if name == "event_type":
+            parts.append(_event_type_check_clause())
+        definitions.append(" ".join(parts))
+
+    index_rows = db.execute(
+        """
+        SELECT sql FROM sqlite_master
+        WHERE type = 'index' AND tbl_name = 'events' AND sql IS NOT NULL
+        """
+    ).fetchall()
+    quoted_names = ", ".join('"' + name.replace('"', '""') + '"' for name in names)
+    db.execute("PRAGMA foreign_keys = OFF")
+    try:
+        db.execute("BEGIN")
+        db.execute(f"CREATE TABLE events__typecheck ({', '.join(definitions)})")
+        db.execute(
+            f"INSERT INTO events__typecheck ({quoted_names}) SELECT {quoted_names} FROM events"
+        )
+        db.execute("DROP TABLE events")
+        db.execute("ALTER TABLE events__typecheck RENAME TO events")
+        for index_row in index_rows:
+            db.execute(index_row["sql"])
+        if db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'"
+        ).fetchone():
+            db.execute(
+                "UPDATE sqlite_sequence SET name = 'events' WHERE name = 'events__typecheck'"
+            )
+        db.execute("COMMIT")
+    except Exception:
+        db.execute("ROLLBACK")
+        raise
+    finally:
+        db.execute("PRAGMA foreign_keys = ON")
+
+
 def _ensure_events_schema(db):
     columns = db.execute("PRAGMA table_info(events)").fetchall()
     column_names = {row["name"] for row in columns}
-    if "event_type" not in column_names:
+    if "event_type" not in column_names and columns:
         db.execute("ALTER TABLE events ADD COLUMN event_type TEXT DEFAULT '其他'")
-    db.execute(
-        f"""
-        UPDATE events
-        SET event_type = CASE
-            WHEN event_type IN ({",".join(["?"] * len(EVENT_TYPE_VALUES))}) THEN event_type
-            ELSE '其他'
-        END
-        """,
-        EVENT_TYPE_VALUES,
-    )
+    _ensure_event_type_check(db)
+    if db.execute("PRAGMA table_info(events)").fetchall():
+        db.execute(
+            f"""
+            UPDATE events
+            SET event_type = CASE
+                WHEN event_type IN ({",".join(["?"] * len(EVENT_TYPE_VALUES))}) THEN event_type
+                ELSE '其他'
+            END
+            """,
+            EVENT_TYPE_VALUES,
+        )
     db.execute(
         """
         CREATE TABLE IF NOT EXISTS fixed_events (
