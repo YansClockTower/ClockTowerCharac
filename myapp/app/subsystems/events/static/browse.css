@@ -6,13 +6,40 @@
 }
 
 .browse-header-row {
-    position: relative;
-    padding-right: 140px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
     margin-bottom: 12px;
 }
 .browse-header-row h2 {
-    margin: 0 0 8px 0;
+    margin: 0;
     font-size: 1.25rem;
+    min-width: 0;
+}
+.browse-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+}
+.browse-header-actions .corner-button {
+    position: static;
+    top: auto;
+    right: auto;
+    padding: 8px 12px;
+    white-space: nowrap;
+}
+.rally-body {
+    min-height: 96px;
+    resize: vertical;
+    font: inherit;
+}
+.rally-modal-hint {
+    margin: 0;
+    color: #666;
+    font-size: 0.85rem;
+    line-height: 1.45;
 }
 .browse-count {
     font-size: 0.85em;

@@ -253,6 +253,7 @@ def browse_events(user_info):
         picker_owners=boardgames_api.PICKER_OWNER_FILTERS,
         self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
         self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
+        rally_cooldown=cooldown_remaining_seconds(RALLY_COOLDOWN_KIND, int(user_info["id"])),
     )
 
 
@@ -1031,12 +1032,10 @@ def _chat_message_payload(message, current_user):
 @login_required_template
 def chat_list_route(user_info):
     rooms = list_rooms_for(user_info["name"], is_admin=_is_admin(user_info))
-    rally_cooldown = cooldown_remaining_seconds(RALLY_COOLDOWN_KIND, int(user_info["id"]))
     return render_template(
         "chat_list.html",
         rooms=rooms,
         current_user=user_info["name"],
-        rally_cooldown=rally_cooldown,
     )
 
 

@@ -11,9 +11,12 @@
     <div class="event-list">
         <div class="browse-header-row">
             <h2>活动列表 <span class="browse-count">（共 {{ events_total }} 个）</span></h2>
-            <a href="{{ url_for('events.choose_event_mode') }}" class="base-btn corner-button">
-                + 新活动
-            </a>
+            <div class="browse-header-actions">
+                <a href="{{ url_for('events.choose_event_mode') }}" class="base-btn corner-button">+ 约局</a>
+                <button type="button" class="base-btn corner-button" id="browseRallyBtn"
+                        data-cooldown="{{ rally_cooldown|default(0) }}"
+                        data-rally-url="{{ url_for('events.chat_rally_route') }}">+ 号召</button>
+            </div>
         </div>
 
         <nav class="browse-tabs" aria-label="活动列表视图">
@@ -47,6 +50,28 @@
         {% endif %}
         
 
+    </div>
+
+    <div id="rallyModal" class="app-modal" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="rallyModalTitle">
+        <div class="app-modal-header">
+          <h3 id="rallyModalTitle">发起号召</h3>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
+        </div>
+        <form id="rallyForm">
+          <label class="app-modal-label" for="rallyTitle">标题</label>
+          <input id="rallyTitle" class="app-modal-input" type="text" maxlength="30" placeholder="例如：今晚血染" autocomplete="off">
+          <label class="app-modal-label" for="rallyBody">号召</label>
+          <textarea id="rallyBody" class="app-modal-input rally-body" rows="4" maxlength="500" placeholder="写一条号召，例如：今晚想打血染，有人吗？"></textarea>
+          <p class="rally-modal-hint">标题会成为聊天室名称。发送后会创建临时聊天室，并把号召推到微信群。已登录的人打开链接就会加入。</p>
+          <p id="rallyError" class="app-modal-error" hidden></p>
+          <div class="app-modal-actions">
+            <button type="button" class="app-modal-btn" data-app-modal-close>取消</button>
+            <button type="submit" class="app-modal-btn app-modal-btn--primary" id="rallySend">发送号召</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <div id="fixedCreateTableModal" class="app-modal app-modal--sheet" hidden>
@@ -288,5 +313,85 @@
                 api.open();
             });
         })();
+    </script>
+    <script>
+    (function () {
+        const btn = document.getElementById("browseRallyBtn");
+        const modal = document.getElementById("rallyModal");
+        const form = document.getElementById("rallyForm");
+        const titleInput = document.getElementById("rallyTitle");
+        const bodyInput = document.getElementById("rallyBody");
+        const errorEl = document.getElementById("rallyError");
+        const sendBtn = document.getElementById("rallySend");
+        if (!btn || !modal || !form || !titleInput || !bodyInput || !sendBtn) return;
+        const api = AppModal.bind(modal);
+
+        function showError(text) {
+            if (!errorEl) return;
+            if (!text) {
+                errorEl.hidden = true;
+                errorEl.textContent = "";
+                return;
+            }
+            errorEl.hidden = false;
+            errorEl.textContent = text;
+        }
+
+        function cooldownMinutes() {
+            const remain = Number(btn.getAttribute("data-cooldown") || 0);
+            if (remain <= 0) return 0;
+            return Math.max(1, Math.ceil(remain / 60));
+        }
+
+        btn.addEventListener("click", function () {
+            const mins = cooldownMinutes();
+            showError(mins ? "号召冷却中，请 " + mins + " 分钟后再试。" : "");
+            sendBtn.disabled = mins > 0;
+            api.open();
+            if (!mins) titleInput.focus();
+        });
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const title = titleInput.value || "";
+            const text = bodyInput.value || "";
+            if (!title.trim()) {
+                showError("请填写标题。");
+                titleInput.focus();
+                return;
+            }
+            if (!text.trim()) {
+                showError("请输入号召内容。");
+                bodyInput.focus();
+                return;
+            }
+            sendBtn.disabled = true;
+            showError("");
+            try {
+                const res = await ClockTowerAuth.authFetch(btn.getAttribute("data-rally-url"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: title, body: text }),
+                });
+                const data = await res.json().catch(function () { return {}; });
+                if (!res.ok || !data.ok) {
+                    if (data.cooldown_seconds) {
+                        btn.setAttribute("data-cooldown", String(data.cooldown_seconds));
+                    }
+                    showError(data.message || "发送失败");
+                    return;
+                }
+                if (data.url) {
+                    window.location.href = data.url;
+                    return;
+                }
+                showError("已发送，但没有拿到聊天室地址。");
+            } catch (err) {
+                showError("发送失败，请稍后再试。");
+            } finally {
+                if (!cooldownMinutes()) sendBtn.disabled = false;
+            }
+        });
+    })();
     </script>
 {% endblock %}

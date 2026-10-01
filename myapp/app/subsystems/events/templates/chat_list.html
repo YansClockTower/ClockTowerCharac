@@ -10,26 +10,9 @@
 <div class="chat-app">
   <div class="chat-top">
     <h1 class="chat-title">消息</h1>
-    <button type="button" class="chat-rally-btn" id="chatRallyBtn"
-            data-cooldown="{{ rally_cooldown|default(0) }}"
-            {% if rally_cooldown|default(0) > 0 %}disabled{% endif %}>
-      {% if rally_cooldown|default(0) > 0 %}还需{{ ((rally_cooldown + 59) // 60) }}分钟{% else %}发起号召{% endif %}
-    </button>
-  </div>
-  <div class="chat-panel chat-rally-panel" id="chatRallyPanel" hidden
-       data-send-url="{{ url_for('events.chat_rally_route') }}">
-    <label class="chat-rally-label" for="chatRallyTitle">标题</label>
-    <input id="chatRallyTitle" type="text" maxlength="30" placeholder="例如：今晚血染" autocomplete="off">
-    <label class="chat-rally-label" for="chatRallyInput">号召</label>
-    <textarea id="chatRallyInput" rows="3" maxlength="500" placeholder="写一条号召，例如：今晚想打血染，有人吗？"></textarea>
-    <p class="chat-rally-hint">发送后会创建临时聊天室，并把这条号召推到微信群。已登录的人打开链接就会加入。一小时内只能发起一次。</p>
-    <div class="chat-announce-actions">
-      <button type="button" class="chat-announce-cancel" id="chatRallyCancel">取消</button>
-      <button type="button" class="chat-announce-send" id="chatRallySend">发送号召</button>
-    </div>
   </div>
   {% if not rooms %}
-  <p class="chat-empty">你还没有参与中的聊天室。报名活动后会显示在这里，也可以发起号召。</p>
+  <p class="chat-empty">你还没有参与中的聊天室。报名活动后会显示在这里。</p>
   {% else %}
   <div class="chat-list">
     {% for room in rooms %}
@@ -47,79 +30,4 @@
   </div>
   {% endif %}
 </div>
-<script>
-(function () {
-  const btn = document.getElementById("chatRallyBtn");
-  const panel = document.getElementById("chatRallyPanel");
-  const titleInput = document.getElementById("chatRallyTitle");
-  const input = document.getElementById("chatRallyInput");
-  const cancel = document.getElementById("chatRallyCancel");
-  const send = document.getElementById("chatRallySend");
-  if (!btn || !panel || !titleInput || !input || !send) return;
-
-  function applyCooldown(seconds) {
-    const remain = Number(seconds || 0);
-    if (remain <= 0) {
-      btn.disabled = false;
-      btn.textContent = "发起号召";
-      return;
-    }
-    btn.disabled = true;
-    panel.hidden = true;
-    const mins = Math.max(1, Math.ceil(remain / 60));
-    btn.textContent = "还需" + mins + "分钟";
-  }
-
-  applyCooldown(btn.getAttribute("data-cooldown"));
-
-  btn.addEventListener("click", function () {
-    if (btn.disabled) return;
-    const open = panel.hidden;
-    panel.hidden = !open;
-    if (open) titleInput.focus();
-  });
-
-  if (cancel) {
-    cancel.addEventListener("click", function () {
-      panel.hidden = true;
-    });
-  }
-
-  send.addEventListener("click", async function () {
-    const title = titleInput.value || "";
-    const text = input.value || "";
-    if (!title.trim()) {
-      titleInput.focus();
-      return;
-    }
-    if (!text.trim()) {
-      input.focus();
-      return;
-    }
-    send.disabled = true;
-    try {
-      const res = await ClockTowerAuth.authFetch(panel.getAttribute("data-send-url"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title, body: text }),
-      });
-      const data = await res.json().catch(function () { return {}; });
-      if (!res.ok || !data.ok) {
-        if (data.cooldown_seconds) applyCooldown(data.cooldown_seconds);
-        alert(data.message || "发送失败");
-        return;
-      }
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      alert("已发送，但没有拿到聊天室地址。");
-    } catch (err) {
-      alert("发送失败，请稍后再试。");
-    } finally {
-      send.disabled = false;
-    }
-  });
-})();
-</script>
 {% endblock %}
