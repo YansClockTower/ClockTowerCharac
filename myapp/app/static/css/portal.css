@@ -83,6 +83,45 @@ body.portal-home {
   box-shadow: 0 6px 16px rgba(63, 111, 92, 0.45);
 }
 
+.recruit-id-list {
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--color-border, #e4dfd8);
+  border-radius: var(--radius-md, 8px);
+  text-align: left;
+}
+
+.recruit-id-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.recruit-id-list li + li {
+  margin-top: 8px;
+}
+
+.recruit-id-list span {
+  color: var(--color-text-muted, #666);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.recruit-id-list strong {
+  font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--color-text, #222);
+  word-break: break-all;
+  user-select: all;
+}
+
+.app-modal .recruit-id-list {
+  margin-bottom: 12px;
+}
+
 body.recruit-modal-open {
   overflow: hidden;
 }
@@ -196,6 +235,17 @@ body.recruit-modal-open {
   gap: 12px;
 }
 
+#recruitGroupModal .recruit-modal-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#recruitGroupModal .recruit-modal-qr {
+  width: auto;
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
+
 .recruit-modal-card {
   margin: 0;
   padding: 10px 8px 8px;
@@ -282,7 +332,8 @@ body.recruit-modal-open {
 }
 
 @media (max-width: 520px) {
-  .recruit-modal-grid {
+  .recruit-modal-grid,
+  #recruitGroupModal .recruit-modal-grid {
     grid-template-columns: 1fr;
   }
 }

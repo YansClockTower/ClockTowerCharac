@@ -19,6 +19,11 @@
     <div class="primary-nav">
         {% if show_join_recruit_group %}
         <button type="button" class="recruit-group-cta" id="openRecruitGroupQr">加入招新群 / 添加官号</button>
+        <ul class="recruit-id-list">
+          <li><span>招新群</span><strong>布鸽x轻桌游 2026招新③群</strong></li>
+          <li><span>布鸽官号</span><strong>SJTU_PartyBGA</strong></li>
+          <li><span>YOYO社长账号</span><strong>ZETA9009</strong></li>
+        </ul>
         {% endif %}
         <button type="button" onclick="toggleSection('club-section')">桌游协会事务</button>
         <div id="club-section" class="secondary-nav">
@@ -48,14 +53,14 @@
     </p>
 
     {% if show_join_recruit_group %}
-    <div id="recruitGroupModal" class="app-modal app-modal--medium" hidden>
+    <div id="recruitGroupModal" class="app-modal app-modal--wide" hidden>
       <div class="app-modal-backdrop" data-app-modal-close></div>
       <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="recruitGroupTitle">
         <div class="app-modal-header">
           <h3 id="recruitGroupTitle">加入招新群</h3>
           <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
         </div>
-        <p class="recruit-modal-hint">使用微信扫描下方二维码加入招新群，群码失效可以加布鸽协会官号。</p>
+        <p class="recruit-modal-hint">扫码加入招新群，或搜索群名和微信号。群二维码过期后，可以加布鸽官号或 YOYO 社长。</p>
         <div class="recruit-modal-grid">
           <figure class="recruit-modal-card">
             <img class="recruit-modal-qr"
@@ -64,7 +69,7 @@
                  width="220" height="220">
             <figcaption>
               <strong>加入招新群</strong>
-              <span>扫码进群了解招新与活动</span>
+              <span>布鸽xYOYO 2026招新③群</span>
             </figcaption>
           </figure>
           <figure class="recruit-modal-card">
@@ -73,8 +78,18 @@
                  alt="布鸽轻桌游官号(备用)"
                  width="220" height="220">
             <figcaption>
-              <strong>添加官号好友</strong>
-              <span>微信号 SJTU_PartyBGA</span>
+              <strong>布鸽官号(备用)</strong>
+              <span>SJTU_PartyBGA</span>
+            </figcaption>
+          </figure>
+          <figure class="recruit-modal-card">
+            <img class="recruit-modal-qr"
+                 src="{{ url_for('users.static', filename='img/yoyocontact.jpg') }}"
+                 alt="YOYO社长微信(备用)"
+                 width="220" height="220">
+            <figcaption>
+              <strong>YOYO社长(备用)</strong>
+              <span>ZETA9009</span>
             </figcaption>
           </figure>
         </div>
@@ -126,7 +141,7 @@
                    width="220" height="220">
               <figcaption>
                 <strong>社长微信</strong>
-                <span>联系人 Zeta</span>
+                <span>ZETA9009</span>
               </figcaption>
             </figure>
           </div>
