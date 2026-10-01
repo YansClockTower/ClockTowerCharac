@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}发布{{ fixed_label }} - 信息板{% endblock %}
+{% block title %}发布{{ club_weekly_label }} - 信息板{% endblock %}
 
 {% block extra_css %}
     <link rel="stylesheet" href="{{ url_for('events.static', filename='browse.css') }}">
@@ -8,16 +8,13 @@
 
 {% block content %}
 <div class="event-form">
-  <h2>发布{{ fixed_label }}</h2>
+  <h2>发布{{ club_weekly_label }}</h2>
   <p>
     <a href="{{ url_for('events.choose_event_mode') }}">← 返回模式选择</a>
     ·
     <a href="{{ url_for('events.browse_events') }}">活动列表</a>
   </p>
-  <p class="hint">
-    此活动即为<strong>{{ fixed_label }}</strong>（固定聚会）。地点锁定「{{ fixed_location }}」，
-    开始时间必须是<strong>周六 18:00 及以后</strong>。发布后由正式会员自建桌、选桌游并报名。
-  </p>
+  <p class="hint" id="gatheringHint"></p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
@@ -32,15 +29,25 @@
   <form method="POST" data-require-wechat>
     <p>
       <label for="name">活动名称 (必填):</label>
-      <input type="text" name="name" required style="width: 98%;" placeholder="例如：9月某周六布鸽桌游聚会">
+      <input type="text" id="event_name" name="name" required style="width: 98%;" placeholder="例如：9月某周六布鸽桌游聚会">
     </p>
     <p>
-      <label>活动类型</label>
-      <input type="text" value="{{ fixed_label }}" disabled style="width: 98%; background: #f5f5f5;">
+      <label for="gathering_kind">活动类型</label>
+      <select id="gathering_kind" name="gathering_kind" required style="width: 98%;">
+        {% for opt in gathering_options %}
+        <option value="{{ opt.kind }}" {% if opt.kind == selected_kind %}selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
     </p>
     <p>
-      <label>活动地点</label>
-      <input type="text" value="{{ fixed_location }}" disabled style="width: 98%; background: #f5f5f5;">
+      <label for="location">活动地点</label>
+      <select id="location" name="location" required style="width: 98%;">
+        {% for opt in gathering_options if opt.kind == selected_kind %}
+          {% for loc in opt.locations %}
+          <option value="{{ loc }}" {% if loc == selected_location %}selected{% endif %}>{{ loc }}</option>
+          {% endfor %}
+        {% endfor %}
+      </select>
     </p>
     <input type="hidden" id="final_locktime" name="locktime">
 
@@ -56,7 +63,7 @@
     </div>
 
     <p>
-      <label for="starttime">活动开始时间 (必填，须为周六晚):</label>
+      <label for="starttime" id="starttimeLabel">活动开始时间 (必填，须为{{ time_hint }}):</label>
       <input type="datetime-local" id="starttime" name="starttime" required style="width: 98%;">
     </p>
     <p>
@@ -74,7 +81,7 @@
       <label for="description">活动描述 (可选):</label>
       <textarea name="description" rows="5" style="width: 98%;"></textarea>
     </p>
-    <p><button type="submit">发布{{ fixed_label }}</button></p>
+    <p><button type="submit" id="fixedSubmitBtn">发布</button></p>
   </form>
 </div>
 <script>
@@ -89,6 +96,37 @@
       finalLocktime.name = "locktime";
     }
   }
+  const GATHERING_OPTIONS = {{ gathering_options|tojson }};
+  function selectedGathering() {
+    const kind = document.getElementById("gathering_kind").value;
+    return GATHERING_OPTIONS.find(function (opt) { return opt.kind === kind; }) || GATHERING_OPTIONS[0];
+  }
+  function applyGatheringKind() {
+    const spec = selectedGathering();
+    const loc = document.getElementById("location");
+    const previous = loc.value;
+    loc.innerHTML = "";
+    spec.locations.forEach(function (name) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      if (name === previous) opt.selected = true;
+      loc.appendChild(opt);
+    });
+    if (loc.options.length && !loc.value) loc.options[0].selected = true;
+    const hint = document.getElementById("gatheringHint");
+    if (hint) hint.textContent = spec.blurb;
+    const timeLabel = document.getElementById("starttimeLabel");
+    if (timeLabel) timeLabel.textContent = "活动开始时间 (必填，须为" + spec.time_hint + "):";
+    const submit = document.getElementById("fixedSubmitBtn");
+    if (submit) submit.textContent = "发布" + spec.label;
+    const nameInput = document.getElementById("event_name");
+    if (nameInput && !nameInput.value) {
+      nameInput.placeholder = spec.kind === "yoyo"
+        ? "例如：10月某周日YOYO桌游聚会"
+        : "例如：9月某周六布鸽桌游聚会";
+    }
+  }
   document.addEventListener("DOMContentLoaded", function() {
     const locktimeSelect = document.getElementById("locktime_select");
     locktimeSelect.value = "0";
@@ -96,6 +134,8 @@
     document.getElementById("starttime").addEventListener("change", function() {
       checkLocktime(locktimeSelect);
     });
+    applyGatheringKind();
+    document.getElementById("gathering_kind").addEventListener("change", applyGatheringKind);
   });
   document.querySelector("form").addEventListener("submit", function() {
     checkLocktime(document.getElementById("locktime_select"));

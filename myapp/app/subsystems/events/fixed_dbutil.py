@@ -11,9 +11,10 @@ from app.subsystems.boardgames import api as boardgames_api
 from app.subsystems.events.chat import KIND_FIXED, close_room, note_joined, note_left, open_room
 from app.subsystems.events.dbutil import (
     ARCHIVED_SIGNCODE,
-    FIXED_GATHERING_LABEL,
+    gathering_spec,
     get_db,
     is_event_archived,
+    normalize_gathering_kind,
 )
 
 SELF_BROUGHT_GAME_ID = 0
@@ -79,8 +80,8 @@ def create_fixed_event(data) -> int:
     cur = db.execute(
         """
         INSERT INTO fixed_events
-            (name, inviter, location, starttime, locktime, description, minplayer, maxplayer, signcode)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (name, inviter, location, starttime, locktime, description, minplayer, maxplayer, signcode, gathering_kind)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["name"],
@@ -92,6 +93,7 @@ def create_fixed_event(data) -> int:
             data.get("minplayer"),
             data.get("maxplayer"),
             str(random.randint(0, 9999)).zfill(4),
+            normalize_gathering_kind(data.get("gathering_kind")),
         ),
     )
     event_id = int(cur.lastrowid)
@@ -106,7 +108,7 @@ def update_fixed_event(event_id, data):
         """
         UPDATE fixed_events
         SET name = ?, location = ?, starttime = ?, locktime = ?, description = ?,
-            minplayer = ?, maxplayer = ?
+            minplayer = ?, maxplayer = ?, gathering_kind = ?
         WHERE id = ?
         """,
         (
@@ -117,6 +119,7 @@ def update_fixed_event(event_id, data):
             data.get("description") or "",
             data.get("minplayer"),
             data.get("maxplayer"),
+            normalize_gathering_kind(data.get("gathering_kind")),
             event_id,
         ),
     )
@@ -164,7 +167,11 @@ def get_fixed_event_attendance_records(event_id):
 def _materialize_fixed_event(row, current_user, db):
     event = _parse_times(dict(row))
     event["mode"] = "fixed"
-    event["event_type"] = FIXED_GATHERING_LABEL
+    kind = normalize_gathering_kind(event.get("gathering_kind"))
+    spec = gathering_spec(kind)
+    event["gathering_kind"] = kind
+    event["event_type"] = spec["label"]
+    event["members_only"] = spec["members_only"]
 
     event_id = event["id"]
     event["attendee_count"] = count_fixed_event_attendees(event_id, db)
@@ -277,7 +284,7 @@ def get_fixed_event_detail(event_id, current_user):
 def list_fixed_events_for_browse(current_user, filters=None):
     """返回用于面板的固定聚会列表（未分页）。"""
     filters = filters or {}
-    # 轻桌游等自由类型书签不展示固定聚会；布鸽书签只展示固定聚会
+    # 自由类型书签不展示社团周常；社团周常书签只展示固定聚会（布鸽与 YOYO）
     if filters.get("event_type") and not filters.get("fixed_only"):
         return []
     if filters.get("free_only"):

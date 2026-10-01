@@ -40,12 +40,17 @@ FREE_EVENT_TYPE_VALUES = (
 )
 
 BROWSE_BOOKMARK_LIGHT_EVENT_TYPE = "轻桌游聚会"
-# 面板「布鸽」书签：固定聚会（布鸽桌游聚会）
-BROWSE_BOOKMARK_PIGEON_LABEL = "布鸽桌游聚会"
+# 活动列表里的社团周常书签，同时包含布鸽与 YOYO
+CLUB_WEEKLY_LABEL = "社团周常活动"
+BROWSE_BOOKMARK_PIGEON_LABEL = CLUB_WEEKLY_LABEL
 FIXED_GATHERING_LABEL = "布鸽桌游聚会"
 FIXED_GATHERING_LOCATION = "南体活动室(布鸽专用)"
 # 周六晚：weekday==5（周六），且小时 >= 18
 FIXED_GATHERING_EVENING_HOUR_START = 18
+GATHERING_KIND_PIGEON = "pigeon"
+GATHERING_KIND_YOYO = "yoyo"
+YOYO_GATHERING_LABEL = "YOYO桌游聚会"
+YOYO_GATHERING_LOCATIONS = ("华师四教312", "华师四教308")
 
 # 兼容旧导入名
 BROWSE_BOOKMARK_PIGEON_EVENT_TYPE = "布鸽桌游活动"
@@ -65,20 +70,83 @@ def parse_event_datetime(value: str):
     return datetime.strptime(value, "%Y-%m-%dT%H:%M")
 
 
-def is_saturday_evening(starttime: str) -> bool:
-    """固定聚会开始时间须为周六晚（周六、当地时间 18:00 及以后）。"""
+def gathering_spec(kind: str):
+    """社团周常的两种固定聚会。未知类型按布鸽处理，避免把会员活动放开。"""
+    if kind == GATHERING_KIND_YOYO:
+        return {
+            "kind": GATHERING_KIND_YOYO,
+            "label": YOYO_GATHERING_LABEL,
+            "locations": YOYO_GATHERING_LOCATIONS,
+            "members_only": False,
+            "weekday": 6,
+            "min_hour": None,
+            "time_hint": "周日",
+            "time_error": "YOYO桌游聚会须安排在周日。",
+            "blurb": "地点为华师四教312或华师四教308，开始时间必须是周日。非会员也可以分桌报名。",
+        }
+    return {
+        "kind": GATHERING_KIND_PIGEON,
+        "label": FIXED_GATHERING_LABEL,
+        "locations": (FIXED_GATHERING_LOCATION,),
+        "members_only": True,
+        "weekday": 5,
+        "min_hour": FIXED_GATHERING_EVENING_HOUR_START,
+        "time_hint": f"周六 {FIXED_GATHERING_EVENING_HOUR_START}:00 及以后",
+        "time_error": (
+            f"布鸽桌游聚会须安排在周六晚"
+            f"（周六 {FIXED_GATHERING_EVENING_HOUR_START}:00 及以后）。"
+        ),
+        "blurb": "地点锁定南体活动室(布鸽专用)，开始时间必须是周六 18:00 及以后。由正式会员分桌报名。",
+    }
+
+
+def normalize_gathering_kind(kind) -> str:
+    return GATHERING_KIND_YOYO if kind == GATHERING_KIND_YOYO else GATHERING_KIND_PIGEON
+
+
+def gathering_label(kind) -> str:
+    return gathering_spec(normalize_gathering_kind(kind))["label"]
+
+
+def gathering_members_only(kind) -> bool:
+    return gathering_spec(normalize_gathering_kind(kind))["members_only"]
+
+
+def gathering_form_options():
+    return [
+        {
+            "kind": spec["kind"],
+            "label": spec["label"],
+            "locations": list(spec["locations"]),
+            "time_hint": spec["time_hint"],
+            "members_only": spec["members_only"],
+            "blurb": spec["blurb"],
+        }
+        for spec in (gathering_spec(GATHERING_KIND_PIGEON), gathering_spec(GATHERING_KIND_YOYO))
+    ]
+
+
+def gathering_starttime_error(kind, starttime) -> str:
+    """符合该周常的开始时间时返回空字符串。"""
+    spec = gathering_spec(normalize_gathering_kind(kind))
     try:
         dt = parse_event_datetime(starttime)
     except (TypeError, ValueError):
-        return False
-    return dt.weekday() == 5 and dt.hour >= FIXED_GATHERING_EVENING_HOUR_START
+        return spec["time_error"]
+    if dt.weekday() != spec["weekday"]:
+        return spec["time_error"]
+    if spec["min_hour"] is not None and dt.hour < spec["min_hour"]:
+        return spec["time_error"]
+    return ""
+
+
+def is_saturday_evening(starttime: str) -> bool:
+    """布鸽桌游聚会开始时间须为周六晚（周六、当地时间 18:00 及以后）。"""
+    return not gathering_starttime_error(GATHERING_KIND_PIGEON, starttime)
 
 
 def saturday_evening_error_message() -> str:
-    return (
-        f"布鸽桌游聚会须安排在周六晚"
-        f"（周六 {FIXED_GATHERING_EVENING_HOUR_START}:00 及以后）。"
-    )
+    return gathering_spec(GATHERING_KIND_PIGEON)["time_error"]
 
 
 # signcode 置为该值表示活动已归档（结束），不再允许报名/编辑等操作
@@ -221,10 +289,18 @@ def _ensure_events_schema(db):
             locktime TEXT NOT NULL,
             description TEXT,
             minplayer INTEGER,
-            maxplayer INTEGER
+            maxplayer INTEGER,
+            gathering_kind TEXT NOT NULL DEFAULT 'pigeon'
         )
         """
     )
+    fixed_columns = {
+        row["name"] for row in db.execute("PRAGMA table_info(fixed_events)").fetchall()
+    }
+    if fixed_columns and "gathering_kind" not in fixed_columns:
+        db.execute(
+            "ALTER TABLE fixed_events ADD COLUMN gathering_kind TEXT NOT NULL DEFAULT 'pigeon'"
+        )
     db.execute(
         """
         CREATE TABLE IF NOT EXISTS fixed_tables (

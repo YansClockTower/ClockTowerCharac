@@ -20,7 +20,7 @@
             <a class="browse-tab {% if browse_tab == 'all' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events') }}">全部</a>
             <a class="browse-tab {% if browse_tab == 'pigeon' %}is-active{% endif %}"
-               href="{{ url_for('events.browse_events', tab='pigeon') }}">{{ pigeon_tab_label|default('布鸽桌游聚会') }}</a>
+               href="{{ url_for('events.browse_events', tab='pigeon') }}">{{ pigeon_tab_label|default('社团周常活动') }}</a>
             <a class="browse-tab {% if browse_tab == 'my' %}is-active{% endif %}"
                href="{{ url_for('events.browse_events', tab='my') }}">我的活动</a>
         </nav>
@@ -30,7 +30,7 @@
             {% if browse_tab == 'light' %}
                 <p>当前没有「轻桌游聚会」类型活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.choose_event_mode') }}">添加活动</a>。</p>
             {% elif browse_tab == 'pigeon' %}
-                <p>当前没有「{{ pigeon_tab_label|default('布鸽桌游聚会') }}」。<a href="{{ url_for('events.browse_events') }}">查看全部</a>{% if current_user_is_staff %} 或 <a href="{{ url_for('events.fixed_add_route') }}">发布一场</a>{% endif %}。</p>
+                <p>当前没有「{{ pigeon_tab_label|default('社团周常活动') }}」。<a href="{{ url_for('events.browse_events') }}">查看全部</a>{% if current_user_is_staff %} 或 <a href="{{ url_for('events.fixed_add_route') }}">发布一场</a>{% endif %}。</p>
             {% elif browse_tab == 'my' %}
                 <p>暂无您组织或已报名的活动。<a href="{{ url_for('events.browse_events') }}">查看全部</a> 或 <a href="{{ url_for('events.choose_event_mode') }}">添加活动</a>。</p>
             {% else %}
@@ -49,7 +49,6 @@
 
     </div>
 
-    {% if current_user_is_member %}
     <div id="fixedCreateTableModal" class="app-modal app-modal--sheet" hidden>
       <div class="app-modal-backdrop" data-app-modal-close></div>
       <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="fixedCreateTableTitle">
@@ -66,7 +65,6 @@
       </div>
     </div>
     {% include "_fixed_game_picker_script.html" %}
-    {% endif %}
 
     <script>
         function refToEdit(eventId) {

@@ -17,13 +17,13 @@
     </a>
     {% if current_user_is_staff %}
     <a class="mode-card mode-card-fixed" href="{{ url_for('events.fixed_add_route') }}">
-      <h3>{{ fixed_label }}</h3>
-      <p>固定聚会：地点锁定「{{ fixed_location }}」，须安排在周六晚。会员分桌选桌游报名；由桌游所有者确认承诺。</p>
+      <h3>{{ club_weekly_label }}</h3>
+      <p>周常固定聚会。创建时再选择布鸽桌游聚会（周六晚、南体活动室，正式会员分桌报名）或 YOYO桌游聚会（周日、华师四教312 / 华师四教308，非会员也可参加）。</p>
     </a>
     {% else %}
     <div class="mode-card mode-card-fixed" style="opacity: 0.72;">
-      <h3>{{ fixed_label }}</h3>
-      <p>固定聚会由干事及以上发布。地点为「{{ fixed_location }}」，时间须为周六晚。正式会员可在活动面板直接报名分桌或创建分桌。</p>
+      <h3>{{ club_weekly_label }}</h3>
+      <p>社团周常由干事及以上发布。布鸽桌游聚会为周六晚的会员活动；YOYO桌游聚会为周日活动，非会员也可参加。</p>
     </div>
     {% endif %}
   </div>

@@ -25,24 +25,28 @@ from app.subsystems.events.attendee_ids import (
 from app.subsystems.events.dbutil import (
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
     BROWSE_BOOKMARK_PIGEON_LABEL,
-    FIXED_GATHERING_LABEL,
+    CLUB_WEEKLY_LABEL,
     FIXED_GATHERING_LOCATION,
     FREE_EVENT_TYPE_VALUES,
+    GATHERING_KIND_PIGEON,
     PRESET_LOCATIONS,
     archive_event,
     create_event,
     delete_event,
+    gathering_form_options,
+    gathering_members_only,
+    gathering_spec,
+    gathering_starttime_error,
     get_browse_events_page,
     get_event_attendance_records,
     get_event_by_id,
     get_event_listing_by_id,
     friend_event,
     is_event_archived,
-    is_saturday_evening,
     join_event,
     leave_event,
+    normalize_gathering_kind,
     note_event,
-    saturday_evening_error_message,
     signin_event,
     update_event,
 )
@@ -242,7 +246,7 @@ def browse_events(user_info):
         current_user_is_staff=_is_staff(user_info),
         pigeon_tab_label=BROWSE_BOOKMARK_PIGEON_LABEL,
         now=datetime.now,
-        games=boardgames_api.list_picker_rows() if current_user_is_member else [],
+        games=boardgames_api.list_picker_rows(),
         picker_owners=boardgames_api.PICKER_OWNER_FILTERS,
         self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
         self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
@@ -300,8 +304,8 @@ def choose_event_mode(user_info):
         current_user=user_info["name"],
         current_user_is_staff=_is_staff(user_info),
         current_user_is_member=user_is_member(user_info),
-        fixed_label=FIXED_GATHERING_LABEL,
-        fixed_location=FIXED_GATHERING_LOCATION,
+        club_weekly_label=CLUB_WEEKLY_LABEL,
+        gathering_options=gathering_form_options(),
     )
 
 
@@ -561,44 +565,76 @@ def archive_event_route(user_info, event_id):
     return redirect(url_for("events.browse_events"))
 
 
-# ----- 固定聚会（布鸽桌游聚会） -----
+# ----- 社团周常（布鸽桌游聚会 / YOYO桌游聚会） -----
 
 
-def _render_fixed_add(user_info):
+def _render_fixed_add(user_info, selected_kind=GATHERING_KIND_PIGEON, selected_location=None):
+    kind = normalize_gathering_kind(selected_kind)
+    spec = gathering_spec(kind)
+    locations = list(spec["locations"])
+    location = selected_location if selected_location in locations else locations[0]
     return render_template(
         "fixed_add.html",
         current_user=user_info["name"],
-        fixed_label=FIXED_GATHERING_LABEL,
-        fixed_location=FIXED_GATHERING_LOCATION,
+        club_weekly_label=CLUB_WEEKLY_LABEL,
+        gathering_options=gathering_form_options(),
+        selected_kind=kind,
+        selected_location=location,
+        time_hint=spec["time_hint"],
     )
 
 
 def _render_fixed_edit(event, user_info):
+    kind = normalize_gathering_kind(event.get("gathering_kind"))
+    spec = gathering_spec(kind)
+    locations = list(spec["locations"])
+    current_location = event.get("location")
+    if current_location and current_location not in locations:
+        locations = [current_location] + locations
     return render_template(
         "fixed_edit.html",
         event=event,
         current_user=user_info["name"],
-        fixed_label=FIXED_GATHERING_LABEL,
-        fixed_location=FIXED_GATHERING_LOCATION,
+        fixed_label=spec["label"],
+        gathering_locations=locations,
+        time_hint=spec["time_hint"],
+        members_only=spec["members_only"],
     )
 
 
 def _require_fixed_staff(user_info):
     if _is_staff(user_info):
         return None
-    return "仅干事及以上可发布布鸽桌游聚会。"
+    return "仅干事及以上可发布社团周常活动。"
 
 
-def _require_fixed_member(user_info):
+def _deny_fixed_participation(user_info, event, *, allow_admin=False):
+    """布鸽周常仅会员可报名；YOYO 周常对非会员开放。"""
+    if allow_admin and _is_admin(user_info):
+        return None
+    if event is not None and not gathering_members_only(event.get("gathering_kind")):
+        return None
     if user_is_member(user_info):
         return None
     return "布鸽桌游聚会仅限正式会员查看与报名，请先验证会员资质。"
 
 
-def _fixed_payload_from_form(form):
+def _fixed_payload_from_form(form, locked_kind=None):
+    kind = normalize_gathering_kind(
+        locked_kind if locked_kind is not None else form.get("gathering_kind")
+    )
+    spec = gathering_spec(kind)
     starttime = form.get("starttime", "")
-    if not is_saturday_evening(starttime):
-        return None, saturday_evening_error_message()
+    time_err = gathering_starttime_error(kind, starttime)
+    if time_err:
+        return None, time_err
+    if len(spec["locations"]) == 1:
+        location = spec["locations"][0]
+    else:
+        location = (form.get("location") or "").strip()
+        if location not in spec["locations"]:
+            rooms = "、".join(spec["locations"])
+            return None, f"请选择{spec['label']}的地点：{rooms}。"
     try:
         minplayer_str = form.get("minplayer")
         maxplayer_str = form.get("maxplayer")
@@ -608,12 +644,13 @@ def _fixed_payload_from_form(form):
         return None, "最小/最大玩家数必须是数字！"
     data = {
         "name": (form.get("name") or "").strip(),
-        "location": FIXED_GATHERING_LOCATION,
+        "location": location,
         "starttime": starttime,
         "locktime": form.get("locktime", ""),
         "description": form.get("description", ""),
         "minplayer": minplayer,
         "maxplayer": maxplayer,
+        "gathering_kind": kind,
     }
     if not (data["name"] and data["starttime"] and data["locktime"]):
         return None, "请完整填写名称、开始时间与锁定时间。"
@@ -631,11 +668,19 @@ def fixed_add_route(user_info):
         data, err = _fixed_payload_from_form(request.form)
         if err:
             flash(err, "error")
-            return _render_fixed_add(user_info)
+            return _render_fixed_add(
+                user_info,
+                selected_kind=request.form.get("gathering_kind"),
+                selected_location=request.form.get("location"),
+            )
         data["inviter"] = user_info["name"]
         event_id = fixed.create_fixed_event(data)
         enqueue_event_created(KIND_FIXED, event_id)
-        flash("布鸽桌游聚会已发布！会员可在活动面板创建分桌与报名。", "success")
+        label = gathering_spec(data["gathering_kind"])["label"]
+        if gathering_members_only(data["gathering_kind"]):
+            flash(f"{label}已发布！正式会员可在活动面板创建分桌与报名。", "success")
+        else:
+            flash(f"{label}已发布！参与者可在活动面板创建分桌与报名。", "success")
         return redirect(url_for("events.browse_events", tab="pigeon"))
     return _render_fixed_add(user_info)
 
@@ -650,7 +695,7 @@ def fixed_detail_route(user_info, event_id):
 @events_bp.route("/fixed/<int:event_id>/tables", methods=["POST"])
 @login_required_template
 def fixed_create_table_route(user_info, event_id):
-    deny = _require_fixed_member(user_info)
+    deny = _deny_fixed_participation(user_info, fixed.get_fixed_event_by_id(event_id))
     if deny:
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
@@ -690,8 +735,13 @@ def fixed_create_table_route(user_info, event_id):
 @events_bp.route("/fixed/tables/<int:table_id>/edit", methods=["POST"])
 @login_required_template
 def fixed_update_table_route(user_info, table_id):
-    deny = _require_fixed_member(user_info)
-    if deny and not _is_admin(user_info):
+    event_id = fixed.get_table_event_id(table_id)
+    deny = _deny_fixed_participation(
+        user_info,
+        fixed.get_fixed_event_by_id(event_id) if event_id else None,
+        allow_admin=True,
+    )
+    if deny:
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
     raw_id = (request.form.get("board_game_id") or "").strip()
@@ -723,7 +773,10 @@ def fixed_update_table_route(user_info, table_id):
 @events_bp.route("/fixed/tables/<int:table_id>/join", methods=["POST"])
 @login_required_template
 def fixed_join_table_route(user_info, table_id):
-    deny = _require_fixed_member(user_info)
+    event_id = fixed.get_table_event_id(table_id)
+    deny = _deny_fixed_participation(
+        user_info, fixed.get_fixed_event_by_id(event_id) if event_id else None
+    )
     if deny:
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
@@ -738,7 +791,10 @@ def fixed_join_table_route(user_info, table_id):
 @events_bp.route("/fixed/tables/<int:table_id>/leave", methods=["POST"])
 @login_required_template
 def fixed_leave_table_route(user_info, table_id):
-    deny = _require_fixed_member(user_info)
+    event_id = fixed.get_table_event_id(table_id)
+    deny = _deny_fixed_participation(
+        user_info, fixed.get_fixed_event_by_id(event_id) if event_id else None
+    )
     if deny:
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
@@ -754,7 +810,10 @@ def fixed_leave_table_route(user_info, table_id):
 @events_bp.route("/fixed/tables/<int:table_id>/reject", methods=["POST"], endpoint="fixed_reject_table_route")
 @login_required_template
 def fixed_set_table_commitment_route(user_info, table_id):
-    deny = _require_fixed_member(user_info)
+    event_id = fixed.get_table_event_id(table_id)
+    deny = _deny_fixed_participation(
+        user_info, fixed.get_fixed_event_by_id(event_id) if event_id else None
+    )
     if deny:
         flash(deny, "warning")
         return redirect(url_for("users.membership"))
@@ -775,7 +834,12 @@ def fixed_set_table_commitment_route(user_info, table_id):
 @events_bp.route("/fixed/<int:event_id>/signin", methods=["POST"])
 @token_required
 def fixed_signin_route(current_user, event_id):
-    if not user_is_member(current_user):
+    event = fixed.get_fixed_event_by_id(event_id)
+    if (
+        event is not None
+        and gathering_members_only(event.get("gathering_kind"))
+        and not user_is_member(current_user)
+    ):
         return jsonify({"success": False, "message": "仅限正式会员签到"}), 200
     data = request.get_json(silent=True) or {}
     signcode = data.get("signcode")
@@ -798,13 +862,16 @@ def fixed_edit_route(user_info, event_id):
         return redirect(url_for("events.browse_events", tab="pigeon"))
 
     if request.method == "POST":
-        data, err = _fixed_payload_from_form(request.form)
+        data, err = _fixed_payload_from_form(
+            request.form, locked_kind=event.get("gathering_kind")
+        )
         if err:
             flash(err, "error")
             return _render_fixed_edit(event, user_info)
         fixed.update_fixed_event(event_id, data)
         enqueue_event_updated(KIND_FIXED, event_id)
-        flash("布鸽桌游聚会信息已更新。", "success")
+        label = gathering_spec(data["gathering_kind"])["label"]
+        flash(f"{label}信息已更新。", "success")
         return redirect(url_for("events.browse_events", tab="pigeon"))
     return _render_fixed_edit(event, user_info)
 

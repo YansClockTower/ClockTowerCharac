@@ -49,7 +49,8 @@ CREATE TABLE fixed_events (
     locktime TEXT NOT NULL,
     description TEXT,
     minplayer INTEGER,
-    maxplayer INTEGER
+    maxplayer INTEGER,
+    gathering_kind TEXT NOT NULL DEFAULT 'pigeon'
 );
 
 CREATE TABLE fixed_tables (

@@ -38,12 +38,14 @@
     {% endif %}
     {% set event_owner_or_admin = (event.inviter == current_user or current_user_is_admin) %}
     {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
+    {% set members_only = event.members_only %}
+    {% set can_participate = current_user_is_member or not members_only %}
 
     <div class="event-item fixed-event-item {{ status_class }}">
         <div class="event-details">
             <div class="event-main">
                 <h3>
-                    <span class="fixed-badge">布鸽桌游聚会</span>
+                    <span class="fixed-badge">{{ event.event_type or '布鸽桌游聚会' }}</span>
                     {{ event.name }}
                     {% if status_text %}
                         <span class="status-tag {{ status_class }}">{{ status_text }}</span>
@@ -62,13 +64,13 @@
             <div class="event-meta-row">
                 <div class="event-info">
                     <p>
-                        <strong>活动模式:</strong> 布鸽桌游聚会 <br>
+                        <strong>活动模式:</strong> {{ event.event_type or '布鸽桌游聚会' }}{% if not members_only %} <span style="font-size:0.85em;color:#1b6b3a;">（非会员可参加）</span>{% endif %} <br>
                         <strong>组织者:</strong> {{ event.inviter }}
                         {% set can_see_chat = (not archived) and (current_user_is_admin or event.is_attending or event.inviter == current_user) %}
                         {% if can_see_chat %}
                         {% with name=event.inviter, wechat=event.inviter_wechat, chat_kind='fixed', chat_event_id=event.id %}{% include "_organizer_wechat_btn.html" %}{% endwith %}
                         {% endif %}<br>
-                        {% if current_user_is_member %}
+                        {% if can_participate %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
                         <strong>活动地点:</strong> {{ event.location }}
@@ -78,7 +80,7 @@
                     </p>
                 </div>
                 <div class="action-buttons">
-                    {% if current_user_is_member %}
+                    {% if can_participate %}
                       {% if not archived %}
                       <button type="button"
                               class="base-btn join-btn fixed-create-table-btn"
@@ -107,7 +109,7 @@
                 </div>
             </div>
         </div>
-        {% if current_user_is_member %}
+        {% if can_participate %}
         <div class="event-summary">
             <strong>已报名:</strong>
             <span style="font-weight: bold; color: #007bff;">{{ event.attendee_count }} 人</span>
@@ -227,7 +229,7 @@
         {% endif %}
         {% endif %}
 
-        {% if current_user_is_member and not archived and can_end_event %}
+        {% if can_participate and not archived and can_end_event %}
         <div class="event-summary">
             {% if event.inviter == current_user or current_user_is_admin %}
             <p><strong>活动签到码:</strong> {{ event.signcode }}</p>

@@ -227,9 +227,9 @@ def _event_text(event, event_kind, source):
     title = "【新活动】" if source == SOURCE_CREATED else "【活动更新】"
     name = (event.get("name") or "").strip()
     if event_kind == KIND_FIXED:
-        from app.subsystems.events.dbutil import FIXED_GATHERING_LABEL
+        from app.subsystems.events.dbutil import gathering_label
 
-        event_type = FIXED_GATHERING_LABEL
+        event_type = gathering_label(event.get("gathering_kind"))
     else:
         event_type = (event.get("event_type") or "").strip() or "其他"
     lines = [f"{title}{name}", f"类型：{event_type}"]
