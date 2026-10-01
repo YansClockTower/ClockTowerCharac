@@ -8,14 +8,21 @@ from app.models.config import get_config
 from app.subsystems.events.chat import (
     KIND_FIXED,
     KIND_FREE,
+    KIND_TMP,
+    MAX_BODY_LEN,
+    MAX_RALLY_TITLE_LEN,
     _organizer_wechat,
+    open_rally_room,
     post_announcement_message,
 )
 
 SOURCE_CREATED = "event_created"
 SOURCE_UPDATED = "event_updated"
 SOURCE_ORGANIZER = "organizer"
+SOURCE_RALLY = "rally"
 EVENT_SOURCES = (SOURCE_CREATED, SOURCE_UPDATED)
+# 号召冷却按用户记在 announcement_cooldowns 上，event_id 存用户 id。
+RALLY_COOLDOWN_KIND = "rally"
 COOLDOWN_SECONDS = 60 * 60
 PANEL_URL = "https://yanice.online/"
 _FOOTER = f"——————\n详情前往管理面板查看\n{PANEL_URL}"
@@ -138,6 +145,65 @@ def cooldown_remaining_seconds(event_kind, event_id):
     return int(math.ceil(remain))
 
 
+def rally_public_url(event_id):
+    """微信里点开的号召聊天室地址，固定走站点公网域名。"""
+    from flask import url_for
+
+    path = url_for("events.chat_room_route", kind=KIND_TMP, event_id=int(event_id))
+    return PANEL_URL.rstrip("/") + path
+
+
+def publish_rally(user_id, caller, title, note):
+    """创建号召聊天室，并把公告排进微信待发队列。同一用户一小时一次。"""
+    title = " ".join((title or "").split())
+    text = (note or "").strip()
+    if not title:
+        return False, "请填写标题。", None, None, 0
+    if len(title) > MAX_RALLY_TITLE_LEN:
+        return False, f"标题过长（最多 {MAX_RALLY_TITLE_LEN} 字）。", None, None, 0
+    if not text:
+        return False, "请输入号召内容。", None, None, 0
+    if len(text) > MAX_BODY_LEN:
+        return False, f"号召过长（最多 {MAX_BODY_LEN} 字）。", None, None, 0
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return False, "无法发起号召。", None, None, 0
+    remain = cooldown_remaining_seconds(RALLY_COOLDOWN_KIND, uid)
+    if remain > 0:
+        minutes = max(1, math.ceil(remain / 60))
+        return False, f"号召冷却中，请 {minutes} 分钟后再试。", None, None, remain
+    ok, err, room, message = open_rally_room(caller, title, text)
+    if not ok or room is None:
+        return False, err or "发送失败。", None, None, 0
+    url = rally_public_url(room["event_id"])
+    now = datetime.now().strftime(_TIME_FMT)
+    db = _db()
+    db.execute(
+        """
+        INSERT INTO pending_announcements (source, event_kind, event_id, text, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            SOURCE_RALLY,
+            room["event_kind"],
+            int(room["event_id"]),
+            _rally_text(caller, text, url),
+            now,
+        ),
+    )
+    db.execute(
+        """
+        INSERT INTO announcement_cooldowns (event_kind, event_id, last_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(event_kind, event_id) DO UPDATE SET last_at = excluded.last_at
+        """,
+        (RALLY_COOLDOWN_KIND, uid, now),
+    )
+    db.commit()
+    return True, None, room, message, COOLDOWN_SECONDS
+
+
 def publish_organizer_announcement(event_kind, event_id, room_id, sender, note):
     """写入聊天室，并单独入队一条组织者公告。冷却按活动计算。"""
     text = (note or "").strip()
@@ -248,6 +314,16 @@ def _event_text(event, event_kind, source):
         lines.append(f"说明：{description}")
     lines.append(_FOOTER)
     return "\n".join(lines)
+
+
+def _rally_text(caller, note, url):
+    name = (caller or "").strip() or "有人"
+    return (
+        f"{name} 发出号召：\n"
+        f"（{note.strip()}）\n"
+        "——————\n"
+        f"可以点击 {url} 与号召者或其他有兴趣的人跨群聊天哦～"
+    )
 
 
 def _organizer_text(event, note):

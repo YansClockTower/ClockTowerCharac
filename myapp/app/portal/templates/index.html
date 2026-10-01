@@ -24,9 +24,7 @@
         <div id="club-section" class="secondary-nav">
             <a href="{{ url_for('events.browse_events') }}">活动面板</a>
             <a href="{{ url_for('boardgames.browse') }}">桌游浏览/借用</a>
-            {% if show_become_member %}
-            <a href="{{ url_for('users.membership') }}">成为布鸽会员</a>
-            {% endif %}
+            <button type="button" id="openJoinClub">加入社团（布鸽/YOYO）</button>
             <button type="button" class="contact-cta" id="openContactUs">联系我们</button>
         </div>
 
@@ -84,6 +82,59 @@
     </div>
     {% endif %}
 
+    <div id="joinClubModal" class="app-modal app-modal--medium" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="joinClubTitle">
+        <div class="app-modal-header">
+          <h3 id="joinClubTitle">加入社团</h3>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
+        </div>
+        <div id="joinClubChoices">
+          <p class="recruit-modal-hint">选择要加入的社团。</p>
+          <div class="join-club-choices">
+            <a class="join-club-choice" href="{{ url_for('users.membership') }}">布鸽</a>
+            <button type="button" class="join-club-choice" id="openYoyoQr">YOYO</button>
+          </div>
+        </div>
+        <div id="joinClubYoyo" hidden>
+          <p class="recruit-modal-hint">扫码加入 YOYO 的 QQ 群或微信群，也可以添加社长微信。</p>
+          <div class="recruit-modal-grid">
+            <figure class="recruit-modal-card">
+              <img class="recruit-modal-qr"
+                   src="{{ url_for('users.static', filename='img/yoyo_q.jpg') }}"
+                   alt="YOYO桌游社 QQ 群二维码"
+                   width="220" height="220">
+              <figcaption>
+                <strong>QQ 群</strong>
+                <span>群号 160494721</span>
+              </figcaption>
+            </figure>
+            <figure class="recruit-modal-card">
+              <img class="recruit-modal-qr"
+                   src="{{ url_for('users.static', filename='img/yoyowxgroup.jpg') }}"
+                   alt="YOYO桌游社微信群二维码"
+                   width="220" height="220">
+              <figcaption>
+                <strong>微信群</strong>
+                <span>YOYO桌游社(2026-2027)</span>
+              </figcaption>
+            </figure>
+            <figure class="recruit-modal-card">
+              <img class="recruit-modal-qr"
+                   src="{{ url_for('users.static', filename='img/yoyocontact.jpg') }}"
+                   alt="YOYO社长微信二维码"
+                   width="220" height="220">
+              <figcaption>
+                <strong>社长微信</strong>
+                <span>联系人 Zeta</span>
+              </figcaption>
+            </figure>
+          </div>
+          <button type="button" class="join-club-back" id="backJoinClubChoices">返回选择</button>
+        </div>
+      </div>
+    </div>
+
     <div id="contactUsModal" class="app-modal app-modal--wide" hidden>
       <div class="app-modal-backdrop" data-app-modal-close></div>
       <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="contactUsTitle">
@@ -127,10 +178,36 @@
 
         const recruitModal = AppModal.bind(document.getElementById("recruitGroupModal"));
         const contactModal = AppModal.bind(document.getElementById("contactUsModal"));
+        const joinClubModal = AppModal.bind(document.getElementById("joinClubModal"));
         const openRecruit = document.getElementById("openRecruitGroupQr");
         const openContact = document.getElementById("openContactUs");
+        const openJoinClub = document.getElementById("openJoinClub");
+        const joinClubChoices = document.getElementById("joinClubChoices");
+        const joinClubYoyo = document.getElementById("joinClubYoyo");
+        const joinClubTitle = document.getElementById("joinClubTitle");
+        function showJoinClubChoices() {
+            if (joinClubChoices) joinClubChoices.hidden = false;
+            if (joinClubYoyo) joinClubYoyo.hidden = true;
+            if (joinClubTitle) joinClubTitle.textContent = "加入社团";
+        }
         if (openRecruit && recruitModal) openRecruit.addEventListener("click", function () { recruitModal.open(); });
         if (openContact && contactModal) openContact.addEventListener("click", function () { contactModal.open(); });
+        if (openJoinClub && joinClubModal) {
+            openJoinClub.addEventListener("click", function () {
+                showJoinClubChoices();
+                joinClubModal.open();
+            });
+        }
+        const openYoyoQr = document.getElementById("openYoyoQr");
+        const backJoinClubChoices = document.getElementById("backJoinClubChoices");
+        if (openYoyoQr) {
+            openYoyoQr.addEventListener("click", function () {
+                if (joinClubChoices) joinClubChoices.hidden = true;
+                if (joinClubYoyo) joinClubYoyo.hidden = false;
+                if (joinClubTitle) joinClubTitle.textContent = "加入 YOYO";
+            });
+        }
+        if (backJoinClubChoices) backJoinClubChoices.addEventListener("click", showJoinClubChoices);
     </script>
 </body>
 </html>

@@ -228,6 +228,59 @@ body.recruit-modal-open {
   background: #fff;
 }
 
+.join-club-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.join-club-choice {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px 10px;
+  text-align: center;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary, #6b7c4a);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+}
+
+.join-club-choice:hover {
+  background: var(--color-primary-hover, #5c6b40);
+  color: #fff;
+  text-decoration: none;
+}
+
+#joinClubYoyo .recruit-modal-qr {
+  width: auto;
+  max-width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+#joinClubYoyo .recruit-modal-card:last-child {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(100%, 240px);
+}
+
+.join-club-back {
+  display: block;
+  margin: 12px auto 0;
+  padding: 8px 14px;
+  font: inherit;
+  color: var(--color-primary, #6b7c4a);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
 @media (max-width: 520px) {
   .recruit-modal-grid {
     grid-template-columns: 1fr;

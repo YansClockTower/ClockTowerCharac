@@ -52,12 +52,14 @@ from app.subsystems.events.dbutil import (
 )
 from app.subsystems.events import fixed_dbutil as fixed
 from app.subsystems.events.announcements import (
+    RALLY_COOLDOWN_KIND,
     clear_pending_announcements,
     cooldown_remaining_seconds,
     enqueue_event_created,
     enqueue_event_updated,
     list_pending_announcements,
     publish_organizer_announcement,
+    publish_rally,
     remove_sent_announcement,
     robot_authorized,
 )
@@ -65,6 +67,7 @@ from app.subsystems.events.chat import (
     CHAT_KINDS,
     KIND_FIXED,
     KIND_FREE,
+    KIND_TMP,
     MSG_GAME,
     MSG_IMAGE,
     can_access_room,
@@ -992,6 +995,16 @@ def _chat_game_card(game_id):
     }
 
 
+def _chat_kind_open(kind):
+    return kind in CHAT_KINDS or kind == KIND_TMP
+
+
+def _chat_join_message(kind):
+    if kind == KIND_TMP:
+        return "请先打开聊天室链接加入。"
+    return "请先报名后再进入聊天室。"
+
+
 def _chat_message_payload(message, current_user):
     msg_type = message.get("msg_type") or "text"
     payload = {
@@ -1018,11 +1031,41 @@ def _chat_message_payload(message, current_user):
 @login_required_template
 def chat_list_route(user_info):
     rooms = list_rooms_for(user_info["name"], is_admin=_is_admin(user_info))
+    rally_cooldown = cooldown_remaining_seconds(RALLY_COOLDOWN_KIND, int(user_info["id"]))
     return render_template(
         "chat_list.html",
         rooms=rooms,
         current_user=user_info["name"],
+        rally_cooldown=rally_cooldown,
     )
+
+
+@events_bp.route("/messages/tmp", methods=["POST"])
+@login_required_template
+def chat_rally_route(user_info):
+    payload = request.get_json(silent=True) or {}
+    title = payload.get("title")
+    if title is None:
+        title = request.form.get("title")
+    body = payload.get("body")
+    if body is None:
+        body = request.form.get("body")
+    ok, err, room, message, remain = publish_rally(
+        user_info["id"], user_info["name"], title or "", body or ""
+    )
+    if not ok or room is None:
+        status = 429 if remain > 0 else 400
+        return jsonify({
+            "ok": False,
+            "message": err or "发送失败。",
+            "cooldown_seconds": remain,
+        }), status
+    return jsonify({
+        "ok": True,
+        "url": url_for("events.chat_room_route", kind=KIND_TMP, event_id=room["event_id"]),
+        "message": _chat_message_payload(message, user_info["name"]) if message else None,
+        "cooldown_seconds": remain,
+    })
 
 
 @events_bp.route("/messages/unread")
@@ -1048,15 +1091,17 @@ def chat_image_route(user_info, message_id):
 @events_bp.route("/messages/<kind>/<int:event_id>")
 @login_required_template
 def chat_room_route(user_info, kind, event_id):
-    if kind not in CHAT_KINDS:
+    if not _chat_kind_open(kind):
         flash("聊天室不存在。", "error")
         return redirect(url_for("events.chat_list_route"))
     room = get_open_room(kind, event_id)
     if room is None:
-        flash("聊天室已关闭。", "info")
+        flash("号召聊天室不存在。" if kind == KIND_TMP else "聊天室已关闭。", "info")
         return redirect(url_for("events.chat_list_route"))
     player = user_info["name"]
     is_admin = _is_admin(user_info)
+    if kind == KIND_TMP and not is_participant(room["id"], player):
+        ensure_viewer(room["id"], player)
     allowed = can_access_room(room["id"], player, is_admin=is_admin)
     messages = []
     games = []
@@ -1076,7 +1121,9 @@ def chat_room_route(user_info, kind, event_id):
                     "image_url": _chat_game_image_url(row.get("image_path")),
                 }
             )
-    is_organizer = bool(allowed and player == (room.get("inviter") or ""))
+    is_organizer = bool(
+        allowed and kind in CHAT_KINDS and player == (room.get("inviter") or "")
+    )
     announce_cooldown = cooldown_remaining_seconds(kind, event_id) if is_organizer else 0
     return render_template(
         "chat_room.html",
@@ -1093,13 +1140,13 @@ def chat_room_route(user_info, kind, event_id):
 @events_bp.route("/messages/<kind>/<int:event_id>/poll")
 @login_required_template
 def chat_poll_route(user_info, kind, event_id):
-    room = get_open_room(kind, event_id) if kind in CHAT_KINDS else None
+    room = get_open_room(kind, event_id) if _chat_kind_open(kind) else None
     if room is None:
         return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
     player = user_info["name"]
     is_admin = _is_admin(user_info)
     if not can_access_room(room["id"], player, is_admin=is_admin):
-        return jsonify({"ok": False, "message": "请先报名后再进入聊天室。"}), 403
+        return jsonify({"ok": False, "message": _chat_join_message(kind)}), 403
     if not is_participant(room["id"], player):
         ensure_viewer(room["id"], player)
     try:
@@ -1116,13 +1163,13 @@ def chat_poll_route(user_info, kind, event_id):
 @events_bp.route("/messages/<kind>/<int:event_id>/send", methods=["POST"])
 @login_required_template
 def chat_send_route(user_info, kind, event_id):
-    room = get_open_room(kind, event_id) if kind in CHAT_KINDS else None
+    room = get_open_room(kind, event_id) if _chat_kind_open(kind) else None
     if room is None:
         return jsonify({"ok": False, "message": "聊天室已关闭。"}), 404
     player = user_info["name"]
     is_admin = _is_admin(user_info)
     if not can_access_room(room["id"], player, is_admin=is_admin):
-        return jsonify({"ok": False, "message": "请先报名后再发言。"}), 403
+        return jsonify({"ok": False, "message": _chat_join_message(kind)}), 403
     if not is_participant(room["id"], player):
         ensure_viewer(room["id"], player)
     image = request.files.get("image")

@@ -43,12 +43,73 @@
 
 .chat-title {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: 1rem;
   font-weight: 650;
   color: #222;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.chat-rally-btn {
+  flex: 0 0 auto;
+  margin: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 16px;
+  background: #07c160;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.chat-rally-btn:hover {
+  background: #06ad56;
+  color: #fff;
+}
+
+.chat-rally-btn:disabled {
+  background: #c8c8c8;
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.chat-rally-label {
+  display: block;
+  margin: 0 0 4px;
+  color: #666;
+  font-size: 0.78rem;
+}
+
+.chat-rally-panel input,
+.chat-rally-panel textarea {
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.chat-rally-panel textarea {
+  min-height: 72px;
+  max-height: 140px;
+  resize: none;
+}
+
+.chat-rally-hint {
+  margin: 8px 0 0;
+  color: #888;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .chat-subtitle {

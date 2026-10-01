@@ -1,4 +1,8 @@
-"""活动临时聊天室。自由聚会与固定聚会各一间，用 event_kind 区分撞号的 id。"""
+"""活动聊天室，以及不依附活动的号召临时聊天室。
+
+自由聚会与固定聚会各一间，用 event_kind 区分撞号的 id。
+号召房间的 event_kind 为 tmp，event_id 单独递增，链接是 /messages/tmp/<id>。
+"""
 
 import os
 import shutil
@@ -9,11 +13,13 @@ from app.models.config import get_config
 
 KIND_FREE = "free"
 KIND_FIXED = "fixed"
+KIND_TMP = "tmp"
 CHAT_KINDS = (KIND_FREE, KIND_FIXED)
 MSG_TEXT = "text"
 MSG_IMAGE = "image"
 MSG_GAME = "game"
 MAX_BODY_LEN = 500
+MAX_RALLY_TITLE_LEN = 30
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "gif", "webp"}
 SYSTEM_SENDER = "系统"
@@ -28,10 +34,14 @@ def ensure_chat_schema(db):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_kind TEXT NOT NULL,
             event_id INTEGER NOT NULL,
+            title TEXT,
             UNIQUE(event_kind, event_id)
         )
         """
     )
+    room_columns = {row["name"] for row in db.execute("PRAGMA table_info(event_chat_rooms)").fetchall()}
+    if "title" not in room_columns:
+        db.execute("ALTER TABLE event_chat_rooms ADD COLUMN title TEXT")
     db.execute(
         """
         CREATE TABLE IF NOT EXISTS event_chat_messages (
@@ -127,7 +137,10 @@ def note_left(db, kind, event_id, player):
 
 
 def list_rooms_for(player, *, is_admin=False):
-    """参与者看到自己的聊天室；管理员额外看到所有未归档活动的聊天室。"""
+    """参与者看到自己的聊天室；管理员额外看到所有未归档活动的聊天室。
+
+    号召房间只对已加入的人显示，管理员也不会看到自己没打开过的号召。
+    """
     db = _db()
     rows = db.execute(
         """
@@ -135,8 +148,16 @@ def list_rooms_for(player, *, is_admin=False):
             r.id AS room_id,
             r.event_kind AS event_kind,
             r.event_id AS event_id,
-            CASE r.event_kind WHEN ? THEN e.name ELSE f.name END AS event_name,
-            CASE r.event_kind WHEN ? THEN e.starttime ELSE f.starttime END AS starttime,
+            CASE
+                WHEN r.event_kind = ? THEN COALESCE(NULLIF(TRIM(r.title), ''), '号召')
+                WHEN r.event_kind = ? THEN e.name
+                ELSE f.name
+            END AS event_name,
+            CASE
+                WHEN r.event_kind = ? THEN NULL
+                WHEN r.event_kind = ? THEN e.starttime
+                ELSE f.starttime
+            END AS starttime,
             rd.last_read_message_id AS last_read_message_id,
             (
                 SELECT CASE
@@ -165,13 +186,20 @@ def list_rooms_for(player, *, is_admin=False):
             ON r.event_kind = ? AND f.id = r.event_id
             AND TRIM(COALESCE(f.signcode, '')) != '0'
         WHERE (
-            (r.event_kind = ? AND e.id IS NOT NULL)
-            OR (r.event_kind = ? AND f.id IS NOT NULL)
+            (
+                (
+                    (r.event_kind = ? AND e.id IS NOT NULL)
+                    OR (r.event_kind = ? AND f.id IS NOT NULL)
+                )
+                AND (? OR rd.player IS NOT NULL)
+            )
+            OR (r.event_kind = ? AND rd.player IS NOT NULL)
           )
-          AND (? OR rd.player IS NOT NULL)
         """,
         (
+            KIND_TMP,
             KIND_FREE,
+            KIND_TMP,
             KIND_FREE,
             player,
             KIND_FREE,
@@ -179,6 +207,7 @@ def list_rooms_for(player, *, is_admin=False):
             KIND_FREE,
             KIND_FIXED,
             1 if is_admin else 0,
+            KIND_TMP,
         ),
     ).fetchall()
     rooms = []
@@ -218,6 +247,7 @@ def has_unread(player, *, is_admin=False):
           AND (
             (r.event_kind = ? AND e.id IS NOT NULL)
             OR (r.event_kind = ? AND f.id IS NOT NULL)
+            OR r.event_kind = ?
           )
           AND EXISTS (
             SELECT 1 FROM event_chat_messages m
@@ -225,13 +255,15 @@ def has_unread(player, *, is_admin=False):
           )
         LIMIT 1
         """,
-        (KIND_FREE, KIND_FIXED, player, KIND_FREE, KIND_FIXED),
+        (KIND_FREE, KIND_FIXED, player, KIND_FREE, KIND_FIXED, KIND_TMP),
     ).fetchone()
     return row is not None
 
 
 def get_open_room(kind, event_id):
-    """未归档活动的聊天室。不存在或已关闭则返回 None。"""
+    """未归档活动的聊天室，或仍在的号召房间。不存在或已关闭则返回 None。"""
+    if kind == KIND_TMP:
+        return _tmp_room(event_id)
     if kind not in CHAT_KINDS:
         return None
     db = _db()
@@ -333,6 +365,49 @@ def mark_read(room_id, player):
     )
     db.commit()
     return tip
+
+
+def open_rally_room(caller, title, note):
+    """创建号召聊天室。标题即聊天室名称，正文是号召者发出的第一条消息。"""
+    caller = (caller or "").strip()
+    title = _plain_line(title)
+    text = (note or "").strip()
+    if not caller:
+        return False, "请先登录。", None, None
+    if not title:
+        return False, "请填写标题。", None, None
+    if len(title) > MAX_RALLY_TITLE_LEN:
+        return False, f"标题过长（最多 {MAX_RALLY_TITLE_LEN} 字）。", None, None
+    if not text:
+        return False, "请输入号召内容。", None, None
+    if len(text) > MAX_BODY_LEN:
+        return False, f"号召过长（最多 {MAX_BODY_LEN} 字）。", None, None
+    db = _db()
+    event_id = _next_tmp_event_id(db)
+    db.execute(
+        """
+        INSERT INTO event_chat_rooms (event_kind, event_id, title)
+        VALUES (?, ?, ?)
+        """,
+        (KIND_TMP, event_id, title),
+    )
+    room_id = _room_id(db, KIND_TMP, event_id)
+    if room_id is None:
+        return False, "创建聊天室失败。", None, None
+    _ensure_participant(db, room_id, caller)
+    ok, err, message = _insert_message(room_id, caller, text, MSG_TEXT)
+    if not ok:
+        return False, err or "发送失败。", None, None
+    room = {
+        "id": room_id,
+        "event_kind": KIND_TMP,
+        "event_id": event_id,
+        "name": title,
+        "inviter": caller,
+        "starttime": "",
+        "location": "临时聊天室",
+    }
+    return True, None, room, message
 
 
 def post_message(room_id, sender, body):
@@ -480,10 +555,12 @@ def _seed_system_notices(db):
         """
         SELECT r.id AS room_id, r.event_kind AS event_kind, r.event_id AS event_id
         FROM event_chat_rooms r
-        WHERE NOT EXISTS (
+        WHERE r.event_kind != ?
+          AND NOT EXISTS (
             SELECT 1 FROM event_chat_messages m WHERE m.room_id = r.id
-        )
-        """
+          )
+        """,
+        (KIND_TMP,),
     ).fetchall()
     for row in rows:
         inviter = _inviter(db, row["event_kind"], row["event_id"])
@@ -554,6 +631,64 @@ def _table_exists(db, name):
         (name,),
     ).fetchone()
     return row is not None
+
+
+def _plain_line(value):
+    return " ".join((value or "").split())
+
+
+def _tmp_room(event_id):
+    db = _db()
+    row = db.execute(
+        """
+        SELECT id, event_id, title
+        FROM event_chat_rooms
+        WHERE event_kind = ? AND event_id = ?
+        """,
+        (KIND_TMP, int(event_id)),
+    ).fetchone()
+    if row is None:
+        return None
+    caller = _first_human_sender(db, row["id"])
+    title = (row["title"] or "").strip()
+    if not title:
+        title = f"{caller}的号召" if caller else "号召"
+    return {
+        "id": int(row["id"]),
+        "event_kind": KIND_TMP,
+        "event_id": int(row["event_id"]),
+        "name": title,
+        "inviter": caller,
+        "starttime": "",
+        "location": "临时聊天室",
+    }
+
+
+def _first_human_sender(db, room_id):
+    row = db.execute(
+        """
+        SELECT sender FROM event_chat_messages
+        WHERE room_id = ? AND sender != ?
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (int(room_id), SYSTEM_SENDER),
+    ).fetchone()
+    if row is None:
+        return ""
+    return (row["sender"] or "").strip()
+
+
+def _next_tmp_event_id(db):
+    row = db.execute(
+        """
+        SELECT COALESCE(MAX(event_id), 0) + 1 AS n
+        FROM event_chat_rooms
+        WHERE event_kind = ?
+        """,
+        (KIND_TMP,),
+    ).fetchone()
+    return int(row["n"] or 1)
 
 
 def _room_id(db, kind, event_id):
