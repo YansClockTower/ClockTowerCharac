@@ -57,6 +57,7 @@ from app.subsystems.events.announcements import (
     cooldown_remaining_seconds,
     enqueue_event_created,
     enqueue_event_updated,
+    event_schedule_changed,
     list_pending_announcements,
     publish_organizer_announcement,
     publish_rally,
@@ -492,8 +493,9 @@ def edit_event_route(user_info, event_id):
             "event_type": event_type,
         }
         if data["name"] and data["location"] and data["starttime"]:
+            rebroadcast = event_schedule_changed(event, data["location"], data["starttime"])
             update_event(event_id, data)
-            enqueue_event_updated(KIND_FREE, event_id)
+            enqueue_event_updated(KIND_FREE, event_id, rebroadcast=rebroadcast)
             flash("活动更新成功！", "success")
             return redirect(url_for("events.browse_events"))
         else:
@@ -872,8 +874,9 @@ def fixed_edit_route(user_info, event_id):
         if err:
             flash(err, "error")
             return _render_fixed_edit(event, user_info)
+        rebroadcast = event_schedule_changed(event, data["location"], data["starttime"])
         fixed.update_fixed_event(event_id, data)
-        enqueue_event_updated(KIND_FIXED, event_id)
+        enqueue_event_updated(KIND_FIXED, event_id, rebroadcast=rebroadcast)
         label = gathering_spec(data["gathering_kind"])["label"]
         flash(f"{label}信息已更新。", "success")
         return redirect(url_for("events.browse_events", tab="pigeon"))

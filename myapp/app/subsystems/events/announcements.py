@@ -24,8 +24,8 @@ EVENT_SOURCES = (SOURCE_CREATED, SOURCE_UPDATED)
 # 号召冷却按用户记在 announcement_cooldowns 上，event_id 存用户 id。
 RALLY_COOLDOWN_KIND = "rally"
 COOLDOWN_SECONDS = 60 * 60
-PANEL_URL = "https://yanice.online/"
-_FOOTER = f"——————\n详情前往管理面板查看\n{PANEL_URL}"
+PANEL_URL = "https://yanice.online/lightboard"
+_FOOTER = f"——————\n详情前往活动面板查看\n{PANEL_URL}"
 _TIME_FMT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -78,9 +78,25 @@ def enqueue_event_created(event_kind, event_id):
     _enqueue_event(event_kind, event_id, SOURCE_CREATED, replace=False)
 
 
-def enqueue_event_updated(event_kind, event_id):
-    """未发出的活动公告只保留一条：已有则刷新正文并保持来源，否则记为更新。"""
-    _enqueue_event(event_kind, event_id, SOURCE_UPDATED, replace=True)
+def event_schedule_changed(event, location, starttime):
+    """地点或开始时间与当前记录不同。"""
+    old_location = (event.get("location") or "").strip()
+    new_location = (location or "").strip()
+    return old_location != new_location or _display_time(event.get("starttime")) != _display_time(starttime)
+
+
+def enqueue_event_updated(event_kind, event_id, *, rebroadcast=False):
+    """未发出的活动公告只保留一条并刷新正文。
+
+    只有地点或开始时间变化时才新插一条「活动更新」去群发。
+    """
+    _enqueue_event(
+        event_kind,
+        event_id,
+        SOURCE_UPDATED,
+        replace=True,
+        insert_if_missing=rebroadcast,
+    )
 
 
 def clear_pending_announcements(event_kind, event_id):
@@ -246,7 +262,7 @@ def publish_organizer_announcement(event_kind, event_id, room_id, sender, note):
     return True, None, message, COOLDOWN_SECONDS
 
 
-def _enqueue_event(event_kind, event_id, source, *, replace):
+def _enqueue_event(event_kind, event_id, source, *, replace, insert_if_missing=True):
     if event_kind not in (KIND_FREE, KIND_FIXED):
         return
     event = _load_event(event_kind, event_id)
@@ -277,6 +293,8 @@ def _enqueue_event(event_kind, event_id, source, *, replace):
                 (refreshed, now, int(row["id"])),
             )
             db.commit()
+            return
+        if not insert_if_missing:
             return
         text = _event_text(event, event_kind, SOURCE_UPDATED)
     db.execute(
