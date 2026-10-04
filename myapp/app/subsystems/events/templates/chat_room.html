@@ -14,7 +14,9 @@
     </a>
     <div class="chat-heading">
       <h1 class="chat-title">{{ room.name }}</h1>
-      {% if room.starttime or room.location %}
+      {% if room.expires_label %}
+      <p class="chat-subtitle">临时聊天室 · {{ room.expires_label }} 关闭</p>
+      {% elif room.starttime or room.location %}
       <p class="chat-subtitle">{{ room.starttime }}{% if room.starttime and room.location %} · {% endif %}{{ room.location }}</p>
       {% endif %}
     </div>

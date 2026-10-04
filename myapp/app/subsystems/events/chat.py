@@ -2,12 +2,13 @@
 
 自由聚会与固定聚会各一间，用 event_kind 区分撞号的 id。
 号召房间的 event_kind 为 tmp，event_id 单独递增，链接是 /messages/tmp/<id>。
+号召房间自创建起 24 小时后删除。
 """
 
 import os
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.models.config import get_config
 
@@ -20,6 +21,7 @@ MSG_IMAGE = "image"
 MSG_GAME = "game"
 MAX_BODY_LEN = 500
 MAX_RALLY_TITLE_LEN = 30
+RALLY_TTL_HOURS = 24
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "gif", "webp"}
 SYSTEM_SENDER = "系统"
@@ -35,6 +37,7 @@ def ensure_chat_schema(db):
             event_kind TEXT NOT NULL,
             event_id INTEGER NOT NULL,
             title TEXT,
+            expires_at TEXT,
             UNIQUE(event_kind, event_id)
         )
         """
@@ -42,6 +45,8 @@ def ensure_chat_schema(db):
     room_columns = {row["name"] for row in db.execute("PRAGMA table_info(event_chat_rooms)").fetchall()}
     if "title" not in room_columns:
         db.execute("ALTER TABLE event_chat_rooms ADD COLUMN title TEXT")
+    if "expires_at" not in room_columns:
+        db.execute("ALTER TABLE event_chat_rooms ADD COLUMN expires_at TEXT")
     db.execute(
         """
         CREATE TABLE IF NOT EXISTS event_chat_messages (
@@ -79,6 +84,8 @@ def ensure_chat_schema(db):
     )
     _backfill_rooms(db)
     _seed_system_notices(db)
+    _backfill_rally_expiry(db)
+    _purge_expired_rally_rooms(db)
 
 
 def open_room(db, kind, event_id, inviter):
@@ -386,10 +393,10 @@ def open_rally_room(caller, title, note):
     event_id = _next_tmp_event_id(db)
     db.execute(
         """
-        INSERT INTO event_chat_rooms (event_kind, event_id, title)
-        VALUES (?, ?, ?)
+        INSERT INTO event_chat_rooms (event_kind, event_id, title, expires_at)
+        VALUES (?, ?, ?, ?)
         """,
-        (KIND_TMP, event_id, title),
+        (KIND_TMP, event_id, title, _rally_expires_at()),
     )
     room_id = _room_id(db, KIND_TMP, event_id)
     if room_id is None:
@@ -641,7 +648,7 @@ def _tmp_room(event_id):
     db = _db()
     row = db.execute(
         """
-        SELECT id, event_id, title
+        SELECT id, event_id, title, expires_at
         FROM event_chat_rooms
         WHERE event_kind = ? AND event_id = ?
         """,
@@ -661,7 +668,82 @@ def _tmp_room(event_id):
         "inviter": caller,
         "starttime": "",
         "location": "临时聊天室",
+        "expires_label": _expiry_label(row["expires_at"]),
     }
+
+
+def _rally_expires_at(started=None):
+    base = started or datetime.now()
+    return (base + timedelta(hours=RALLY_TTL_HOURS)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _parse_db_time(value):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    for fmt, size in (
+        ("%Y-%m-%d %H:%M:%S", 19),
+        ("%Y-%m-%dT%H:%M:%S", 19),
+        ("%Y-%m-%dT%H:%M", 16),
+    ):
+        try:
+            return datetime.strptime(raw[:size], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _expiry_label(value):
+    dt = _parse_db_time(value)
+    if dt is None:
+        return ""
+    return dt.strftime("%m-%d %H:%M")
+
+
+def _backfill_rally_expiry(db):
+    """已有号召房间按第一条消息的时间补上 24 小时截止。"""
+    rows = db.execute(
+        """
+        SELECT r.id AS id,
+               (
+                   SELECT MIN(m.created_at)
+                   FROM event_chat_messages m
+                   WHERE m.room_id = r.id
+               ) AS started
+        FROM event_chat_rooms r
+        WHERE r.event_kind = ?
+          AND (r.expires_at IS NULL OR TRIM(r.expires_at) = '')
+        """,
+        (KIND_TMP,),
+    ).fetchall()
+    for row in rows:
+        db.execute(
+            "UPDATE event_chat_rooms SET expires_at = ? WHERE id = ?",
+            (_rally_expires_at(_parse_db_time(row["started"])), int(row["id"])),
+        )
+
+
+def _purge_expired_rally_rooms(db):
+    """删除已过期的号召聊天室，消息与已读记录随外键一并清除。"""
+    cutoff = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    rows = db.execute(
+        """
+        SELECT id FROM event_chat_rooms
+        WHERE event_kind = ? AND expires_at IS NOT NULL AND expires_at <= ?
+        """,
+        (KIND_TMP, cutoff),
+    ).fetchall()
+    if not rows:
+        return
+    for row in rows:
+        _delete_room_images(int(row["id"]))
+    db.execute(
+        """
+        DELETE FROM event_chat_rooms
+        WHERE event_kind = ? AND expires_at IS NOT NULL AND expires_at <= ?
+        """,
+        (KIND_TMP, cutoff),
+    )
 
 
 def _first_human_sender(db, room_id):

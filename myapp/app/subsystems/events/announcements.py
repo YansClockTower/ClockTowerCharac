@@ -24,7 +24,8 @@ EVENT_SOURCES = (SOURCE_CREATED, SOURCE_UPDATED)
 # 号召冷却按用户记在 announcement_cooldowns 上，event_id 存用户 id。
 RALLY_COOLDOWN_KIND = "rally"
 COOLDOWN_SECONDS = 60 * 60
-PANEL_URL = "https://yanice.online/lightboard"
+SITE_ORIGIN = "https://yanice.online"
+PANEL_URL = SITE_ORIGIN + "/lightboard"
 _FOOTER = f"——————\n详情前往活动面板查看\n{PANEL_URL}"
 _TIME_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -57,6 +58,17 @@ def ensure_announcement_schema(db):
             PRIMARY KEY (event_kind, event_id)
         )
         """
+    )
+    # 旧链接把活动面板前缀又拼了一次，待发公告里改回正确地址。
+    doubled = SITE_ORIGIN + "/lightboard/lightboard/"
+    fixed = SITE_ORIGIN + "/lightboard/"
+    db.execute(
+        """
+        UPDATE pending_announcements
+        SET text = REPLACE(text, ?, ?)
+        WHERE instr(text, ?) > 0
+        """,
+        (doubled, fixed, doubled),
     )
 
 
@@ -166,7 +178,7 @@ def rally_public_url(event_id):
     from flask import url_for
 
     path = url_for("events.chat_room_route", kind=KIND_TMP, event_id=int(event_id))
-    return PANEL_URL.rstrip("/") + path
+    return SITE_ORIGIN.rstrip("/") + path
 
 
 def publish_rally(user_id, caller, title, note):
