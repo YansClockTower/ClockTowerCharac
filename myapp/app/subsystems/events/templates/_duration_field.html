@@ -1,0 +1,48 @@
+<p>
+    <label for="duration_hours">持续时长 (必填):</label>
+    <select id="duration_hours" name="duration_hours" required>
+        {% if selected_duration is none %}
+        <option value="" selected disabled>请选择</option>
+        {% endif %}
+        {% for hours in duration_hour_choices %}
+        <option value="{{ hours }}" {% if selected_duration == hours %}selected{% endif %}>{{ hours }} 小时</option>
+        {% endfor %}
+    </select>
+</p>
+<p id="endtimePreview" class="hint" hidden></p>
+<script>
+function refreshEndtimePreview() {
+    const startEl = document.getElementById("starttime");
+    const hoursEl = document.getElementById("duration_hours");
+    const preview = document.getElementById("endtimePreview");
+    if (!startEl || !hoursEl || !preview) return;
+    const hours = parseInt(hoursEl.value, 10);
+    if (!startEl.value || !hours) {
+        preview.hidden = true;
+        preview.textContent = "";
+        return;
+    }
+    const start = new Date(startEl.value);
+    if (Number.isNaN(start.getTime())) {
+        preview.hidden = true;
+        preview.textContent = "";
+        return;
+    }
+    const end = new Date(start.getTime() + hours * 60 * 60 * 1000);
+    const pad = function (n) { return String(n).padStart(2, "0"); };
+    const label = end.getFullYear() + "-" + pad(end.getMonth() + 1) + "-" + pad(end.getDate())
+        + " " + pad(end.getHours()) + ":" + pad(end.getMinutes());
+    preview.hidden = false;
+    preview.textContent = "结束时间：" + label;
+}
+document.addEventListener("DOMContentLoaded", function () {
+    const startEl = document.getElementById("starttime");
+    const hoursEl = document.getElementById("duration_hours");
+    if (startEl) {
+        startEl.addEventListener("change", refreshEndtimePreview);
+        startEl.addEventListener("input", refreshEndtimePreview);
+    }
+    if (hoursEl) hoursEl.addEventListener("change", refreshEndtimePreview);
+    refreshEndtimePreview();
+});
+</script>

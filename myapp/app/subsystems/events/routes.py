@@ -26,6 +26,8 @@ from app.subsystems.events.dbutil import (
     BROWSE_BOOKMARK_LIGHT_EVENT_TYPE,
     BROWSE_BOOKMARK_PIGEON_LABEL,
     CLUB_WEEKLY_LABEL,
+    DEFAULT_DURATION_HOURS,
+    DURATION_HOUR_CHOICES,
     FIXED_GATHERING_LOCATION,
     FREE_EVENT_TYPE_VALUES,
     GATHERING_KIND_PIGEON,
@@ -33,6 +35,7 @@ from app.subsystems.events.dbutil import (
     archive_event,
     create_event,
     delete_event,
+    endtime_from_duration,
     gathering_form_options,
     gathering_members_only,
     gathering_spec,
@@ -48,6 +51,8 @@ from app.subsystems.events.dbutil import (
     normalize_gathering_kind,
     note_event,
     signin_event,
+    signup_time_conflict,
+    board_signin_notices,
     update_event,
 )
 from app.subsystems.events import fixed_dbutil as fixed
@@ -116,6 +121,51 @@ def _is_staff(user_info) -> bool:
     return user_is_staff(user_info)
 
 
+def _same_schedule(event, data):
+    def norm(value):
+        return (value or "").replace("T", " ").strip()
+
+    return norm(event.get("starttime")) == norm(data.get("starttime")) and norm(
+        event.get("endtime")
+    ) == norm(data.get("endtime"))
+
+
+def _reschedule_signup_conflict(players, starttime, endtime, *, exclude_free_id=None, exclude_fixed_id=None):
+    """改时间后，已报名的人不能和自己的其他报名重叠。"""
+    seen = []
+    for player in players:
+        name = (player or "").strip()
+        if not name or name in seen:
+            continue
+        seen.append(name)
+        conflict = signup_time_conflict(
+            name,
+            starttime,
+            endtime,
+            exclude_free_id=exclude_free_id,
+            exclude_fixed_id=exclude_fixed_id,
+        )
+        if conflict:
+            return f"{name}{conflict}"
+    return None
+
+
+def _apply_endtime(data, form):
+    """把表单里的持续时长写成结束时间。失败时返回提示。"""
+    raw = form.get("duration_hours")
+    try:
+        hours = int(raw)
+    except (TypeError, ValueError):
+        return "请选择持续时长。"
+    if hours not in DURATION_HOUR_CHOICES:
+        return "请选择持续时长。"
+    try:
+        data["endtime"] = endtime_from_duration(data.get("starttime") or "", hours)
+    except (TypeError, ValueError):
+        return "开始时间无效。"
+    return None
+
+
 def _render_add_event(user_info, selected_event_type="其他"):
     return render_template(
         "add.html",
@@ -125,6 +175,8 @@ def _render_add_event(user_info, selected_event_type="其他"):
         event_type_values=FREE_EVENT_TYPE_VALUES,
         preset_locations=PRESET_LOCATIONS,
         selected_event_type=selected_event_type if selected_event_type in FREE_EVENT_TYPE_VALUES else "其他",
+        duration_hour_choices=DURATION_HOUR_CHOICES,
+        selected_duration=DEFAULT_DURATION_HOURS,
     )
 
 
@@ -137,6 +189,8 @@ def _render_edit_event(event, user_info):
         current_user_is_staff=_is_staff(user_info),
         event_type_values=FREE_EVENT_TYPE_VALUES,
         preset_locations=PRESET_LOCATIONS,
+        duration_hour_choices=DURATION_HOUR_CHOICES,
+        selected_duration=event.get("duration_hours"),
     )
 
 
@@ -255,6 +309,7 @@ def browse_events(user_info):
         self_brought_id=fixed.SELF_BROUGHT_GAME_ID,
         self_brought_name=fixed.SELF_BROUGHT_GAME_NAME,
         rally_cooldown=cooldown_remaining_seconds(RALLY_COOLDOWN_KIND, int(user_info["id"])),
+        signin_notice=board_signin_notices(current_user),
     )
 
 
@@ -441,6 +496,10 @@ def add_event_route(user_info):
             "event_type": event_type,
         }
         if data["name"] and data["location"] and data["starttime"]:
+            end_err = _apply_endtime(data, request.form)
+            if end_err:
+                flash(end_err, "error")
+                return _render_add_event(user_info, event_type)
             event_id = create_event(data)
             enqueue_event_created(KIND_FREE, event_id)
             flash("活动添加成功！", "success")
@@ -493,7 +552,24 @@ def edit_event_route(user_info, event_id):
             "event_type": event_type,
         }
         if data["name"] and data["location"] and data["starttime"]:
-            rebroadcast = event_schedule_changed(event, data["location"], data["starttime"])
+            end_err = _apply_endtime(data, request.form)
+            if end_err:
+                flash(end_err, "error")
+                return _render_edit_event(event, user_info)
+            if not _same_schedule(event, data):
+                attendees = [row["player"] for row in get_event_attendance_records(event_id)]
+                conflict = _reschedule_signup_conflict(
+                    attendees,
+                    data["starttime"],
+                    data.get("endtime"),
+                    exclude_free_id=event_id,
+                )
+                if conflict:
+                    flash(conflict, "error")
+                    return _render_edit_event(event, user_info)
+            rebroadcast = event_schedule_changed(
+                event, data["location"], data["starttime"], data.get("endtime")
+            )
             update_event(event_id, data)
             enqueue_event_updated(KIND_FREE, event_id, rebroadcast=rebroadcast)
             flash("活动更新成功！", "success")
@@ -587,6 +663,8 @@ def _render_fixed_add(user_info, selected_kind=GATHERING_KIND_PIGEON, selected_l
         selected_kind=kind,
         selected_location=location,
         time_hint=spec["time_hint"],
+        duration_hour_choices=DURATION_HOUR_CHOICES,
+        selected_duration=DEFAULT_DURATION_HOURS,
     )
 
 
@@ -605,6 +683,8 @@ def _render_fixed_edit(event, user_info):
         gathering_locations=locations,
         time_hint=spec["time_hint"],
         members_only=spec["members_only"],
+        duration_hour_choices=DURATION_HOUR_CHOICES,
+        selected_duration=event.get("duration_hours"),
     )
 
 
@@ -660,6 +740,9 @@ def _fixed_payload_from_form(form, locked_kind=None):
     }
     if not (data["name"] and data["starttime"] and data["locktime"]):
         return None, "请完整填写名称、开始时间与锁定时间。"
+    end_err = _apply_endtime(data, form)
+    if end_err:
+        return None, end_err
     return data, None
 
 
@@ -874,7 +957,22 @@ def fixed_edit_route(user_info, event_id):
         if err:
             flash(err, "error")
             return _render_fixed_edit(event, user_info)
-        rebroadcast = event_schedule_changed(event, data["location"], data["starttime"])
+        if not _same_schedule(event, data):
+            attendees = [
+                row["player"] for row in fixed.get_fixed_event_attendance_records(event_id)
+            ]
+            conflict = _reschedule_signup_conflict(
+                attendees,
+                data["starttime"],
+                data.get("endtime"),
+                exclude_fixed_id=event_id,
+            )
+            if conflict:
+                flash(conflict, "error")
+                return _render_fixed_edit(event, user_info)
+        rebroadcast = event_schedule_changed(
+            event, data["location"], data["starttime"], data.get("endtime")
+        )
         fixed.update_fixed_event(event_id, data)
         enqueue_event_updated(KIND_FIXED, event_id, rebroadcast=rebroadcast)
         label = gathering_spec(data["gathering_kind"])["label"]

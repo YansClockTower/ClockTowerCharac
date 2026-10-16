@@ -1,0 +1,14 @@
+<button type="button" class="event-fold-bar" aria-expanded="false">
+  <span class="event-fold-main">
+    <span class="event-fold-title">
+      {% if fold_badge %}<span class="fixed-badge">{{ fold_badge }}</span>{% endif %}{{ fold_title }}
+    </span>
+    {% if fold_sub %}
+    <span class="event-fold-sub">{{ fold_sub }}</span>
+    {% endif %}
+  </span>
+  <span class="event-fold-side">
+    <span class="event-fold-count">{{ fold_min }}/<span class="event-fold-count-cur">{{ fold_cur }}</span>/{{ fold_max }}</span>
+    <span class="event-fold-chevron" aria-hidden="true"></span>
+  </span>
+</button>

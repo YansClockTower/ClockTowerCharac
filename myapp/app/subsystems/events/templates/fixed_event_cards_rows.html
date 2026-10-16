@@ -40,10 +40,29 @@
     {% set can_end_event = (event.starttime_obj < now()) and ((not event.minplayer) or event.attendee_count >= event.minplayer) %}
     {% set members_only = event.members_only %}
     {% set can_participate = current_user_is_member or not members_only %}
+    {% if can_participate %}
+        {% set fold_time = event.time_range_label or (event.starttime or "")|replace("T", " ") %}
+        {% set fold_place = event.location or "" %}
+        {% if fold_time and fold_place %}
+            {% set fold_sub = fold_time ~ " · " ~ fold_place %}
+        {% else %}
+            {% set fold_sub = fold_time or fold_place %}
+        {% endif %}
+    {% else %}
+        {% set fold_sub = "正式会员活动，验证会员后可参与" %}
+    {% endif %}
+    {% set fold_title = event.name %}
+    {% set fold_badge = event.event_type or "布鸽桌游聚会" %}
+    {% set fold_min = event.minplayer if event.minplayer is not none else "—" %}
+    {% set fold_cur = event.attendee_count if event.attendee_count is not none else 0 %}
+    {% set fold_max = event.maxplayer if event.maxplayer is not none else "—" %}
 
     <div class="event-item fixed-event-item {{ status_class }}">
+        {% include "_event_fold_bar.html" %}
+        <div class="event-fold-body">
         <div class="event-details">
             <div class="event-main">
+                <div class="event-title-row">
                 <h3>
                     <span class="fixed-badge">{{ event.event_type or '布鸽桌游聚会' }}</span>
                     {{ event.name }}
@@ -57,6 +76,10 @@
                         <span style="font-size: 0.7em; color: #0b5; font-weight: bold;">(已报桌)</span>
                     {% endif %}
                 </h3>
+                <button type="button" class="event-collapse-btn" aria-label="折叠">
+                    <span class="event-fold-chevron is-open" aria-hidden="true"></span>
+                </button>
+                </div>
                 {% if event.description %}
                     <div class="event-description">{{ event.description }}</div>
                 {% endif %}
@@ -72,6 +95,7 @@
                         {% endif %}<br>
                         {% if can_participate %}
                         <strong>活动开始:</strong> {{ event.starttime.replace("T", " ") }}<br>
+                        {% if event.endtime_label %}<strong>活动结束:</strong> {{ event.endtime_label }}<br>{% endif %}
                         <strong>锁定名单:</strong> {{ event.locktime.replace("T", " ") }}<br>
                         <strong>活动地点:</strong> {{ event.location }}
                         {% else %}
@@ -245,6 +269,7 @@
             {% endif %}
         </div>
         {% endif %}
+        </div>
     </div>
     {% endif %}
 {% endfor %}

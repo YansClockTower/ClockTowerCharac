@@ -6,6 +6,7 @@
 
   function showModal() {
     if (!global.AppModal) return;
+    if (document.querySelector(".app-modal:not([hidden])")) return;
     const modal = global.AppModal.create({
       title: "建议绑定邮箱",
       html: "<p>绑定并验证邮箱后，可用于登录与找回密码。</p>",

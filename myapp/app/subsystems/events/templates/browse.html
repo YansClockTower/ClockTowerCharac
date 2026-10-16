@@ -91,6 +91,101 @@
     </div>
     {% include "_fixed_game_picker_script.html" %}
 
+    {% if signin_notice and (signin_notice.attend or signin_notice.hosted) %}
+    <div id="signinNoticeModal" class="app-modal" hidden>
+      <div class="app-modal-backdrop" data-app-modal-close></div>
+      <div class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="signinNoticeTitle">
+        <div class="app-modal-header">
+          <h3 id="signinNoticeTitle">活动签到</h3>
+          <button type="button" class="app-modal-close" data-app-modal-close aria-label="关闭">×</button>
+        </div>
+        {% if signin_notice.attend %}
+        <form id="signinNoticeForm"
+              data-kind="{{ signin_notice.attend.kind }}"
+              data-event-id="{{ signin_notice.attend.id }}">
+          <p>「{{ signin_notice.attend.name }}」正在进行{% if signin_notice.attend.when %}（{{ signin_notice.attend.when }}）{% endif %}。请输入签到码。</p>
+          <label class="app-modal-label" for="signinNoticeCode">签到码</label>
+          <input id="signinNoticeCode" class="app-modal-input" type="text" inputmode="numeric" autocomplete="off" placeholder="请输入签到码">
+          <p id="signinNoticeError" class="app-modal-error" hidden></p>
+        </form>
+        {% endif %}
+        {% if signin_notice.hosted %}
+        <div class="signin-hosted">
+          <p>你组织的这些活动正在进行，签到码如下，请线下告知到场的人：</p>
+          <ul class="signin-code-list">
+            {% for item in signin_notice.hosted %}
+            <li>
+              <span class="signin-code-name">{{ item.name }}{% if item.when %}<small>{{ item.when }}</small>{% endif %}</span>
+              <strong class="signin-code-value">{{ item.signcode }}</strong>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="app-modal-actions">
+          <button type="button" class="app-modal-btn" data-app-modal-close>关闭</button>
+          {% if signin_notice.attend %}
+          <button type="submit" class="app-modal-btn app-modal-btn--primary" id="signinNoticeSubmit" form="signinNoticeForm">签到</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <script>
+    (function () {
+        const modal = document.getElementById("signinNoticeModal");
+        if (!modal || !window.AppModal) return;
+        const api = AppModal.bind(modal);
+        api.open();
+        const form = document.getElementById("signinNoticeForm");
+        const input = document.getElementById("signinNoticeCode");
+        const errorEl = document.getElementById("signinNoticeError");
+        const submit = document.getElementById("signinNoticeSubmit");
+        if (input) input.focus();
+        if (!form || !submit) return;
+        function showError(text) {
+            if (!errorEl) return;
+            errorEl.hidden = !text;
+            errorEl.textContent = text || "";
+        }
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            const code = (input && input.value || "").trim();
+            if (!code) {
+                showError("请输入签到码。");
+                if (input) input.focus();
+                return;
+            }
+            const kind = form.getAttribute("data-kind");
+            const eventId = form.getAttribute("data-event-id");
+            const freeUrl = {{ url_for('events.signin_event_route', event_id=7777)|tojson }};
+            const fixedUrl = {{ url_for('events.fixed_signin_route', event_id=7777)|tojson }};
+            const url = (kind === "fixed" ? fixedUrl : freeUrl).replace("7777", eventId);
+            submit.disabled = true;
+            showError("");
+            fetch(url, {
+                method: "POST",
+                credentials: "include",
+                headers: ClockTowerAuth.authHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ signcode: code })
+            })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    window.location.reload();
+                    return;
+                }
+                showError(data.message || "签到失败");
+                submit.disabled = false;
+            })
+            .catch(function () {
+                showError("提交请求出错，请稍后再试。");
+                submit.disabled = false;
+            });
+        });
+    })();
+    </script>
+    {% endif %}
+
     <script>
         function refToEdit(eventId) {
             const urlTemplate = "{{ url_for('events.edit_event_route', event_id=7777) }}";
@@ -172,6 +267,33 @@
             })
             .catch(() => alert("提交请求出错，请稍后再试。"));
         }
+
+        (function () {
+            const list = document.getElementById("browse-events-list");
+            if (!list) return;
+
+            function setExpanded(item, open) {
+                item.classList.toggle("is-expanded", open);
+                const bar = item.querySelector(".event-fold-bar");
+                if (bar) bar.setAttribute("aria-expanded", open ? "true" : "false");
+            }
+
+            list.addEventListener("click", function (e) {
+                const collapseBtn = e.target.closest(".event-collapse-btn");
+                const foldBar = e.target.closest(".event-fold-bar");
+                if (!collapseBtn && !foldBar) return;
+                const item = (collapseBtn || foldBar).closest(".event-item");
+                if (!item || !list.contains(item)) return;
+                if (collapseBtn) {
+                    setExpanded(item, false);
+                    return;
+                }
+                list.querySelectorAll(".event-item.is-expanded").forEach(function (other) {
+                    if (other !== item) setExpanded(other, false);
+                });
+                setExpanded(item, true);
+            });
+        })();
 
         (function () {
             const PAGE = {{ browse_page_size|tojson }};

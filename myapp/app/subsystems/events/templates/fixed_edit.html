@@ -48,6 +48,7 @@
       <label for="starttime">活动开始时间 (必填，须为{{ time_hint }}):</label>
       <input type="datetime-local" id="starttime" name="starttime" required style="width: 98%;" value="{{ event.starttime }}">
     </p>
+    {% include "_duration_field.html" %}
     <p>
       <label for="locktime_select">锁定报名时间:</label>
       <select id="locktime_select" name="locktime_select" required onchange="checkLocktime(this)">
@@ -94,6 +95,7 @@
     document.getElementById("starttime").addEventListener("change", function() {
       checkLocktime(locktimeSelect);
     });
+    refreshEndtimePreview();
   });
   document.querySelector("form").addEventListener("submit", function() {
     checkLocktime(document.getElementById("locktime_select"));

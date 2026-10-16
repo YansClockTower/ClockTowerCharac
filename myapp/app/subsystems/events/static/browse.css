@@ -123,6 +123,138 @@
     margin-top: 0;
     margin-bottom: 8px;
 }
+.event-title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.event-title-row h3 {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.event-fold-bar,
+.event-collapse-btn {
+    font-family: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+.event-fold-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+}
+.event-fold-bar:hover,
+.event-collapse-btn:hover {
+    background: transparent;
+    color: inherit;
+}
+.event-item:not(.is-expanded) .event-fold-body,
+.event-item.is-expanded > .event-fold-bar {
+    display: none;
+}
+.event-fold-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.event-fold-title {
+    display: block;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.35;
+    color: #222;
+    word-break: break-word;
+}
+.event-fold-sub {
+    display: block;
+    margin-top: 4px;
+    color: #444;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+.event-fold-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+}
+.event-fold-count {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #222;
+    white-space: nowrap;
+    line-height: 1.15;
+}
+.event-fold-count-cur {
+    color: #007bff;
+}
+.event-fold-chevron {
+    box-sizing: border-box;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid #333;
+    border-bottom: 2px solid #333;
+    transform: rotate(45deg) translateY(-2px);
+}
+.event-fold-chevron.is-open {
+    transform: rotate(-135deg) translateY(-2px);
+}
+.event-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-top: 1px;
+    padding: 0;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+.event-collapse-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+.signin-hosted {
+    margin-top: 4px;
+}
+.signin-code-list {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0;
+}
+.signin-code-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+.signin-code-name {
+    min-width: 0;
+    font-weight: 600;
+    color: #222;
+}
+.signin-code-name small {
+    display: block;
+    margin-top: 2px;
+    font-weight: 400;
+    color: #666;
+    font-size: 0.82rem;
+}
+.signin-code-value {
+    flex: 0 0 auto;
+    font-size: 1.15rem;
+    letter-spacing: 0.08em;
+    color: #222;
+}
 .event-main p,
 .event-main br {
     display: none;

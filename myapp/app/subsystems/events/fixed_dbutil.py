@@ -11,10 +11,12 @@ from app.subsystems.boardgames import api as boardgames_api
 from app.subsystems.events.chat import KIND_FIXED, close_room, note_joined, note_left, open_room
 from app.subsystems.events.dbutil import (
     ARCHIVED_SIGNCODE,
+    attach_duration,
     gathering_spec,
     get_db,
     is_event_archived,
     normalize_gathering_kind,
+    signup_time_conflict,
 )
 
 SELF_BROUGHT_GAME_ID = 0
@@ -27,6 +29,7 @@ def _parse_times(event_dict):
     starttime = event_dict["starttime_obj"]
     locktime = event_dict["locktime_obj"]
     event_dict["locktime_select"] = str(int((starttime - locktime).total_seconds() / 3600))
+    attach_duration(event_dict)
     return event_dict
 
 
@@ -80,8 +83,8 @@ def create_fixed_event(data) -> int:
     cur = db.execute(
         """
         INSERT INTO fixed_events
-            (name, inviter, location, starttime, locktime, description, minplayer, maxplayer, signcode, gathering_kind)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (name, inviter, location, starttime, locktime, endtime, description, minplayer, maxplayer, signcode, gathering_kind)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["name"],
@@ -89,6 +92,7 @@ def create_fixed_event(data) -> int:
             data["location"],
             data["starttime"],
             data["locktime"],
+            data.get("endtime") or None,
             data.get("description") or "",
             data.get("minplayer"),
             data.get("maxplayer"),
@@ -107,7 +111,7 @@ def update_fixed_event(event_id, data):
     db.execute(
         """
         UPDATE fixed_events
-        SET name = ?, location = ?, starttime = ?, locktime = ?, description = ?,
+        SET name = ?, location = ?, starttime = ?, locktime = ?, endtime = ?, description = ?,
             minplayer = ?, maxplayer = ?, gathering_kind = ?
         WHERE id = ?
         """,
@@ -116,6 +120,7 @@ def update_fixed_event(event_id, data):
             data["location"],
             data["starttime"],
             data["locktime"],
+            data.get("endtime") or None,
             data.get("description") or "",
             data.get("minplayer"),
             data.get("maxplayer"),
@@ -328,6 +333,12 @@ def create_table(
         return False, blocked, None
     if event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法开桌。", None
+
+    conflict = signup_time_conflict(
+        host, event.get("starttime"), event.get("endtime"), exclude_fixed_id=event_id
+    )
+    if conflict:
+        return False, conflict, None
 
     if get_player_table_id(event_id, host, db) is not None:
         return False, "您已报名本聚会的一张桌，不能再开新桌。", None
@@ -601,6 +612,12 @@ def join_table(table_id, player) -> Tuple[bool, Optional[str]]:
         return False, blocked
     if event["locktime_obj"] < datetime.now():
         return False, "名单已锁定，无法报名。"
+
+    conflict = signup_time_conflict(
+        player, event.get("starttime"), event.get("endtime"), exclude_fixed_id=event["id"]
+    )
+    if conflict:
+        return False, conflict
 
     if get_player_table_id(event["id"], player, db) is not None:
         return False, "您已报名本聚会的一张桌，不能再报其他桌。"

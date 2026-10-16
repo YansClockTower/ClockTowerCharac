@@ -1,7 +1,7 @@
 import os
 import random
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import g
 
@@ -66,8 +66,267 @@ PRESET_LOCATIONS = (
 )
 
 
+# 创建/编辑时选持续时长，存成结束时间。
+DURATION_HOUR_CHOICES = (1, 2, 3, 4, 5, 6, 8, 12)
+DEFAULT_DURATION_HOURS = 3
+# 补结束时间之前就存在的活动，按开始后 4 小时。
+EXISTING_EVENT_DURATION_HOURS = 4
+
+
 def parse_event_datetime(value: str):
     return datetime.strptime(value, "%Y-%m-%dT%H:%M")
+
+
+def _parse_stored_time(value):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    for fmt, size in (("%Y-%m-%dT%H:%M", 16), ("%Y-%m-%d %H:%M", 16)):
+        try:
+            return datetime.strptime(raw[:size], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def duration_hours_between(starttime, endtime):
+    """开始到结束的整点小时数。对不上可选项时返回 None。"""
+    start = _parse_stored_time(starttime)
+    end = _parse_stored_time(endtime)
+    if start is None or end is None or end <= start:
+        return None
+    hours = int(round((end - start).total_seconds() / 3600))
+    if hours not in DURATION_HOUR_CHOICES:
+        return None
+    return hours
+
+
+def endtime_from_duration(starttime, hours):
+    start = parse_event_datetime(starttime)
+    return (start + timedelta(hours=int(hours))).strftime("%Y-%m-%dT%H:%M")
+
+
+def schedule_labels(starttime, endtime):
+    """卡片上的时间范围，以及单独的结束时间。同一天只把结束时刻接在开始时间后面。"""
+    start = _parse_stored_time(starttime)
+    end = _parse_stored_time(endtime)
+    if start is None:
+        start_label = (starttime or "").replace("T", " ").strip()
+        return start_label, ""
+    start_label = start.strftime("%Y-%m-%d %H:%M")
+    if end is None or end <= start:
+        return start_label, ""
+    end_label = end.strftime("%Y-%m-%d %H:%M")
+    if start.date() == end.date():
+        return f"{start_label}–{end.strftime('%H:%M')}", end_label
+    return f"{start_label} – {end_label}", end_label
+
+
+def attach_duration(event_dict):
+    time_range, end_label = schedule_labels(event_dict.get("starttime"), event_dict.get("endtime"))
+    event_dict["time_range_label"] = time_range
+    event_dict["endtime_label"] = end_label
+    event_dict["duration_hours"] = duration_hours_between(
+        event_dict.get("starttime"), event_dict.get("endtime")
+    )
+    return event_dict
+
+
+def _event_interval(starttime, endtime):
+    """报名占用的时段。没有结束时间时按 4 小时计。首尾相接不算重叠。"""
+    start = _parse_stored_time(starttime)
+    if start is None:
+        return None
+    end = _parse_stored_time(endtime)
+    if end is None or end <= start:
+        end = start + timedelta(hours=EXISTING_EVENT_DURATION_HOURS)
+    return start, end
+
+
+def _intervals_overlap(left, right):
+    return left[0] < right[1] and right[0] < left[1]
+
+
+def signup_time_conflict(player, starttime, endtime, *, exclude_free_id=None, exclude_fixed_id=None):
+    """玩家已报名的其他活动与此时段相交时返回提示。只统计报名，不含仅作为组织者的场次。"""
+    player = (player or "").strip()
+    window = _event_interval(starttime, endtime)
+    if not player or window is None:
+        return None
+    db = get_db()
+    occupied = []
+    free_rows = db.execute(
+        """
+        SELECT e.id AS id, e.name AS name, e.starttime AS starttime, e.endtime AS endtime
+        FROM attendinfo a
+        JOIN events e ON e.id = a.eventid
+        WHERE a.player = ?
+          AND TRIM(COALESCE(e.signcode, '')) != ?
+        """,
+        (player, ARCHIVED_SIGNCODE),
+    ).fetchall()
+    for row in free_rows:
+        if exclude_free_id is not None and int(row["id"]) == int(exclude_free_id):
+            continue
+        occupied.append(row)
+    fixed_rows = db.execute(
+        """
+        SELECT e.id AS id, e.name AS name, e.starttime AS starttime, e.endtime AS endtime
+        FROM fixed_table_attend a
+        JOIN fixed_events e ON e.id = a.fixed_event_id
+        WHERE a.player = ?
+          AND TRIM(COALESCE(e.signcode, '')) != ?
+        """,
+        (player, ARCHIVED_SIGNCODE),
+    ).fetchall()
+    for row in fixed_rows:
+        if exclude_fixed_id is not None and int(row["id"]) == int(exclude_fixed_id):
+            continue
+        occupied.append(row)
+    for row in occupied:
+        other = _event_interval(row["starttime"], row["endtime"])
+        if other is None or not _intervals_overlap(window, other):
+            continue
+        label, _end = schedule_labels(row["starttime"], row["endtime"])
+        name = (row["name"] or "").strip() or "未命名活动"
+        when = f"（{label}）" if label else ""
+        return f"与已报名活动「{name}」{when}时间重叠。"
+    return None
+
+
+def is_event_in_progress(starttime, endtime, now=None):
+    """当前时刻落在开始之后、结束之前。没有结束时间时按 4 小时。"""
+    window = _event_interval(starttime, endtime)
+    if window is None:
+        return False
+    moment = now or datetime.now()
+    return window[0] < moment < window[1]
+
+
+def _needs_signin(row, now):
+    """与卡片上的签到区相同：进行中、未签到，且已达到最少人数（未设最少人数则直接可签）。"""
+    if int(row["signed"] or 0) > 0:
+        return False
+    if not is_event_in_progress(row["starttime"], row["endtime"], now):
+        return False
+    minimum = row["minplayer"]
+    if not minimum:
+        return True
+    return int(row["attendee_count"] or 0) >= int(minimum)
+
+
+def board_signin_notices(player, now=None):
+    """活动板上的签到提示。
+
+    已报名、正在进行、已达到最少人数、尚未签到的活动最多一场。
+    自己组的、正在进行的活动列出全部签到码，不要求已达到最少人数。
+    只组局、未报名的场次不要求签到。
+    """
+    player = (player or "").strip()
+    moment = now or datetime.now()
+    if not player:
+        return {"attend": None, "hosted": []}
+    db = get_db()
+    attend_rows = []
+    hosted_rows = []
+    free_attend = db.execute(
+        """
+        SELECT e.id AS id, e.name AS name, e.starttime AS starttime, e.endtime AS endtime,
+               e.minplayer AS minplayer, IFNULL(a.signed, 0) AS signed,
+               (SELECT COUNT(*) FROM attendinfo WHERE eventid = e.id) AS attendee_count
+        FROM attendinfo a
+        JOIN events e ON e.id = a.eventid
+        WHERE a.player = ?
+          AND TRIM(COALESCE(e.signcode, '')) != ?
+        """,
+        (player, ARCHIVED_SIGNCODE),
+    ).fetchall()
+    for row in free_attend:
+        if not _needs_signin(row, moment):
+            continue
+        attend_rows.append(("free", row))
+    fixed_attend = db.execute(
+        """
+        SELECT e.id AS id, e.name AS name, e.starttime AS starttime, e.endtime AS endtime,
+               e.minplayer AS minplayer, IFNULL(a.signed, 0) AS signed,
+               (SELECT COUNT(*) FROM fixed_table_attend WHERE fixed_event_id = e.id) AS attendee_count
+        FROM fixed_table_attend a
+        JOIN fixed_events e ON e.id = a.fixed_event_id
+        WHERE a.player = ?
+          AND TRIM(COALESCE(e.signcode, '')) != ?
+        """,
+        (player, ARCHIVED_SIGNCODE),
+    ).fetchall()
+    for row in fixed_attend:
+        if not _needs_signin(row, moment):
+            continue
+        attend_rows.append(("fixed", row))
+    attend_rows.sort(
+        key=lambda item: _parse_stored_time(item[1]["starttime"]) or datetime.min,
+        reverse=True,
+    )
+    attend = None
+    if attend_rows:
+        kind, row = attend_rows[0]
+        when, _end = schedule_labels(row["starttime"], row["endtime"])
+        attend = {
+            "id": int(row["id"]),
+            "kind": kind,
+            "name": (row["name"] or "").strip() or "未命名活动",
+            "when": when,
+        }
+    free_hosted = db.execute(
+        """
+        SELECT id, name, starttime, endtime, signcode
+        FROM events
+        WHERE inviter = ?
+          AND TRIM(COALESCE(signcode, '')) != ?
+        """,
+        (player, ARCHIVED_SIGNCODE),
+    ).fetchall()
+    fixed_hosted = db.execute(
+        """
+        SELECT id, name, starttime, endtime, signcode
+        FROM fixed_events
+        WHERE inviter = ?
+          AND TRIM(COALESCE(signcode, '')) != ?
+        """,
+        (player, ARCHIVED_SIGNCODE),
+    ).fetchall()
+    for kind, rows in (("free", free_hosted), ("fixed", fixed_hosted)):
+        for row in rows:
+            if not is_event_in_progress(row["starttime"], row["endtime"], moment):
+                continue
+            when, _end = schedule_labels(row["starttime"], row["endtime"])
+            hosted_rows.append({
+                "id": int(row["id"]),
+                "kind": kind,
+                "name": (row["name"] or "").strip() or "未命名活动",
+                "when": when,
+                "signcode": (row["signcode"] or "").strip(),
+                "start": _parse_stored_time(row["starttime"]) or datetime.min,
+            })
+    hosted_rows.sort(key=lambda item: item["start"])
+    for item in hosted_rows:
+        item.pop("start", None)
+    return {"attend": attend, "hosted": hosted_rows}
+
+
+def _backfill_missing_endtimes(db):
+    """还没有结束时间的活动，按开始时间后 4 小时写入。"""
+    for table in ("events", "fixed_events"):
+        rows = db.execute(
+            f"SELECT id, starttime FROM {table} WHERE endtime IS NULL OR TRIM(endtime) = ''"
+        ).fetchall()
+        for row in rows:
+            start = _parse_stored_time(row["starttime"])
+            if start is None:
+                continue
+            end = (start + timedelta(hours=EXISTING_EVENT_DURATION_HOURS)).strftime("%Y-%m-%dT%H:%M")
+            db.execute(
+                f"UPDATE {table} SET endtime = ? WHERE id = ?",
+                (end, int(row["id"])),
+            )
 
 
 def gathering_spec(kind: str):
@@ -265,6 +524,8 @@ def _ensure_events_schema(db):
     column_names = {row["name"] for row in columns}
     if "event_type" not in column_names and columns:
         db.execute("ALTER TABLE events ADD COLUMN event_type TEXT DEFAULT '其他'")
+    if columns and "endtime" not in column_names:
+        db.execute("ALTER TABLE events ADD COLUMN endtime TEXT")
     _ensure_event_type_check(db)
     if db.execute("PRAGMA table_info(events)").fetchall():
         db.execute(
@@ -287,6 +548,7 @@ def _ensure_events_schema(db):
             location TEXT NOT NULL,
             starttime TEXT NOT NULL,
             locktime TEXT NOT NULL,
+            endtime TEXT,
             description TEXT,
             minplayer INTEGER,
             maxplayer INTEGER,
@@ -301,6 +563,8 @@ def _ensure_events_schema(db):
         db.execute(
             "ALTER TABLE fixed_events ADD COLUMN gathering_kind TEXT NOT NULL DEFAULT 'pigeon'"
         )
+    if fixed_columns and "endtime" not in fixed_columns:
+        db.execute("ALTER TABLE fixed_events ADD COLUMN endtime TEXT")
     db.execute(
         """
         CREATE TABLE IF NOT EXISTS fixed_tables (
@@ -341,6 +605,7 @@ def _ensure_events_schema(db):
 
     ensure_announcement_schema(db)
     ensure_chat_schema(db)
+    _backfill_missing_endtimes(db)
     db.commit()
 
 
@@ -427,6 +692,7 @@ def _materialize_event_rows(rows):
         starttime = datetime.strptime(event_dict["starttime"], "%Y-%m-%dT%H:%M")
         locktime = datetime.strptime(event_dict["locktime"], "%Y-%m-%dT%H:%M")
         event_dict["locktime_select"] = str(int((starttime - locktime).seconds / 3600))
+        attach_duration(event_dict)
         events_list.append(event_dict)
     return events_list
 
@@ -507,6 +773,7 @@ def get_event_by_id(event_id):
     starttime = datetime.strptime(event_dict["starttime"], "%Y-%m-%dT%H:%M")
     locktime = datetime.strptime(event_dict["locktime"], "%Y-%m-%dT%H:%M")
     event_dict["locktime_select"] = str(int((starttime - locktime).seconds / 3600))
+    attach_duration(event_dict)
     return event_dict
 
 
@@ -528,9 +795,9 @@ def create_event(data):
     cur = db.execute(
         """
         INSERT INTO events
-            (name, inviter, location, starttime, locktime, description, minplayer, maxplayer, signcode, event_type)
+            (name, inviter, location, starttime, locktime, endtime, description, minplayer, maxplayer, signcode, event_type)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             data["name"],
@@ -538,6 +805,7 @@ def create_event(data):
             data["location"],
             data["starttime"],
             data["locktime"],
+            data.get("endtime") or None,
             data["description"],
             data["minplayer"],
             data["maxplayer"],
@@ -556,7 +824,7 @@ def update_event(event_id, data):
     db.execute(
         """
         UPDATE events
-        SET name = ?, location = ?, starttime = ?, locktime = ?, description = ?, minplayer = ?, maxplayer = ?, event_type = ?
+        SET name = ?, location = ?, starttime = ?, locktime = ?, endtime = ?, description = ?, minplayer = ?, maxplayer = ?, event_type = ?
         WHERE id = ?
         """,
         (
@@ -564,6 +832,7 @@ def update_event(event_id, data):
             data["location"],
             data["starttime"],
             data["locktime"],
+            data.get("endtime") or None,
             data["description"],
             data["minplayer"],
             data["maxplayer"],
@@ -583,15 +852,22 @@ def delete_event(event_id):
 
 def join_event(event_id, player):
     db = get_db()
-    row = db.execute("SELECT signcode FROM events WHERE id = ?", (event_id,)).fetchone()
+    row = db.execute(
+        "SELECT signcode, inviter, starttime, endtime FROM events WHERE id = ?",
+        (event_id,),
+    ).fetchone()
     if row is None:
         return False, "活动不存在。"
     if is_event_archived(dict(row)):
         return False, "活动已归档，无法报名。"
+    conflict = signup_time_conflict(
+        player, row["starttime"], row["endtime"], exclude_free_id=event_id
+    )
+    if conflict:
+        return False, conflict
     from app.user.blacklist import signup_block_reason
 
-    inviter = db.execute("SELECT inviter FROM events WHERE id = ?", (event_id,)).fetchone()
-    blocked = signup_block_reason(inviter["inviter"] if inviter else "", player)
+    blocked = signup_block_reason(row["inviter"] if row else "", player)
     if blocked:
         return False, blocked
     try:

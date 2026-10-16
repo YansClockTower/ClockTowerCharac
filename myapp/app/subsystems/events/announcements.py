@@ -90,17 +90,21 @@ def enqueue_event_created(event_kind, event_id):
     _enqueue_event(event_kind, event_id, SOURCE_CREATED, replace=False)
 
 
-def event_schedule_changed(event, location, starttime):
-    """地点或开始时间与当前记录不同。"""
+def event_schedule_changed(event, location, starttime, endtime=None):
+    """地点、开始时间或结束时间与当前记录不同。"""
     old_location = (event.get("location") or "").strip()
     new_location = (location or "").strip()
-    return old_location != new_location or _display_time(event.get("starttime")) != _display_time(starttime)
+    return (
+        old_location != new_location
+        or _display_time(event.get("starttime")) != _display_time(starttime)
+        or _display_time(event.get("endtime")) != _display_time(endtime)
+    )
 
 
 def enqueue_event_updated(event_kind, event_id, *, rebroadcast=False):
     """未发出的活动公告只保留一条并刷新正文。
 
-    只有地点或开始时间变化时才新插一条「活动更新」去群发。
+    只有地点、开始时间或结束时间变化时才新插一条「活动更新」去群发。
     """
     _enqueue_event(
         event_kind,
@@ -329,9 +333,11 @@ def _event_text(event, event_kind, source):
     else:
         event_type = (event.get("event_type") or "").strip() or "其他"
     lines = [f"{title}{name}", f"类型：{event_type}"]
-    start = _display_time(event.get("starttime"))
-    if start:
-        lines.append(f"时间：{start}")
+    from app.subsystems.events.dbutil import schedule_labels
+
+    time_range, _end_label = schedule_labels(event.get("starttime"), event.get("endtime"))
+    if time_range:
+        lines.append(f"时间：{time_range}")
     location = (event.get("location") or "").strip()
     if location:
         lines.append(f"地点：{location}")
